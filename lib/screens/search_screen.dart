@@ -31,7 +31,7 @@ class _SearchScreenState extends State<SearchScreen> {
             leading: const Icon(Icons.search),
             onChanged: (value) => setState(() => _query = value),
             elevation: const WidgetStatePropertyAll(0),
-            constraints: const BoxConstraints(minHeight: 44, maxHeight: 44),
+            constraints: const BoxConstraints(minHeight: 40, maxHeight: 40),
             shape: WidgetStatePropertyAll(
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
