@@ -48,6 +48,12 @@ Future<void> main() async {
     SettingsStore.saveSelectedRelays(selectedRelaysNotifier.value);
   });
 
+  runApp(const MainApp());
+
+  _loadFeed();
+}
+
+Future<void> _loadFeed() async {
   final PostRepository postRepository = RelayPostRepository(
     relayUrls: selectedRelaysNotifier.value,
   );
@@ -67,8 +73,6 @@ Future<void> main() async {
         ),
       )
       .toList();
-
-  runApp(const MainApp());
 }
 
 class MainApp extends StatelessWidget {
