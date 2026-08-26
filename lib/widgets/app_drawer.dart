@@ -6,6 +6,37 @@ import '../models/current_user.dart';
 import '../screens/profile_screen.dart';
 import '../screens/relays_screen.dart';
 
+Future<void> _confirmClearCache(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Clear cached data?'),
+      content: const Text(
+        'This removes cached profile names, pictures, and banners. '
+        'They will be re-fetched from relays as needed.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Clear'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+
+  profileCacheNotifier.value = {};
+
+  if (context.mounted) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Cleared cached data')));
+  }
+}
+
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
 
@@ -102,6 +133,13 @@ class AppDrawer extends StatelessWidget {
                       ),
                     );
                   },
+                ),
+                ListTile(
+                  key: const Key('clearCacheCard'),
+                  leading: const Icon(Icons.delete_outline),
+                  title: const Text('Clear cached data'),
+                  subtitle: const Text('Cached profile info'),
+                  onTap: () => _confirmClearCache(context),
                 ),
                 const Divider(height: 1),
                 ValueListenableBuilder<Set<String>>(

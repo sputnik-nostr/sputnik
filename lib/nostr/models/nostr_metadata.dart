@@ -25,6 +25,18 @@ class NostrMetadata {
     );
   }
 
+  factory NostrMetadata.fromJson(Map<String, dynamic> json) {
+    return NostrMetadata(
+      name: json['name'] as String?,
+      displayName: json['displayName'] as String?,
+      about: json['about'] as String?,
+      picture: json['picture'] as String?,
+      banner: json['banner'] as String?,
+      nip05: json['nip05'] as String?,
+      website: json['website'] as String?,
+    );
+  }
+
   final String? name;
   final String? displayName;
   final String? about;
@@ -41,5 +53,17 @@ class NostrMetadata {
     final trimmedName = name?.trim();
     if (trimmedName != null && trimmedName.isNotEmpty) return trimmedName;
     return null;
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (name != null) 'name': name,
+      if (displayName != null) 'displayName': displayName,
+      if (about != null) 'about': about,
+      if (picture != null) 'picture': picture,
+      if (banner != null) 'banner': banner,
+      if (nip05 != null) 'nip05': nip05,
+      if (website != null) 'website': website,
+    };
   }
 }

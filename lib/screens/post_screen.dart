@@ -219,7 +219,7 @@ class _PostHeader extends StatelessWidget {
               const SizedBox(width: 20),
               _StatCount(count: note.likeCount, label: 'Likes'),
               const Spacer(),
-              _HeaderBookmarkButton(noteId: note.id),
+              _HeaderBookmarkButton(note: note),
             ],
           ),
         ),
@@ -257,28 +257,28 @@ class _StatCount extends StatelessWidget {
 }
 
 class _HeaderBookmarkButton extends StatelessWidget {
-  const _HeaderBookmarkButton({required this.noteId});
+  const _HeaderBookmarkButton({required this.note});
 
-  final String noteId;
+  final Note note;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return ValueListenableBuilder<Set<String>>(
-      valueListenable: bookmarkedIdsNotifier,
-      builder: (context, bookmarkedIds, _) {
-        final bookmarked = bookmarkedIds.contains(noteId);
+    return ValueListenableBuilder<Map<String, Note>>(
+      valueListenable: bookmarkedNotesNotifier,
+      builder: (context, bookmarkedNotes, _) {
+        final bookmarked = bookmarkedNotes.containsKey(note.id);
 
         return InkWell(
           onTap: () {
-            final updated = Set<String>.from(bookmarkedIds);
+            final updated = Map<String, Note>.from(bookmarkedNotes);
             if (bookmarked) {
-              updated.remove(noteId);
+              updated.remove(note.id);
             } else {
-              updated.add(noteId);
+              updated[note.id] = note;
             }
-            bookmarkedIdsNotifier.value = updated;
+            bookmarkedNotesNotifier.value = updated;
           },
           borderRadius: BorderRadius.circular(16),
           child: Padding(

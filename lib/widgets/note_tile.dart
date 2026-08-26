@@ -104,7 +104,7 @@ class NoteTile extends StatelessWidget {
                           count: note.likeCount,
                         ),
                         const SizedBox(width: 20),
-                        _BookmarkButton(noteId: note.id),
+                        _BookmarkButton(note: note),
                       ],
                     ),
                   ),
@@ -146,28 +146,28 @@ class _StatButton extends StatelessWidget {
 }
 
 class _BookmarkButton extends StatelessWidget {
-  const _BookmarkButton({required this.noteId});
+  const _BookmarkButton({required this.note});
 
-  final String noteId;
+  final Note note;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return ValueListenableBuilder<Set<String>>(
-      valueListenable: bookmarkedIdsNotifier,
-      builder: (context, bookmarkedIds, _) {
-        final bookmarked = bookmarkedIds.contains(noteId);
+    return ValueListenableBuilder<Map<String, Note>>(
+      valueListenable: bookmarkedNotesNotifier,
+      builder: (context, bookmarkedNotes, _) {
+        final bookmarked = bookmarkedNotes.containsKey(note.id);
 
         return InkWell(
           onTap: () {
-            final updated = Set<String>.from(bookmarkedIds);
+            final updated = Map<String, Note>.from(bookmarkedNotes);
             if (bookmarked) {
-              updated.remove(noteId);
+              updated.remove(note.id);
             } else {
-              updated.add(noteId);
+              updated[note.id] = note;
             }
-            bookmarkedIdsNotifier.value = updated;
+            bookmarkedNotesNotifier.value = updated;
           },
           borderRadius: BorderRadius.circular(16),
           child: Padding(

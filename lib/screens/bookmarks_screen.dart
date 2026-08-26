@@ -10,30 +10,23 @@ class BookmarksScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<Set<String>>(
-      valueListenable: bookmarkedIdsNotifier,
-      builder: (context, bookmarkedIds, _) {
-        return ValueListenableBuilder<List<Note>?>(
-          valueListenable: notesNotifier,
-          builder: (context, notes, _) {
-            final bookmarkedNotes = (notes ?? const [])
-                .where((note) => bookmarkedIds.contains(note.id))
-                .toList();
+    return ValueListenableBuilder<Map<String, Note>>(
+      valueListenable: bookmarkedNotesNotifier,
+      builder: (context, bookmarkedNotes, _) {
+        if (bookmarkedNotes.isEmpty) {
+          return const PlaceholderTab(
+            icon: Icons.bookmark_border,
+            label: 'No bookmarks yet',
+          );
+        }
 
-            if (bookmarkedNotes.isEmpty) {
-              return const PlaceholderTab(
-                icon: Icons.bookmark_border,
-                label: 'No bookmarks yet',
-              );
-            }
+        final notes = bookmarkedNotes.values.toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-            return ListView.separated(
-              itemCount: bookmarkedNotes.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
-              itemBuilder: (context, index) =>
-                  NoteTile(note: bookmarkedNotes[index]),
-            );
-          },
+        return ListView.separated(
+          itemCount: notes.length,
+          separatorBuilder: (_, _) => const Divider(height: 1),
+          itemBuilder: (context, index) => NoteTile(note: notes[index]),
         );
       },
     );

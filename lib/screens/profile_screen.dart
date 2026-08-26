@@ -51,21 +51,21 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  late final Future<NostrMetadata?> _metadataFuture;
-
   bool get _isCurrentUser => widget.pubkeyHex == CurrentUser.pubkeyHex;
 
   @override
   void initState() {
     super.initState();
     // The current user's pubkey is a local placeholder, not a real key any
-    // relay has metadata for, so there's nothing to fetch.
-    _metadataFuture = _isCurrentUser
-        ? Future.value(null)
-        : const RelayProfileRepository().fetchProfile(
-            widget.pubkeyHex,
-            selectedRelaysNotifier.value,
-          );
+    // relay has metadata for, so there's nothing to fetch. Otherwise, the
+    // cached metadata (if any) renders instantly below while this refreshes
+    // it in the background.
+    if (!_isCurrentUser) {
+      const RelayProfileRepository().fetchProfile(
+        widget.pubkeyHex,
+        selectedRelaysNotifier.value,
+      );
+    }
   }
 
   @override
@@ -75,10 +75,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final npub = npubFromHex(pubkeyHex);
 
     return Scaffold(
-      body: FutureBuilder<NostrMetadata?>(
-        future: _metadataFuture,
-        builder: (context, metadataSnapshot) {
-          final metadata = metadataSnapshot.data;
+      body: ValueListenableBuilder<Map<String, NostrMetadata>>(
+        valueListenable: profileCacheNotifier,
+        builder: (context, profileCache, _) {
+          final metadata = _isCurrentUser ? null : profileCache[pubkeyHex];
 
           return ValueListenableBuilder<List<Note>?>(
             valueListenable: notesNotifier,

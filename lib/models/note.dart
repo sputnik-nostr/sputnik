@@ -1,3 +1,5 @@
+import 'relative_time.dart';
+
 class Note {
   const Note({
     required this.id,
@@ -12,6 +14,25 @@ class Note {
     this.repostCount = 0,
     this.likeCount = 0,
   });
+
+  factory Note.fromJson(Map<String, dynamic> json) {
+    final createdAt = DateTime.fromMillisecondsSinceEpoch(
+      json['createdAt'] as int,
+    );
+    return Note(
+      id: json['id'] as String,
+      pubkey: json['pubkey'] as String,
+      displayName: json['displayName'] as String,
+      handle: json['handle'] as String,
+      content: json['content'] as String,
+      postedAt: relativeTime(createdAt),
+      createdAt: createdAt,
+      pictureUrl: json['pictureUrl'] as String?,
+      replyCount: json['replyCount'] as int? ?? 0,
+      repostCount: json['repostCount'] as int? ?? 0,
+      likeCount: json['likeCount'] as int? ?? 0,
+    );
+  }
 
   final String id;
   final String pubkey;
@@ -39,5 +60,20 @@ class Note {
       repostCount: repostCount ?? this.repostCount,
       likeCount: likeCount ?? this.likeCount,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'pubkey': pubkey,
+      'displayName': displayName,
+      'handle': handle,
+      'content': content,
+      'createdAt': createdAt.millisecondsSinceEpoch,
+      if (pictureUrl != null) 'pictureUrl': pictureUrl,
+      'replyCount': replyCount,
+      'repostCount': repostCount,
+      'likeCount': likeCount,
+    };
   }
 }

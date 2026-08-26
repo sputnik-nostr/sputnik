@@ -1,3 +1,4 @@
+import '../main.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'models/nostr_metadata.dart';
@@ -39,6 +40,14 @@ class RelayProfileRepository {
         // Metadata content is malformed; skip event for this author.
       }
     }
+
+    if (metadataByPubkey.isNotEmpty) {
+      profileCacheNotifier.value = {
+        ...profileCacheNotifier.value,
+        ...metadataByPubkey,
+      };
+    }
+
     return metadataByPubkey;
   }
 }

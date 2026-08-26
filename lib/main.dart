@@ -18,13 +18,16 @@ final ValueNotifier<AppSeedColor> seedColorNotifier = ValueNotifier(
 
 final ValueNotifier<List<Note>?> notesNotifier = ValueNotifier(null);
 
-final ValueNotifier<Set<String>> bookmarkedIdsNotifier = ValueNotifier(
+final ValueNotifier<Map<String, Note>> bookmarkedNotesNotifier = ValueNotifier(
   const {},
 );
 
 final ValueNotifier<Set<String>> selectedRelaysNotifier = ValueNotifier(
   const {},
 );
+
+final ValueNotifier<Map<String, NostrMetadata>> profileCacheNotifier =
+    ValueNotifier(const {});
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -41,14 +44,19 @@ Future<void> main() async {
     SettingsStore.saveSeedColor(seedColorNotifier.value);
   });
 
-  bookmarkedIdsNotifier.value = await SettingsStore.loadBookmarkedIds();
-  bookmarkedIdsNotifier.addListener(() {
-    SettingsStore.saveBookmarkedIds(bookmarkedIdsNotifier.value);
+  bookmarkedNotesNotifier.value = await SettingsStore.loadBookmarkedNotes();
+  bookmarkedNotesNotifier.addListener(() {
+    SettingsStore.saveBookmarkedNotes(bookmarkedNotesNotifier.value);
   });
 
   selectedRelaysNotifier.value = await SettingsStore.loadSelectedRelays();
   selectedRelaysNotifier.addListener(() {
     SettingsStore.saveSelectedRelays(selectedRelaysNotifier.value);
+  });
+
+  profileCacheNotifier.value = await SettingsStore.loadProfileCache();
+  profileCacheNotifier.addListener(() {
+    SettingsStore.saveProfileCache(profileCacheNotifier.value);
   });
 
   runApp(const MainApp());

@@ -50,16 +50,17 @@ class _SearchScreenState extends State<SearchScreen> {
             }),
           ),
         ),
-        Expanded(
-          child: _query.isEmpty
-              ? const PlaceholderTab(icon: Icons.search, label: 'Search')
-              : npubPubkeyHex != null
-              ? _NpubResult(pubkeyHex: npubPubkeyHex)
-              : PlaceholderTab(
-                  icon: Icons.search_off,
-                  label: 'No results for "$_query"',
-                ),
-        ),
+        if (npubPubkeyHex != null)
+          _NpubResult(pubkeyHex: npubPubkeyHex)
+        else
+          Expanded(
+            child: _query.isEmpty
+                ? const PlaceholderTab(icon: Icons.search, label: 'Search')
+                : PlaceholderTab(
+                    icon: Icons.search_off,
+                    label: 'No results for "$_query"',
+                  ),
+          ),
       ],
     );
   }
