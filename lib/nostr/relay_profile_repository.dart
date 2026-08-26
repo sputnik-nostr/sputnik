@@ -1,4 +1,5 @@
 import '../main.dart';
+import '../services/cache_store.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'models/nostr_metadata.dart';
@@ -23,9 +24,21 @@ class RelayProfileRepository {
   ) async {
     if (pubkeys.isEmpty) return {};
 
+    final cached = <String, NostrMetadata>{};
+    final toFetch = <String>{};
+    for (final pubkey in pubkeys) {
+      final metadata = profileCacheNotifier.value[pubkey];
+      if (metadata != null && CacheStore.isProfileFresh(pubkey)) {
+        cached[pubkey] = metadata;
+      } else {
+        toFetch.add(pubkey);
+      }
+    }
+    if (toFetch.isEmpty) return cached;
+
     final events = await client.query(
       relayUrls,
-      NostrFilter(kinds: const [0], authors: pubkeys.toList()),
+      NostrFilter(kinds: const [0], authors: toFetch.toList()),
     );
     events.sort(compareNewestFirst);
 
@@ -46,8 +59,9 @@ class RelayProfileRepository {
         ...profileCacheNotifier.value,
         ...metadataByPubkey,
       };
+      await CacheStore.putProfiles(metadataByPubkey);
     }
 
-    return metadataByPubkey;
+    return {...cached, ...metadataByPubkey};
   }
 }

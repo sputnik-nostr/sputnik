@@ -1,3 +1,4 @@
+import '../services/cache_store.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'relay_client.dart';
@@ -19,14 +20,22 @@ class RelayContactsRepository {
     String pubkeyHex,
     Set<String> relayUrls,
   ) async {
+    if (CacheStore.isFollowingFresh(pubkeyHex)) {
+      final cached = CacheStore.getFollowing(pubkeyHex);
+      if (cached != null) return cached;
+    }
+
     final events = await client.query(
       relayUrls,
       NostrFilter(kinds: const [3], authors: [pubkeyHex], limit: 1),
     );
-    if (events.isEmpty) return [];
 
-    events.sort(compareNewestFirst);
-    return _followedPubkeys(events.first);
+    final following = events.isEmpty
+        ? const <String>[]
+        : _followedPubkeys((events..sort(compareNewestFirst)).first);
+
+    await CacheStore.putFollowing(pubkeyHex, following);
+    return following;
   }
 
   // The pubkeys of people whose own contact list currently includes this
@@ -35,6 +44,11 @@ class RelayContactsRepository {
     String pubkeyHex,
     Set<String> relayUrls,
   ) async {
+    if (CacheStore.isFollowersFresh(pubkeyHex)) {
+      final cached = CacheStore.getFollowers(pubkeyHex);
+      if (cached != null) return cached;
+    }
+
     final events = await client.query(
       relayUrls,
       NostrFilter(
@@ -52,9 +66,12 @@ class RelayContactsRepository {
       latestByAuthor.putIfAbsent(event.pubkey, () => event);
     }
 
-    return [
+    final followers = [
       for (final event in latestByAuthor.values)
         if (_followedPubkeys(event).contains(pubkeyHex)) event.pubkey,
     ];
+
+    await CacheStore.putFollowers(pubkeyHex, followers);
+    return followers;
   }
 }

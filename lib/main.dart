@@ -6,6 +6,7 @@ import 'models/note.dart';
 import 'models/note_mapper.dart';
 import 'nostr/nostr.dart';
 import 'screens/root_screen.dart';
+import 'services/cache_store.dart';
 import 'services/settings_store.dart';
 
 final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier(
@@ -33,6 +34,7 @@ final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await CacheStore.init();
 
   themeModeNotifier.value = await SettingsStore.loadThemeMode();
   themeModeNotifier.addListener(() {
@@ -54,10 +56,7 @@ Future<void> main() async {
     SettingsStore.saveSelectedRelays(selectedRelaysNotifier.value);
   });
 
-  profileCacheNotifier.value = await SettingsStore.loadProfileCache();
-  profileCacheNotifier.addListener(() {
-    SettingsStore.saveProfileCache(profileCacheNotifier.value);
-  });
+  profileCacheNotifier.value = CacheStore.loadAllProfiles();
 
   runApp(const MainApp());
 

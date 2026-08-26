@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/app_seed_color.dart';
 import '../models/note.dart';
 import '../models/relay.dart';
-import '../nostr/models/nostr_metadata.dart';
 
 class SettingsStore {
   SettingsStore._();
@@ -15,7 +14,6 @@ class SettingsStore {
   static const _seedColorKey = 'seed_color';
   static const _bookmarkedNotesKey = 'bookmarked_notes';
   static const _selectedRelaysKey = 'selected_relays';
-  static const _profileCacheKey = 'profile_cache';
 
   static Future<ThemeMode> loadThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
@@ -88,34 +86,5 @@ class SettingsStore {
   static Future<void> saveSelectedRelays(Set<String> relays) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_selectedRelaysKey, relays.toList());
-  }
-
-  static Future<Map<String, NostrMetadata>> loadProfileCache() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_profileCacheKey);
-    if (raw == null) return {};
-
-    try {
-      final decoded = jsonDecode(raw) as Map<String, dynamic>;
-      return {
-        for (final entry in decoded.entries)
-          entry.key: NostrMetadata.fromJson(
-            entry.value as Map<String, dynamic>,
-          ),
-      };
-    } catch (_) {
-      // Cached profile data is malformed; start with an empty cache.
-      return {};
-    }
-  }
-
-  static Future<void> saveProfileCache(
-    Map<String, NostrMetadata> profiles,
-  ) async {
-    final prefs = await SharedPreferences.getInstance();
-    final encoded = {
-      for (final entry in profiles.entries) entry.key: entry.value.toJson(),
-    };
-    await prefs.setString(_profileCacheKey, jsonEncode(encoded));
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../main.dart';
 import '../models/app_seed_color.dart';
+import '../services/cache_store.dart';
 import 'relays_screen.dart';
 
 Future<void> _confirmClearCache(BuildContext context) async {
@@ -27,6 +28,7 @@ Future<void> _confirmClearCache(BuildContext context) async {
   );
   if (confirmed != true) return;
 
+  await CacheStore.clearProfiles();
   profileCacheNotifier.value = {};
 
   if (context.mounted) {
