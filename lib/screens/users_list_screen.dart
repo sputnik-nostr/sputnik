@@ -5,8 +5,10 @@ import '../nostr/nostr.dart';
 import '../widgets/placeholder_tab.dart';
 import '../widgets/profile_result_tile.dart';
 
-class FollowListScreen extends StatefulWidget {
-  const FollowListScreen({
+// A titled list of users, rendered as profile tiles. Used for
+// followers/following as well as for who liked/reposted a post.
+class UsersListScreen extends StatefulWidget {
+  const UsersListScreen({
     super.key,
     required this.title,
     required this.pubkeys,
@@ -16,10 +18,10 @@ class FollowListScreen extends StatefulWidget {
   final List<String> pubkeys;
 
   @override
-  State<FollowListScreen> createState() => _FollowListScreenState();
+  State<UsersListScreen> createState() => _UsersListScreenState();
 }
 
-class _FollowListScreenState extends State<FollowListScreen> {
+class _UsersListScreenState extends State<UsersListScreen> {
   @override
   void initState() {
     super.initState();

@@ -2,6 +2,20 @@ import '../nostr/nostr.dart';
 import 'note.dart';
 import 'relative_time.dart';
 
+List<Note> applyReactionCounts(
+  List<Note> notes,
+  Map<String, PostReactions> reactionsByPostId,
+) {
+  return notes.map((note) {
+    final reactions = reactionsByPostId[note.id];
+    if (reactions == null) return note;
+    return note.copyWith(
+      likeCount: reactions.likeCount,
+      repostCount: reactions.repostCount,
+    );
+  }).toList();
+}
+
 Note noteFromNostrPost(NostrPost post, {NostrMetadata? authorMetadata}) {
   return Note(
     id: post.id,

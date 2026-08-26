@@ -6,10 +6,11 @@ import '../models/current_user.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
+import '../widgets/count_label.dart';
 import '../widgets/linkified_text.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/placeholder_tab.dart';
-import 'follow_list_screen.dart';
+import 'users_list_screen.dart';
 
 const _bannerHeight = 140.0 * 0.8;
 const _avatarRadius = 40.0;
@@ -87,10 +88,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (!mounted) return;
 
     final metadata = profileCacheNotifier.value[widget.pubkeyHex];
+    final notes = posts
+        .map((post) => noteFromNostrPost(post, authorMetadata: metadata))
+        .toList();
+
+    final reactionsByPostId = await const RelayReactionsRepository()
+        .fetchReactions(notes.map((note) => note.id).toList(), relayUrls);
+    if (!mounted) return;
+
     setState(() {
-      _fetchedNotes = posts
-          .map((post) => noteFromNostrPost(post, authorMetadata: metadata))
-          .toList();
+      _fetchedNotes = applyReactionCounts(notes, reactionsByPostId);
       _loadingNotes = false;
     });
   }
@@ -306,7 +313,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              _FollowCount(
+                              CountLabel(
                                 count: _following?.length,
                                 label: 'following',
                                 onTap: _following == null
@@ -314,7 +321,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     : () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => FollowListScreen(
+                                          builder: (_) => UsersListScreen(
                                             title: 'Following',
                                             pubkeys: _following!,
                                           ),
@@ -322,7 +329,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                               ),
                               const SizedBox(width: 16),
-                              _FollowCount(
+                              CountLabel(
                                 count: _followers?.length,
                                 label: 'followers',
                                 onTap: _followers == null
@@ -330,7 +337,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     : () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => FollowListScreen(
+                                          builder: (_) => UsersListScreen(
                                             title: 'Followers',
                                             pubkeys: _followers!,
                                           ),
@@ -367,39 +374,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             },
           );
         },
-      ),
-    );
-  }
-}
-
-class _FollowCount extends StatelessWidget {
-  const _FollowCount({required this.count, required this.label, this.onTap});
-
-  final int? count;
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(4),
-      onTap: onTap,
-      child: RichText(
-        text: TextSpan(
-          style: theme.textTheme.bodySmall,
-          children: [
-            TextSpan(
-              text: '${count ?? '···'} ',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            TextSpan(
-              text: label,
-              style: TextStyle(color: theme.colorScheme.outline),
-            ),
-          ],
-        ),
       ),
     );
   }

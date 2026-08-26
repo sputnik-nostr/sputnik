@@ -64,18 +64,25 @@ Future<void> main() async {
 }
 
 Future<void> _loadFeed() async {
+  final relayUrls = selectedRelaysNotifier.value;
   final PostRepository postRepository = RelayPostRepository(
-    relayUrls: selectedRelaysNotifier.value,
+    relayUrls: relayUrls,
   );
   final posts = await postRepository.fetchPosts();
 
   final authorPubkeys = posts.map((post) => post.author.pubkey).toSet();
-  final profilesByPubkey = await const RelayProfileRepository().fetchProfiles(
+  final profilesFuture = const RelayProfileRepository().fetchProfiles(
     authorPubkeys,
-    selectedRelaysNotifier.value,
+    relayUrls,
   );
+  final reactionsFuture = const RelayReactionsRepository().fetchReactions(
+    posts.map((post) => post.id).toList(),
+    relayUrls,
+  );
+  final profilesByPubkey = await profilesFuture;
+  final reactionsByPostId = await reactionsFuture;
 
-  notesNotifier.value = posts
+  final notes = posts
       .map(
         (post) => noteFromNostrPost(
           post,
@@ -83,6 +90,8 @@ Future<void> _loadFeed() async {
         ),
       )
       .toList();
+
+  notesNotifier.value = applyReactionCounts(notes, reactionsByPostId);
 }
 
 class MainApp extends StatelessWidget {

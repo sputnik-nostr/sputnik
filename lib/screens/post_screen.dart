@@ -4,9 +4,11 @@ import '../main.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
+import '../widgets/count_label.dart';
 import '../widgets/linkified_text.dart';
 import '../widgets/note_tile.dart';
 import 'profile_screen.dart';
+import 'users_list_screen.dart';
 
 const _monthNames = [
   'Jan',
@@ -41,16 +43,28 @@ class PostScreen extends StatefulWidget {
   State<PostScreen> createState() => _PostScreenState();
 }
 
+class _PostThread {
+  const _PostThread({
+    required this.replies,
+    required this.likerPubkeys,
+    required this.reposterPubkeys,
+  });
+
+  final List<Note> replies;
+  final List<String> likerPubkeys;
+  final List<String> reposterPubkeys;
+}
+
 class _PostScreenState extends State<PostScreen> {
-  late final Future<List<Note>> _repliesFuture;
+  late final Future<_PostThread> _threadFuture;
 
   @override
   void initState() {
     super.initState();
-    _repliesFuture = _loadReplies();
+    _threadFuture = _loadThread();
   }
 
-  Future<List<Note>> _loadReplies() async {
+  Future<_PostThread> _loadThread() async {
     final relayUrls = selectedRelaysNotifier.value;
     final thread = await const RelayThreadRepository().fetchThread(
       widget.note.id,
@@ -77,7 +91,7 @@ class _PostScreenState extends State<PostScreen> {
       relayUrls,
     );
 
-    return thread.replies
+    final replyNotes = thread.replies
         .map(
           (post) => noteFromNostrPost(
             post,
@@ -85,19 +99,34 @@ class _PostScreenState extends State<PostScreen> {
           ),
         )
         .toList();
+
+    final reactionsByReplyId = await const RelayReactionsRepository()
+        .fetchReactions(replyNotes.map((note) => note.id).toList(), relayUrls);
+
+    return _PostThread(
+      replies: applyReactionCounts(replyNotes, reactionsByReplyId),
+      likerPubkeys: thread.likerPubkeys,
+      reposterPubkeys: thread.reposterPubkeys,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(),
-      body: FutureBuilder<List<Note>>(
-        future: _repliesFuture,
+      body: FutureBuilder<_PostThread>(
+        future: _threadFuture,
         builder: (context, snapshot) {
-          final replies = snapshot.data;
+          final thread = snapshot.data;
+          final replies = thread?.replies;
           return ListView(
             children: [
-              _PostHeader(note: widget.note, replyCount: replies?.length),
+              _PostHeader(
+                note: widget.note,
+                replyCount: replies?.length,
+                likerPubkeys: thread?.likerPubkeys,
+                reposterPubkeys: thread?.reposterPubkeys,
+              ),
               const Divider(height: 1),
               if (snapshot.connectionState == ConnectionState.waiting)
                 const Padding(
@@ -123,15 +152,35 @@ class _PostScreenState extends State<PostScreen> {
 }
 
 class _PostHeader extends StatelessWidget {
-  const _PostHeader({required this.note, required this.replyCount});
+  const _PostHeader({
+    required this.note,
+    required this.replyCount,
+    required this.likerPubkeys,
+    required this.reposterPubkeys,
+  });
 
   final Note note;
   final int? replyCount;
+  final List<String>? likerPubkeys;
+  final List<String>? reposterPubkeys;
 
   void _openProfile(BuildContext context) {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ProfileScreen(pubkeyHex: note.pubkey)),
+    );
+  }
+
+  void _openUsersList(
+    BuildContext context,
+    String title,
+    List<String> pubkeys,
+  ) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UsersListScreen(title: title, pubkeys: pubkeys),
+      ),
     );
   }
 
@@ -211,48 +260,33 @@ class _PostHeader extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           child: Row(
             children: [
-              _StatCount(
+              CountLabel(
                 count: replyCount ?? note.replyCount,
                 label: 'replies',
               ),
               const SizedBox(width: 20),
-              _StatCount(count: note.repostCount, label: 'reposts'),
+              CountLabel(
+                count: reposterPubkeys?.length ?? note.repostCount,
+                label: 'reposts',
+                onTap: reposterPubkeys == null
+                    ? null
+                    : () =>
+                          _openUsersList(context, 'Reposts', reposterPubkeys!),
+              ),
               const SizedBox(width: 20),
-              _StatCount(count: note.likeCount, label: 'likes'),
+              CountLabel(
+                count: likerPubkeys?.length ?? note.likeCount,
+                label: 'likes',
+                onTap: likerPubkeys == null
+                    ? null
+                    : () => _openUsersList(context, 'Likes', likerPubkeys!),
+              ),
               const Spacer(),
               _HeaderBookmarkButton(note: note),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _StatCount extends StatelessWidget {
-  const _StatCount({required this.count, required this.label});
-
-  final int count;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return RichText(
-      text: TextSpan(
-        style: theme.textTheme.bodySmall,
-        children: [
-          TextSpan(
-            text: '$count ',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          TextSpan(
-            text: label,
-            style: TextStyle(color: theme.colorScheme.outline),
-          ),
-        ],
-      ),
     );
   }
 }
