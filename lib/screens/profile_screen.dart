@@ -6,14 +6,37 @@ import '../models/note.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/placeholder_tab.dart';
 
+const _bannerHeight = 140.0 * 0.8;
+const _avatarRadius = 40.0;
+const _avatarOverlap = _avatarRadius * 2 * 0.25;
+
 String _truncateNpub(String npub) {
-  const totalLength = 25;
-  const suffixLength = 8;
+  const totalLength = 20;
+  const suffixLength = 5;
   if (npub.length <= totalLength) return npub;
   final prefixLength = totalLength - suffixLength - 3;
   final prefix = npub.substring(0, prefixLength);
   final suffix = npub.substring(npub.length - suffixLength);
   return '$prefix...$suffix';
+}
+
+String _formatLastActive(DateTime time) {
+  final diff = DateTime.now().difference(time);
+  if (diff.inMinutes < 1) return 'Last active just now';
+  if (diff.inMinutes < 60) {
+    final m = diff.inMinutes;
+    return 'Last active $m minute${m == 1 ? '' : 's'} ago';
+  }
+  if (diff.inHours < 24) {
+    final h = diff.inHours;
+    return 'Last active $h hour${h == 1 ? '' : 's'} ago';
+  }
+  if (diff.inDays < 7) {
+    final d = diff.inDays;
+    return 'Last active $d day${d == 1 ? '' : 's'} ago';
+  }
+  final w = diff.inDays ~/ 7;
+  return 'Last active $w week${w == 1 ? '' : 's'} ago';
 }
 
 class ProfileScreen extends StatelessWidget {
@@ -26,51 +49,92 @@ class ProfileScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(),
       body: ValueListenableBuilder<List<Note>>(
         valueListenable: notesNotifier,
         builder: (context, notes, _) {
           final ownNotes = notes.where((note) => note.pubkey == npub).toList();
 
           return ListView(
+            padding: EdgeInsets.zero,
             children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              SizedBox(
+                height: _bannerHeight + _avatarRadius * 2 - _avatarOverlap,
+                child: Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    CircleAvatar(
-                      radius: 32,
-                      backgroundColor: theme.colorScheme.primaryContainer,
-                      child: Text(
-                        CurrentUser.displayName[0],
-                        style: TextStyle(
-                          color: theme.colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 24,
+                    Container(
+                      height: _bannerHeight,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            theme.colorScheme.primary,
+                            theme.colorScheme.tertiary,
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            CurrentUser.displayName,
-                            style: theme.textTheme.titleLarge?.copyWith(
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: SafeArea(
+                        bottom: false,
+                        child: _FloatingBackButton(
+                          onTap: () => Navigator.pop(context),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: _bannerHeight - _avatarOverlap,
+                      left: 16,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: theme.colorScheme.surface,
+                        ),
+                        child: CircleAvatar(
+                          radius: _avatarRadius,
+                          backgroundColor: theme.colorScheme.primaryContainer,
+                          child: Text(
+                            CurrentUser.displayName[0],
+                            style: TextStyle(
+                              color: theme.colorScheme.onPrimaryContainer,
                               fontWeight: FontWeight.bold,
+                              fontSize: 28,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _truncateNpub(npub),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontFamily: 'monospace',
-                              color: theme.colorScheme.outline,
-                            ),
-                          ),
-                        ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      CurrentUser.displayName,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _truncateNpub(npub),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatLastActive(CurrentUser.lastActiveAt),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.outline,
                       ),
                     ),
                   ],
@@ -93,6 +157,28 @@ class ProfileScreen extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _FloatingBackButton extends StatelessWidget {
+  const _FloatingBackButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipOval(
+      child: Material(
+        color: Colors.black38,
+        child: InkWell(
+          onTap: onTap,
+          child: const Padding(
+            padding: EdgeInsets.all(8),
+            child: Icon(Icons.arrow_back, color: Colors.white, size: 20),
+          ),
+        ),
       ),
     );
   }
