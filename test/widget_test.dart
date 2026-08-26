@@ -30,6 +30,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Anon'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('settingsCard')));
+    await tester.pumpAndSettle();
+
     expect(find.text('Dark mode'), findsOneWidget);
   });
 }
