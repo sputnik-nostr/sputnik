@@ -1,0 +1,26 @@
+{
+  "posts": [
+    {
+      "id": "1",
+      "author": {
+        "pubkey": "npub1alice0000000000000000000000000000000000000000000000000000",
+        "displayName": "Alice",
+        "handle": "npub1alice..."
+      },
+      "content": "test message 1",
+      "createdAt": "2026-08-26T08:00:00.000Z",
+      "stats": { "replies": 2, "reposts": 1, "likes": 5 }
+    },
+    {
+      "id": "2",
+      "author": {
+        "pubkey": "npub1bob00000000000000000000000000000000000000000000000000000",
+        "displayName": "Bob",
+        "handle": "npub1bob..."
+      },
+      "content": "test message 2",
+      "createdAt": "2026-08-26T07:30:00.000Z",
+      "stats": { "replies": 0, "reposts": 0, "likes": 3 }
+    }
+  ]
+}
