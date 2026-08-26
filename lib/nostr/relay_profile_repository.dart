@@ -5,6 +5,18 @@ import 'models/nostr_filter.dart';
 import 'models/nostr_metadata.dart';
 import 'relay_client.dart';
 
+// Some relays cap how many authors a single filter may list, so large
+// requests (e.g. profiles for a big follower list) are split into chunks
+// small enough that no relay should reject or truncate them.
+const _authorsChunkSize = 100;
+
+List<List<String>> _chunked(List<String> items, int size) {
+  return [
+    for (var i = 0; i < items.length; i += size)
+      items.sublist(i, i + size > items.length ? items.length : i + size),
+  ];
+}
+
 class RelayProfileRepository {
   const RelayProfileRepository({this.client = const RelayClient()});
 
@@ -36,11 +48,16 @@ class RelayProfileRepository {
     }
     if (toFetch.isEmpty) return cached;
 
-    final events = await client.query(
-      relayUrls,
-      NostrFilter(kinds: const [0], authors: toFetch.toList()),
+    final eventsByChunk = await Future.wait(
+      _chunked(toFetch.toList(), _authorsChunkSize).map(
+        (chunk) => client.query(
+          relayUrls,
+          NostrFilter(kinds: const [0], authors: chunk),
+        ),
+      ),
     );
-    events.sort(compareNewestFirst);
+    final events = eventsByChunk.expand((events) => events).toList()
+      ..sort(compareNewestFirst);
 
     final metadataByPubkey = <String, NostrMetadata>{};
     for (final event in events) {
