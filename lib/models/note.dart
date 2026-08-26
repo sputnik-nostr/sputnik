@@ -6,6 +6,7 @@ class Note {
     required this.handle,
     required this.content,
     required this.postedAt,
+    this.pictureUrl,
     this.replyCount = 0,
     this.repostCount = 0,
     this.likeCount = 0,
@@ -17,6 +18,7 @@ class Note {
   final String handle;
   final String content;
   final String postedAt;
+  final String? pictureUrl;
   final int replyCount;
   final int repostCount;
   final int likeCount;

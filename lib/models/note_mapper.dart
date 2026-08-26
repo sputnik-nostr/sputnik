@@ -1,12 +1,13 @@
 import '../nostr/nostr.dart';
 import 'note.dart';
 
-Note noteFromNostrPost(NostrPost post) {
+Note noteFromNostrPost(NostrPost post, {NostrMetadata? authorMetadata}) {
   return Note(
     id: post.id,
     pubkey: post.author.pubkey,
-    displayName: post.author.displayName,
+    displayName: authorMetadata?.resolvedName ?? post.author.displayName,
     handle: post.author.handle,
+    pictureUrl: authorMetadata?.picture,
     content: post.content,
     postedAt: _relativeTime(post.createdAt),
     replyCount: post.replyCount,

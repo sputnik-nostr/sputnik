@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../main.dart';
 import '../models/current_user.dart';
 import '../models/note.dart';
+import '../nostr/nostr.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/placeholder_tab.dart';
 
@@ -50,167 +51,225 @@ String _formatLastActive(DateTime time) {
   return 'Last active $w week${w == 1 ? '' : 's'} ago';
 }
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, this.npub = CurrentUser.npub});
 
   final String npub;
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  late final Future<NostrMetadata?> _metadataFuture;
+
+  bool get _isCurrentUser => widget.npub == CurrentUser.npub;
+
+  @override
+  void initState() {
+    super.initState();
+    // The current user's npub is a local placeholder, not a real key any
+    // relay has metadata for, so there's nothing to fetch.
+    _metadataFuture = _isCurrentUser
+        ? Future.value(null)
+        : const RelayProfileRepository().fetchProfile(
+            widget.npub,
+            selectedRelaysNotifier.value,
+          );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final npub = widget.npub;
 
     return Scaffold(
-      body: ValueListenableBuilder<List<Note>?>(
-        valueListenable: notesNotifier,
-        builder: (context, notes, _) {
-          final ownNotes = (notes ?? const [])
-              .where((note) => note.pubkey == npub)
-              .toList();
-          final isCurrentUser = npub == CurrentUser.npub;
-          final displayName = isCurrentUser
-              ? CurrentUser.displayName
-              : (ownNotes.isNotEmpty
-                    ? ownNotes.first.displayName
-                    : _shortPubkey(npub));
+      body: FutureBuilder<NostrMetadata?>(
+        future: _metadataFuture,
+        builder: (context, metadataSnapshot) {
+          final metadata = metadataSnapshot.data;
 
-          return ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              SizedBox(
-                height: _bannerHeight + _avatarRadius * 2 - _avatarOverlap,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Container(
-                      height: _bannerHeight,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            theme.colorScheme.primary,
-                            theme.colorScheme.tertiary,
-                          ],
+          return ValueListenableBuilder<List<Note>?>(
+            valueListenable: notesNotifier,
+            builder: (context, notes, _) {
+              final ownNotes = (notes ?? const [])
+                  .where((note) => note.pubkey == npub)
+                  .toList();
+              final displayName = _isCurrentUser
+                  ? CurrentUser.displayName
+                  : (metadata?.resolvedName ??
+                        (ownNotes.isNotEmpty
+                            ? ownNotes.first.displayName
+                            : _shortPubkey(npub)));
+              final pictureUrl = metadata?.picture;
+              final bannerUrl = metadata?.banner;
+              final bio = _isCurrentUser ? CurrentUser.bio : metadata?.about;
+              final hasBio = bio != null && bio.trim().isNotEmpty;
+
+              return ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  SizedBox(
+                    height: _bannerHeight + _avatarRadius * 2 - _avatarOverlap,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          height: _bannerHeight,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            gradient: bannerUrl == null
+                                ? LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      theme.colorScheme.primary,
+                                      theme.colorScheme.tertiary,
+                                    ],
+                                  )
+                                : null,
+                            image: bannerUrl != null
+                                ? DecorationImage(
+                                    image: NetworkImage(bannerUrl),
+                                    fit: BoxFit.cover,
+                                    onError: (_, _) {},
+                                  )
+                                : null,
+                          ),
                         ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: SafeArea(
-                        bottom: false,
-                        child: _FloatingBackButton(
-                          onTap: () => Navigator.pop(context),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: _bannerHeight - _avatarOverlap,
-                      left: 16,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: theme.colorScheme.surface,
-                        ),
-                        child: CircleAvatar(
-                          radius: _avatarRadius,
-                          backgroundColor: theme.colorScheme.primaryContainer,
-                          child: Text(
-                            displayName[0].toUpperCase(),
-                            style: TextStyle(
-                              color: theme.colorScheme.onPrimaryContainer,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 28,
+                        Positioned(
+                          top: 8,
+                          left: 8,
+                          child: SafeArea(
+                            bottom: false,
+                            child: _FloatingBackButton(
+                              onTap: () => Navigator.pop(context),
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      displayName,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _truncateNpub(npub),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.outline,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: () {
-                            Clipboard.setData(ClipboardData(text: npub));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Copied npub to clipboard'),
-                              ),
-                            );
-                          },
-                          child: Padding(
+                        Positioned(
+                          top: _bannerHeight - _avatarOverlap,
+                          left: 16,
+                          child: Container(
                             padding: const EdgeInsets.all(4),
-                            child: Icon(
-                              Icons.copy,
-                              size: 14,
-                              color: theme.colorScheme.outline,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: theme.colorScheme.surface,
+                            ),
+                            child: CircleAvatar(
+                              radius: _avatarRadius,
+                              backgroundColor:
+                                  theme.colorScheme.primaryContainer,
+                              backgroundImage: pictureUrl != null
+                                  ? NetworkImage(pictureUrl)
+                                  : null,
+                              onBackgroundImageError: pictureUrl != null
+                                  ? (_, _) {}
+                                  : null,
+                              child: pictureUrl == null
+                                  ? Text(
+                                      displayName[0].toUpperCase(),
+                                      style: TextStyle(
+                                        color: theme
+                                            .colorScheme
+                                            .onPrimaryContainer,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 28,
+                                      ),
+                                    )
+                                  : null,
                             ),
                           ),
                         ),
                       ],
                     ),
-                    if (isCurrentUser) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatLastActive(CurrentUser.lastActiveAt),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.outline,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(CurrentUser.bio, style: theme.textTheme.bodyMedium),
-                    ] else if (ownNotes.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatLastActiveFromPostedAt(ownNotes.first.postedAt),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.outline,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              if (ownNotes.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: 48),
-                  child: PlaceholderTab(
-                    icon: Icons.notes_outlined,
-                    label: 'No posts yet',
                   ),
-                )
-              else
-                for (final note in ownNotes) ...[
-                  NoteTile(note: note),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          displayName,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _truncateNpub(npub),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.outline,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () {
+                                Clipboard.setData(ClipboardData(text: npub));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Copied npub to clipboard'),
+                                  ),
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  Icons.copy,
+                                  size: 14,
+                                  color: theme.colorScheme.outline,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_isCurrentUser) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatLastActive(CurrentUser.lastActiveAt),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
+                        ] else if (ownNotes.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatLastActiveFromPostedAt(
+                              ownNotes.first.postedAt,
+                            ),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
+                        ],
+                        if (hasBio) ...[
+                          const SizedBox(height: 8),
+                          Text(bio, style: theme.textTheme.bodyMedium),
+                        ],
+                      ],
+                    ),
+                  ),
                   const Divider(height: 1),
+                  if (ownNotes.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 48),
+                      child: PlaceholderTab(
+                        icon: Icons.notes_outlined,
+                        label: 'No posts yet',
+                      ),
+                    )
+                  else
+                    for (final note in ownNotes) ...[
+                      NoteTile(note: note),
+                      const Divider(height: 1),
+                    ],
                 ],
-            ],
+              );
+            },
           );
         },
       ),

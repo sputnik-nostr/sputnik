@@ -29,10 +29,20 @@ class NoteTile extends StatelessWidget {
             onTap: () => _openProfile(context),
             child: CircleAvatar(
               backgroundColor: theme.colorScheme.primaryContainer,
-              child: Text(
-                note.displayName[0],
-                style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
-              ),
+              backgroundImage: note.pictureUrl != null
+                  ? NetworkImage(note.pictureUrl!)
+                  : null,
+              onBackgroundImageError: note.pictureUrl != null
+                  ? (_, _) {}
+                  : null,
+              child: note.pictureUrl == null
+                  ? Text(
+                      note.displayName[0].toUpperCase(),
+                      style: TextStyle(
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                    )
+                  : null,
             ),
           ),
           const SizedBox(width: 12),

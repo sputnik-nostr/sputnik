@@ -52,7 +52,21 @@ Future<void> main() async {
     relayUrls: selectedRelaysNotifier.value,
   );
   final posts = await postRepository.fetchPosts();
-  notesNotifier.value = posts.map(noteFromNostrPost).toList();
+
+  final authorPubkeys = posts.map((post) => post.author.pubkey).toSet();
+  final profilesByPubkey = await const RelayProfileRepository().fetchProfiles(
+    authorPubkeys,
+    selectedRelaysNotifier.value,
+  );
+
+  notesNotifier.value = posts
+      .map(
+        (post) => noteFromNostrPost(
+          post,
+          authorMetadata: profilesByPubkey[post.author.pubkey],
+        ),
+      )
+      .toList();
 
   runApp(const MainApp());
 }
