@@ -10,6 +10,8 @@ void main() {
   ) async {
     notesNotifier.value = const [
       Note(
+        pubkey:
+            'npub1alice0000000000000000000000000000000000000000000000000000',
         displayName: 'Alice',
         handle: 'npub1alice...',
         content: 'hello',

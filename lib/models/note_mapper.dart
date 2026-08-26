@@ -3,6 +3,7 @@ import 'note.dart';
 
 Note noteFromNostrPost(NostrPost post) {
   return Note(
+    pubkey: post.author.pubkey,
     displayName: post.author.displayName,
     handle: post.author.handle,
     content: post.content,

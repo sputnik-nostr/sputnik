@@ -21,6 +21,17 @@
       "content": "test message 2",
       "createdAt": "2026-08-26T07:30:00.000Z",
       "stats": { "replies": 0, "reposts": 0, "likes": 3 }
+    },
+    {
+      "id": "3",
+      "author": {
+        "pubkey": "npub1anon0000000000000000000000000000000000000000000000000000",
+        "displayName": "Anon",
+        "handle": "npub1anon..."
+      },
+      "content": "test message from anon",
+      "createdAt": "2026-08-26T09:00:00.000Z",
+      "stats": { "replies": 1, "reposts": 0, "likes": 2 }
     }
   ]
 }

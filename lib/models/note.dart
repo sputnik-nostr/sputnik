@@ -1,5 +1,6 @@
 class Note {
   const Note({
+    required this.pubkey,
     required this.displayName,
     required this.handle,
     required this.content,
@@ -9,6 +10,7 @@ class Note {
     this.likeCount = 0,
   });
 
+  final String pubkey;
   final String displayName;
   final String handle;
   final String content;
