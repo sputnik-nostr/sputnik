@@ -75,22 +75,25 @@ class NoteTile extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(note.content, style: theme.textTheme.bodyMedium),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    _StatButton(
-                      icon: Icons.chat_bubble_outline,
-                      count: note.replyCount,
-                    ),
-                    const SizedBox(width: 20),
-                    _StatButton(icon: Icons.repeat, count: note.repostCount),
-                    const SizedBox(width: 20),
-                    _StatButton(
-                      icon: Icons.favorite_border,
-                      count: note.likeCount,
-                    ),
-                    const Spacer(),
-                    _BookmarkButton(noteId: note.id),
-                  ],
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _StatButton(
+                        icon: Icons.chat_bubble_outline,
+                        count: note.replyCount,
+                      ),
+                      const SizedBox(width: 20),
+                      _StatButton(icon: Icons.repeat, count: note.repostCount),
+                      const SizedBox(width: 20),
+                      _StatButton(
+                        icon: Icons.favorite_border,
+                        count: note.likeCount,
+                      ),
+                      const SizedBox(width: 20),
+                      _BookmarkButton(noteId: note.id),
+                    ],
+                  ),
                 ),
               ],
             ),
