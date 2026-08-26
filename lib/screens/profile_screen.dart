@@ -21,6 +21,16 @@ String _truncateNpub(String npub) {
   return '$prefix...$suffix';
 }
 
+String _formatLastActiveFromPostedAt(String postedAt) {
+  return postedAt == 'now'
+      ? 'Last active just now'
+      : 'Last active $postedAt ago';
+}
+
+String _shortPubkey(String pubkey) {
+  return pubkey.length <= 8 ? pubkey : pubkey.substring(0, 8);
+}
+
 String _formatLastActive(DateTime time) {
   final diff = DateTime.now().difference(time);
   if (diff.inMinutes < 1) return 'Last active just now';
@@ -50,10 +60,18 @@ class ProfileScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: ValueListenableBuilder<List<Note>>(
+      body: ValueListenableBuilder<List<Note>?>(
         valueListenable: notesNotifier,
         builder: (context, notes, _) {
-          final ownNotes = notes.where((note) => note.pubkey == npub).toList();
+          final ownNotes = (notes ?? const [])
+              .where((note) => note.pubkey == npub)
+              .toList();
+          final isCurrentUser = npub == CurrentUser.npub;
+          final displayName = isCurrentUser
+              ? CurrentUser.displayName
+              : (ownNotes.isNotEmpty
+                    ? ownNotes.first.displayName
+                    : _shortPubkey(npub));
 
           return ListView(
             padding: EdgeInsets.zero,
@@ -100,7 +118,7 @@ class ProfileScreen extends StatelessWidget {
                           radius: _avatarRadius,
                           backgroundColor: theme.colorScheme.primaryContainer,
                           child: Text(
-                            CurrentUser.displayName[0],
+                            displayName[0].toUpperCase(),
                             style: TextStyle(
                               color: theme.colorScheme.onPrimaryContainer,
                               fontWeight: FontWeight.bold,
@@ -119,7 +137,7 @@ class ProfileScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      CurrentUser.displayName,
+                      displayName,
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -156,15 +174,25 @@ class ProfileScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatLastActive(CurrentUser.lastActiveAt),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.outline,
+                    if (isCurrentUser) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatLastActive(CurrentUser.lastActiveAt),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.outline,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(CurrentUser.bio, style: theme.textTheme.bodyMedium),
+                      const SizedBox(height: 8),
+                      Text(CurrentUser.bio, style: theme.textTheme.bodyMedium),
+                    ] else if (ownNotes.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatLastActiveFromPostedAt(ownNotes.first.postedAt),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.outline,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -55,8 +55,14 @@ class SettingsStore {
   static Future<Set<String>> loadSelectedRelays() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getStringList(_selectedRelaysKey);
-    if (saved == null) return dummyRelays.toSet();
-    return saved.toSet();
+    if (saved == null) return defaultRelays.toSet();
+
+    final stillKnown = saved.toSet().intersection(defaultRelays.toSet());
+    if (stillKnown.isEmpty) {
+      await saveSelectedRelays(defaultRelays.toSet());
+      return defaultRelays.toSet();
+    }
+    return stillKnown;
   }
 
   static Future<void> saveSelectedRelays(Set<String> relays) async {

@@ -15,7 +15,7 @@ final ValueNotifier<AppSeedColor> seedColorNotifier = ValueNotifier(
   AppSeedColor.blue,
 );
 
-final ValueNotifier<List<Note>> notesNotifier = ValueNotifier(const []);
+final ValueNotifier<List<Note>?> notesNotifier = ValueNotifier(null);
 
 final ValueNotifier<Set<String>> bookmarkedIdsNotifier = ValueNotifier(
   const {},
@@ -48,7 +48,9 @@ Future<void> main() async {
     SettingsStore.saveSelectedRelays(selectedRelaysNotifier.value);
   });
 
-  const PostRepository postRepository = JsonPostRepository();
+  final PostRepository postRepository = RelayPostRepository(
+    relayUrls: selectedRelaysNotifier.value,
+  );
   final posts = await postRepository.fetchPosts();
   notesNotifier.value = posts.map(noteFromNostrPost).toList();
 

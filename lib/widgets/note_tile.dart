@@ -2,11 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../main.dart';
 import '../models/note.dart';
+import '../screens/profile_screen.dart';
 
 class NoteTile extends StatelessWidget {
   const NoteTile({super.key, required this.note});
 
   final Note note;
+
+  void _openProfile(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ProfileScreen(npub: note.pubkey)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,11 +25,14 @@ class NoteTile extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            backgroundColor: theme.colorScheme.primaryContainer,
-            child: Text(
-              note.displayName[0],
-              style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+          GestureDetector(
+            onTap: () => _openProfile(context),
+            child: CircleAvatar(
+              backgroundColor: theme.colorScheme.primaryContainer,
+              child: Text(
+                note.displayName[0],
+                style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -32,11 +43,14 @@ class NoteTile extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        note.displayName,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
+                      child: GestureDetector(
+                        onTap: () => _openProfile(context),
+                        child: Text(
+                          note.displayName,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),

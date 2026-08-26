@@ -15,7 +15,7 @@ class RelaysScreen extends StatelessWidget {
         builder: (context, selected, _) {
           return ListView(
             children: [
-              for (final relay in dummyRelays)
+              for (final relay in defaultRelays)
                 CheckboxListTile(
                   title: Text(relay),
                   value: selected.contains(relay),

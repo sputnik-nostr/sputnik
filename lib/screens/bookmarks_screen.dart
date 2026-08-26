@@ -13,10 +13,10 @@ class BookmarksScreen extends StatelessWidget {
     return ValueListenableBuilder<Set<String>>(
       valueListenable: bookmarkedIdsNotifier,
       builder: (context, bookmarkedIds, _) {
-        return ValueListenableBuilder<List<Note>>(
+        return ValueListenableBuilder<List<Note>?>(
           valueListenable: notesNotifier,
           builder: (context, notes, _) {
-            final bookmarkedNotes = notes
+            final bookmarkedNotes = (notes ?? const [])
                 .where((note) => bookmarkedIds.contains(note.id))
                 .toList();
 
