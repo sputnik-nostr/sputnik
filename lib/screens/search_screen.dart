@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import '../nostr/nostr.dart';
 import '../widgets/placeholder_tab.dart';
-import 'profile_screen.dart';
+import '../widgets/profile_result_tile.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -88,35 +88,12 @@ class _NpubResultState extends State<_NpubResult> {
 
   @override
   Widget build(BuildContext context) {
-    final npub = npubFromHex(widget.pubkeyHex);
-
     return ValueListenableBuilder<Map<String, NostrMetadata>>(
       valueListenable: profileCacheNotifier,
       builder: (context, profileCache, _) {
-        final metadata = profileCache[widget.pubkeyHex];
-        final displayName = metadata?.resolvedName;
-        final pictureUrl = metadata?.picture;
-
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundImage: pictureUrl != null
-                ? NetworkImage(pictureUrl)
-                : null,
-            onBackgroundImageError: pictureUrl != null ? (_, _) {} : null,
-            child: pictureUrl == null ? const Icon(Icons.person_outline) : null,
-          ),
-          title: Text(displayName ?? truncateNpub(npub)),
-          subtitle: Text(
-            displayName != null ? truncateNpub(npub) : 'View profile',
-          ),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProfileScreen(pubkeyHex: widget.pubkeyHex),
-              ),
-            );
-          },
+        return ProfileResultTile(
+          pubkeyHex: widget.pubkeyHex,
+          metadata: profileCache[widget.pubkeyHex],
         );
       },
     );

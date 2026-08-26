@@ -9,6 +9,7 @@ import '../nostr/nostr.dart';
 import '../widgets/linkified_text.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/placeholder_tab.dart';
+import 'follow_list_screen.dart';
 
 const _bannerHeight = 140.0 * 0.8;
 const _avatarRadius = 40.0;
@@ -55,6 +56,8 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   List<Note>? _fetchedNotes;
   bool _loadingNotes = true;
+  List<String>? _following;
+  List<String>? _followers;
 
   bool get _isCurrentUser => widget.pubkeyHex == CurrentUser.pubkeyHex;
 
@@ -73,6 +76,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         selectedRelaysNotifier.value,
       );
       _loadAuthorPosts();
+      _loadContacts();
     }
   }
 
@@ -89,6 +93,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .toList();
       _loadingNotes = false;
     });
+  }
+
+  Future<void> _loadContacts() async {
+    final relayUrls = selectedRelaysNotifier.value;
+    const repository = RelayContactsRepository();
+    final following = await repository.fetchFollowing(
+      widget.pubkeyHex,
+      relayUrls,
+    );
+    if (mounted) setState(() => _following = following);
+
+    final followers = await repository.fetchFollowers(
+      widget.pubkeyHex,
+      relayUrls,
+    );
+    if (mounted) setState(() => _followers = followers);
   }
 
   @override
@@ -268,6 +288,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const SizedBox(height: 8),
                           LinkifiedText(bio, style: theme.textTheme.bodyMedium),
                         ],
+                        if (!_isCurrentUser) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              _FollowCount(
+                                count: _following?.length,
+                                label: 'Following',
+                                onTap: _following == null
+                                    ? null
+                                    : () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => FollowListScreen(
+                                            title: 'Following',
+                                            pubkeys: _following!,
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                              const SizedBox(width: 16),
+                              _FollowCount(
+                                count: _followers?.length,
+                                label: 'Followers',
+                                onTap: _followers == null
+                                    ? null
+                                    : () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => FollowListScreen(
+                                            title: 'Followers',
+                                            pubkeys: _followers!,
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -295,6 +353,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+class _FollowCount extends StatelessWidget {
+  const _FollowCount({required this.count, required this.label, this.onTap});
+
+  final int? count;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(4),
+      onTap: onTap,
+      child: RichText(
+        text: TextSpan(
+          style: theme.textTheme.bodySmall,
+          children: [
+            TextSpan(
+              text: '${count ?? '···'} ',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            TextSpan(
+              text: label,
+              style: TextStyle(color: theme.colorScheme.outline),
+            ),
+          ],
+        ),
       ),
     );
   }

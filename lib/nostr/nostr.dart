@@ -6,6 +6,7 @@ export 'models/nostr_post.dart';
 export 'nip19.dart';
 export 'post_repository.dart';
 export 'relay_client.dart';
+export 'relay_contacts_repository.dart';
 export 'relay_post_repository.dart';
 export 'relay_profile_repository.dart';
 export 'relay_thread_repository.dart';
