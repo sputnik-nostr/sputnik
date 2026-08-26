@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/app_drawer.dart';
+import 'bookmarks_screen.dart';
 import 'home_screen.dart';
 import 'notifications_screen.dart';
 import 'search_screen.dart';
@@ -17,7 +18,12 @@ class _RootScreenState extends State<RootScreen> {
 
   int _index = 0;
 
-  static const _tabs = [HomeScreen(), SearchScreen(), NotificationsScreen()];
+  static const _tabs = [
+    HomeScreen(),
+    SearchScreen(),
+    NotificationsScreen(),
+    BookmarksScreen(),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +84,11 @@ class _RootScreenState extends State<RootScreen> {
             icon: Icon(Icons.notifications_outlined),
             selectedIcon: Icon(Icons.notifications),
             label: 'Notifications',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.bookmark_border),
+            selectedIcon: Icon(Icons.bookmark),
+            label: 'Bookmarks',
           ),
         ],
       ),

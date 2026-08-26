@@ -4,6 +4,7 @@ import '../main.dart';
 import '../models/app_seed_color.dart';
 import '../models/current_user.dart';
 import '../screens/profile_screen.dart';
+import '../screens/relays_screen.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -99,6 +100,27 @@ class AppDrawer extends StatelessWidget {
                           ],
                         ],
                       ),
+                    );
+                  },
+                ),
+                const Divider(height: 1),
+                ValueListenableBuilder<Set<String>>(
+                  valueListenable: selectedRelaysNotifier,
+                  builder: (context, selectedRelays, _) {
+                    return ListTile(
+                      key: const Key('relaysCard'),
+                      leading: const Icon(Icons.dns_outlined),
+                      title: const Text('Relays'),
+                      subtitle: Text('${selectedRelays.length} selected'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RelaysScreen(),
+                          ),
+                        );
+                      },
                     );
                   },
                 ),

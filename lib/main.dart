@@ -17,6 +17,14 @@ final ValueNotifier<AppSeedColor> seedColorNotifier = ValueNotifier(
 
 final ValueNotifier<List<Note>> notesNotifier = ValueNotifier(const []);
 
+final ValueNotifier<Set<String>> bookmarkedIdsNotifier = ValueNotifier(
+  const {},
+);
+
+final ValueNotifier<Set<String>> selectedRelaysNotifier = ValueNotifier(
+  const {},
+);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -28,6 +36,16 @@ Future<void> main() async {
   seedColorNotifier.value = await SettingsStore.loadSeedColor();
   seedColorNotifier.addListener(() {
     SettingsStore.saveSeedColor(seedColorNotifier.value);
+  });
+
+  bookmarkedIdsNotifier.value = await SettingsStore.loadBookmarkedIds();
+  bookmarkedIdsNotifier.addListener(() {
+    SettingsStore.saveBookmarkedIds(bookmarkedIdsNotifier.value);
+  });
+
+  selectedRelaysNotifier.value = await SettingsStore.loadSelectedRelays();
+  selectedRelaysNotifier.addListener(() {
+    SettingsStore.saveSelectedRelays(selectedRelaysNotifier.value);
   });
 
   const PostRepository postRepository = JsonPostRepository();

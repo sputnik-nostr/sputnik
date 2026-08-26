@@ -1,23 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../main.dart';
 import '../models/note.dart';
 
-class NoteTile extends StatefulWidget {
+class NoteTile extends StatelessWidget {
   const NoteTile({super.key, required this.note});
 
   final Note note;
 
   @override
-  State<NoteTile> createState() => _NoteTileState();
-}
-
-class _NoteTileState extends State<NoteTile> {
-  bool _bookmarked = false;
-
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final note = widget.note;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -72,10 +65,7 @@ class _NoteTileState extends State<NoteTile> {
                       count: note.likeCount,
                     ),
                     const Spacer(),
-                    _BookmarkButton(
-                      bookmarked: _bookmarked,
-                      onTap: () => setState(() => _bookmarked = !_bookmarked),
-                    ),
+                    _BookmarkButton(noteId: note.id),
                   ],
                 ),
               ],
@@ -115,28 +105,42 @@ class _StatButton extends StatelessWidget {
 }
 
 class _BookmarkButton extends StatelessWidget {
-  const _BookmarkButton({required this.bookmarked, required this.onTap});
+  const _BookmarkButton({required this.noteId});
 
-  final bool bookmarked;
-  final VoidCallback onTap;
+  final String noteId;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: Icon(
-          bookmarked ? Icons.bookmark : Icons.bookmark_border,
-          size: 18,
-          color: bookmarked
-              ? theme.colorScheme.primary
-              : theme.colorScheme.outline,
-        ),
-      ),
+    return ValueListenableBuilder<Set<String>>(
+      valueListenable: bookmarkedIdsNotifier,
+      builder: (context, bookmarkedIds, _) {
+        final bookmarked = bookmarkedIds.contains(noteId);
+
+        return InkWell(
+          onTap: () {
+            final updated = Set<String>.from(bookmarkedIds);
+            if (bookmarked) {
+              updated.remove(noteId);
+            } else {
+              updated.add(noteId);
+            }
+            bookmarkedIdsNotifier.value = updated;
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: Icon(
+              bookmarked ? Icons.bookmark : Icons.bookmark_border,
+              size: 18,
+              color: bookmarked
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.outline,
+            ),
+          ),
+        );
+      },
     );
   }
 }
