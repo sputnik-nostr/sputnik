@@ -16,10 +16,15 @@ class RelayPostRepository implements PostRepository {
   final RelayClient client;
 
   @override
-  Future<List<NostrPost>> fetchPosts() async {
+  Future<List<NostrPost>> fetchPosts() => _fetchPosts();
+
+  Future<List<NostrPost>> fetchPostsByAuthor(String pubkeyHex) =>
+      _fetchPosts(authors: [pubkeyHex]);
+
+  Future<List<NostrPost>> _fetchPosts({List<String>? authors}) async {
     final events = await client.query(
       relayUrls,
-      NostrFilter(kinds: const [1], limit: limit),
+      NostrFilter(kinds: const [1], authors: authors, limit: limit),
     );
 
     events.sort(compareNewestFirst);

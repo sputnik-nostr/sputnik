@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../main.dart';
 import '../nostr/nostr.dart';
 import '../widgets/placeholder_tab.dart';
 import 'profile_screen.dart';
@@ -51,7 +52,7 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ),
         if (npubPubkeyHex != null)
-          _NpubResult(pubkeyHex: npubPubkeyHex)
+          _NpubResult(key: ValueKey(npubPubkeyHex), pubkeyHex: npubPubkeyHex)
         else
           Expanded(
             child: _query.isEmpty
@@ -66,25 +67,56 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 }
 
-class _NpubResult extends StatelessWidget {
-  const _NpubResult({required this.pubkeyHex});
+class _NpubResult extends StatefulWidget {
+  const _NpubResult({super.key, required this.pubkeyHex});
 
   final String pubkeyHex;
 
   @override
-  Widget build(BuildContext context) {
-    final npub = npubFromHex(pubkeyHex);
+  State<_NpubResult> createState() => _NpubResultState();
+}
 
-    return ListTile(
-      leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-      title: Text(truncateNpub(npub)),
-      subtitle: const Text('View profile'),
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProfileScreen(pubkeyHex: pubkeyHex),
+class _NpubResultState extends State<_NpubResult> {
+  @override
+  void initState() {
+    super.initState();
+    const RelayProfileRepository().fetchProfile(
+      widget.pubkeyHex,
+      selectedRelaysNotifier.value,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final npub = npubFromHex(widget.pubkeyHex);
+
+    return ValueListenableBuilder<Map<String, NostrMetadata>>(
+      valueListenable: profileCacheNotifier,
+      builder: (context, profileCache, _) {
+        final metadata = profileCache[widget.pubkeyHex];
+        final displayName = metadata?.resolvedName;
+        final pictureUrl = metadata?.picture;
+
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundImage: pictureUrl != null
+                ? NetworkImage(pictureUrl)
+                : null,
+            onBackgroundImageError: pictureUrl != null ? (_, _) {} : null,
+            child: pictureUrl == null ? const Icon(Icons.person_outline) : null,
           ),
+          title: Text(displayName ?? truncateNpub(npub)),
+          subtitle: Text(
+            displayName != null ? truncateNpub(npub) : 'View profile',
+          ),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProfileScreen(pubkeyHex: widget.pubkeyHex),
+              ),
+            );
+          },
         );
       },
     );

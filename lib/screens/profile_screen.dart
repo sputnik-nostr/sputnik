@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../main.dart';
 import '../models/current_user.dart';
 import '../models/note.dart';
+import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/placeholder_tab.dart';
@@ -51,6 +52,9 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  List<Note>? _fetchedNotes;
+  bool _loadingNotes = true;
+
   bool get _isCurrentUser => widget.pubkeyHex == CurrentUser.pubkeyHex;
 
   @override
@@ -60,12 +64,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // relay has metadata for, so there's nothing to fetch. Otherwise, the
     // cached metadata (if any) renders instantly below while this refreshes
     // it in the background.
-    if (!_isCurrentUser) {
+    if (_isCurrentUser) {
+      _loadingNotes = false;
+    } else {
       const RelayProfileRepository().fetchProfile(
         widget.pubkeyHex,
         selectedRelaysNotifier.value,
       );
+      _loadAuthorPosts();
     }
+  }
+
+  Future<void> _loadAuthorPosts() async {
+    final relayUrls = selectedRelaysNotifier.value;
+    final posts = await RelayPostRepository(relayUrls: relayUrls)
+        .fetchPostsByAuthor(widget.pubkeyHex);
+    if (!mounted) return;
+
+    final metadata = profileCacheNotifier.value[widget.pubkeyHex];
+    setState(() {
+      _fetchedNotes = posts
+          .map((post) => noteFromNostrPost(post, authorMetadata: metadata))
+          .toList();
+      _loadingNotes = false;
+    });
   }
 
   @override
@@ -83,9 +105,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           return ValueListenableBuilder<List<Note>?>(
             valueListenable: notesNotifier,
             builder: (context, notes, _) {
-              final ownNotes = (notes ?? const [])
-                  .where((note) => note.pubkey == pubkeyHex)
-                  .toList();
+              final ownNotesById = <String, Note>{
+                for (final note in (notes ?? const []))
+                  if (note.pubkey == pubkeyHex) note.id: note,
+                for (final note in (_fetchedNotes ?? const [])) note.id: note,
+              };
+              final ownNotes = ownNotesById.values.toList()
+                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
               final displayName = _isCurrentUser
                   ? CurrentUser.displayName
                   : (metadata?.resolvedName ??
@@ -245,7 +271,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const Divider(height: 1),
-                  if (ownNotes.isEmpty)
+                  if (ownNotes.isEmpty && _loadingNotes)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 48),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (ownNotes.isEmpty)
                     const Padding(
                       padding: EdgeInsets.only(top: 48),
                       child: PlaceholderTab(
