@@ -131,8 +131,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   if (note.pubkey == pubkeyHex) note.id: note,
                 for (final note in (_fetchedNotes ?? const [])) note.id: note,
               };
-              final ownNotes = ownNotesById.values.toList()
-                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+              // Notes may have been fetched (and their author metadata
+              // resolved) before this profile's own metadata query landed,
+              // so always re-apply whatever is currently cached rather than
+              // trusting what was baked in when each note was fetched.
+              final ownNotes =
+                  ownNotesById.values
+                      .map(
+                        (note) => metadata == null
+                            ? note
+                            : note.copyWith(
+                                displayName: metadata.resolvedName,
+                                pictureUrl: metadata.picture,
+                              ),
+                      )
+                      .toList()
+                    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
               final displayName = _isCurrentUser
                   ? CurrentUser.displayName
                   : (metadata?.resolvedName ??
@@ -294,7 +308,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             children: [
                               _FollowCount(
                                 count: _following?.length,
-                                label: 'Following',
+                                label: 'following',
                                 onTap: _following == null
                                     ? null
                                     : () => Navigator.push(
@@ -310,7 +324,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               const SizedBox(width: 16),
                               _FollowCount(
                                 count: _followers?.length,
-                                label: 'Followers',
+                                label: 'followers',
                                 onTap: _followers == null
                                     ? null
                                     : () => Navigator.push(

@@ -213,12 +213,12 @@ class _PostHeader extends StatelessWidget {
             children: [
               _StatCount(
                 count: replyCount ?? note.replyCount,
-                label: 'Replies',
+                label: 'replies',
               ),
               const SizedBox(width: 20),
-              _StatCount(count: note.repostCount, label: 'Reposts'),
+              _StatCount(count: note.repostCount, label: 'reposts'),
               const SizedBox(width: 20),
-              _StatCount(count: note.likeCount, label: 'Likes'),
+              _StatCount(count: note.likeCount, label: 'likes'),
               const Spacer(),
               _HeaderBookmarkButton(note: note),
             ],

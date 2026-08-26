@@ -55,6 +55,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
           style: TextStyle(
             color: linkColor,
             decoration: TextDecoration.underline,
+            decorationColor: linkColor,
           ),
           recognizer: recognizer,
         ),

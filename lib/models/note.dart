@@ -46,16 +46,22 @@ class Note {
   final int repostCount;
   final int likeCount;
 
-  Note copyWith({int? replyCount, int? repostCount, int? likeCount}) {
+  Note copyWith({
+    String? displayName,
+    String? pictureUrl,
+    int? replyCount,
+    int? repostCount,
+    int? likeCount,
+  }) {
     return Note(
       id: id,
       pubkey: pubkey,
-      displayName: displayName,
+      displayName: displayName ?? this.displayName,
       handle: handle,
       content: content,
       postedAt: postedAt,
       createdAt: createdAt,
-      pictureUrl: pictureUrl,
+      pictureUrl: pictureUrl ?? this.pictureUrl,
       replyCount: replyCount ?? this.replyCount,
       repostCount: repostCount ?? this.repostCount,
       likeCount: likeCount ?? this.likeCount,
