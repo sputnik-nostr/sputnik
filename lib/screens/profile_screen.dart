@@ -6,6 +6,7 @@ import '../models/current_user.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
+import '../widgets/linkified_text.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/placeholder_tab.dart';
 
@@ -265,7 +266,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                         if (hasBio) ...[
                           const SizedBox(height: 8),
-                          Text(bio, style: theme.textTheme.bodyMedium),
+                          LinkifiedText(bio, style: theme.textTheme.bodyMedium),
                         ],
                       ],
                     ),

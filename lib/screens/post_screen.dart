@@ -4,6 +4,7 @@ import '../main.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
+import '../widgets/linkified_text.dart';
 import '../widgets/note_tile.dart';
 import 'profile_screen.dart';
 
@@ -194,7 +195,7 @@ class _PostHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Text(note.content, style: theme.textTheme.bodyLarge),
+              LinkifiedText(note.content, style: theme.textTheme.bodyLarge),
               const SizedBox(height: 16),
               Text(
                 _formatAbsoluteTime(note.createdAt),

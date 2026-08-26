@@ -4,6 +4,7 @@ import '../main.dart';
 import '../models/note.dart';
 import '../screens/post_screen.dart';
 import '../screens/profile_screen.dart';
+import 'linkified_text.dart';
 
 class NoteTile extends StatelessWidget {
   const NoteTile({super.key, required this.note});
@@ -83,7 +84,10 @@ class NoteTile extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(note.content, style: theme.textTheme.bodyMedium),
+                  LinkifiedText(
+                    note.content,
+                    style: theme.textTheme.bodyMedium,
+                  ),
                   const SizedBox(height: 8),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
