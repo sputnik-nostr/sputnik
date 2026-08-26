@@ -12,7 +12,7 @@ class NoteTile extends StatelessWidget {
   void _openProfile(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => ProfileScreen(npub: note.pubkey)),
+      MaterialPageRoute(builder: (_) => ProfileScreen(pubkeyHex: note.pubkey)),
     );
   }
 

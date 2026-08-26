@@ -16,6 +16,7 @@ Note noteFromNostrPost(NostrPost post, {NostrMetadata? authorMetadata}) {
   );
 }
 
+// Returns the note's relative timestamp in a human-readable format.
 String _relativeTime(DateTime time) {
   final diff = DateTime.now().difference(time);
   if (diff.inMinutes < 1) return 'now';

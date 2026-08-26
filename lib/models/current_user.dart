@@ -1,8 +1,9 @@
 class CurrentUser {
   const CurrentUser._();
 
-  static const npub =
-      'npub1anon0000000000000000000000000000000000000000000000000000';
+  // Placeholder hex pubkey for the current user. The NIP-19 `npub` is an encoding of this.
+  static const pubkeyHex =
+      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
   static const displayName = 'Anon';
   static const bio = 'This is a test bio';
   static final lastActiveAt = DateTime.now().subtract(

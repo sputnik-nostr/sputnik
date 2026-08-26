@@ -48,12 +48,13 @@ class RelayClient {
           case 'EVENT':
             events.add(NostrEvent.fromJson(message[2] as Map<String, dynamic>));
           case 'EOSE':
+          case 'CLOSED':
             return events;
         }
       }
     } catch (_) {
-      // Relay unreachable, timed out, or sent something unexpected: fall
-      // back to whatever events were collected before the failure.
+      // Relay is unreachable for some reason; fall back to whatever events were
+      // loaded before the failure.
     } finally {
       unawaited(channel?.sink.close());
     }

@@ -12,6 +12,7 @@ const _bannerHeight = 140.0 * 0.8;
 const _avatarRadius = 40.0;
 const _avatarOverlap = _avatarRadius * 2 * 0.25;
 
+// Truncates the `npub`-encoded public key for readability.
 String _truncateNpub(String npub) {
   const totalLength = 20;
   const suffixLength = 5;
@@ -52,9 +53,9 @@ String _formatLastActive(DateTime time) {
 }
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key, this.npub = CurrentUser.npub});
+  const ProfileScreen({super.key, this.pubkeyHex = CurrentUser.pubkeyHex});
 
-  final String npub;
+  final String pubkeyHex;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -63,17 +64,17 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   late final Future<NostrMetadata?> _metadataFuture;
 
-  bool get _isCurrentUser => widget.npub == CurrentUser.npub;
+  bool get _isCurrentUser => widget.pubkeyHex == CurrentUser.pubkeyHex;
 
   @override
   void initState() {
     super.initState();
-    // The current user's npub is a local placeholder, not a real key any
+    // The current user's pubkey is a local placeholder, not a real key any
     // relay has metadata for, so there's nothing to fetch.
     _metadataFuture = _isCurrentUser
         ? Future.value(null)
         : const RelayProfileRepository().fetchProfile(
-            widget.npub,
+            widget.pubkeyHex,
             selectedRelaysNotifier.value,
           );
   }
@@ -81,7 +82,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final npub = widget.npub;
+    final pubkeyHex = widget.pubkeyHex;
+    final npub = npubFromHex(pubkeyHex);
 
     return Scaffold(
       body: FutureBuilder<NostrMetadata?>(
@@ -93,14 +95,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             valueListenable: notesNotifier,
             builder: (context, notes, _) {
               final ownNotes = (notes ?? const [])
-                  .where((note) => note.pubkey == npub)
+                  .where((note) => note.pubkey == pubkeyHex)
                   .toList();
               final displayName = _isCurrentUser
                   ? CurrentUser.displayName
                   : (metadata?.resolvedName ??
                         (ownNotes.isNotEmpty
                             ? ownNotes.first.displayName
-                            : _shortPubkey(npub)));
+                            : _shortPubkey(pubkeyHex)));
               final pictureUrl = metadata?.picture;
               final bannerUrl = metadata?.banner;
               final bio = _isCurrentUser ? CurrentUser.bio : metadata?.about;

@@ -22,7 +22,7 @@ class RelayPostRepository implements PostRepository {
       NostrFilter(kinds: const [1], limit: limit),
     );
 
-    events.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    events.sort(compareNewestFirst);
 
     return events.take(limit).map(_toPost).toList();
   }

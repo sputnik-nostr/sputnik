@@ -33,3 +33,8 @@ class NostrEvent {
   final String content;
   final String sig;
 }
+
+int compareNewestFirst(NostrEvent a, NostrEvent b) {
+  final byTime = b.createdAt.compareTo(a.createdAt);
+  return byTime != 0 ? byTime : a.id.compareTo(b.id);
+}

@@ -1,3 +1,4 @@
+import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'models/nostr_metadata.dart';
 import 'relay_client.dart';
@@ -25,7 +26,7 @@ class RelayProfileRepository {
       relayUrls,
       NostrFilter(kinds: const [0], authors: pubkeys.toList()),
     );
-    events.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    events.sort(compareNewestFirst);
 
     final metadataByPubkey = <String, NostrMetadata>{};
     for (final event in events) {
@@ -35,7 +36,7 @@ class RelayProfileRepository {
           event.content,
         );
       } catch (_) {
-        // Malformed metadata content: skip this event for this author.
+        // Metadata content is malformed; skip event for this author.
       }
     }
     return metadataByPubkey;
