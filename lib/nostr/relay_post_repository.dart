@@ -24,20 +24,6 @@ class RelayPostRepository implements PostRepository {
 
     events.sort(compareNewestFirst);
 
-    return events.take(limit).map(_toPost).toList();
-  }
-
-  NostrPost _toPost(NostrEvent event) {
-    final shortPubkey = event.pubkey.substring(0, 8);
-    return NostrPost(
-      id: event.id,
-      author: NostrAuthor(
-        pubkey: event.pubkey,
-        displayName: shortPubkey,
-        handle: shortPubkey,
-      ),
-      content: event.content,
-      createdAt: event.createdAt,
-    );
+    return events.take(limit).map(nostrPostFromEvent).toList();
   }
 }

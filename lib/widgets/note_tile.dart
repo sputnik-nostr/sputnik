@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../main.dart';
 import '../models/note.dart';
+import '../screens/post_screen.dart';
 import '../screens/profile_screen.dart';
 
 class NoteTile extends StatelessWidget {
@@ -16,89 +17,102 @@ class NoteTile extends StatelessWidget {
     );
   }
 
+  void _openPost(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => PostScreen(note: note)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          GestureDetector(
-            onTap: () => _openProfile(context),
-            child: CircleAvatar(
-              backgroundColor: theme.colorScheme.primaryContainer,
-              backgroundImage: note.pictureUrl != null
-                  ? NetworkImage(note.pictureUrl!)
-                  : null,
-              onBackgroundImageError: note.pictureUrl != null
-                  ? (_, _) {}
-                  : null,
-              child: note.pictureUrl == null
-                  ? Text(
-                      note.displayName[0].toUpperCase(),
-                      style: TextStyle(
-                        color: theme.colorScheme.onPrimaryContainer,
-                      ),
-                    )
-                  : null,
+    return InkWell(
+      onTap: () => _openPost(context),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: () => _openProfile(context),
+              child: CircleAvatar(
+                backgroundColor: theme.colorScheme.primaryContainer,
+                backgroundImage: note.pictureUrl != null
+                    ? NetworkImage(note.pictureUrl!)
+                    : null,
+                onBackgroundImageError: note.pictureUrl != null
+                    ? (_, _) {}
+                    : null,
+                child: note.pictureUrl == null
+                    ? Text(
+                        note.displayName[0].toUpperCase(),
+                        style: TextStyle(
+                          color: theme.colorScheme.onPrimaryContainer,
+                        ),
+                      )
+                    : null,
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => _openProfile(context),
-                        child: Text(
-                          note.displayName,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _openProfile(context),
+                          child: Text(
+                            note.displayName,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    Text(
-                      note.postedAt,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.outline,
+                      Text(
+                        note.postedAt,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.outline,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(note.content, style: theme.textTheme.bodyMedium),
-                const SizedBox(height: 8),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _StatButton(
-                        icon: Icons.chat_bubble_outline,
-                        count: note.replyCount,
-                      ),
-                      const SizedBox(width: 20),
-                      _StatButton(icon: Icons.repeat, count: note.repostCount),
-                      const SizedBox(width: 20),
-                      _StatButton(
-                        icon: Icons.favorite_border,
-                        count: note.likeCount,
-                      ),
-                      const SizedBox(width: 20),
-                      _BookmarkButton(noteId: note.id),
                     ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(note.content, style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _StatButton(
+                          icon: Icons.chat_bubble_outline,
+                          count: note.replyCount,
+                        ),
+                        const SizedBox(width: 20),
+                        _StatButton(
+                          icon: Icons.repeat,
+                          count: note.repostCount,
+                        ),
+                        const SizedBox(width: 20),
+                        _StatButton(
+                          icon: Icons.favorite_border,
+                          count: note.likeCount,
+                        ),
+                        const SizedBox(width: 20),
+                        _BookmarkButton(noteId: note.id),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

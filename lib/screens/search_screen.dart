@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../nostr/nostr.dart';
 import '../widgets/placeholder_tab.dart';
+import 'profile_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -21,6 +23,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final npubPubkeyHex = hexFromNpub(_query.trim());
+
     return Column(
       children: [
         Padding(
@@ -49,12 +53,39 @@ class _SearchScreenState extends State<SearchScreen> {
         Expanded(
           child: _query.isEmpty
               ? const PlaceholderTab(icon: Icons.search, label: 'Search')
+              : npubPubkeyHex != null
+              ? _NpubResult(pubkeyHex: npubPubkeyHex)
               : PlaceholderTab(
                   icon: Icons.search_off,
                   label: 'No results for "$_query"',
                 ),
         ),
       ],
+    );
+  }
+}
+
+class _NpubResult extends StatelessWidget {
+  const _NpubResult({required this.pubkeyHex});
+
+  final String pubkeyHex;
+
+  @override
+  Widget build(BuildContext context) {
+    final npub = npubFromHex(pubkeyHex);
+
+    return ListTile(
+      leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+      title: Text(truncateNpub(npub)),
+      subtitle: const Text('View profile'),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProfileScreen(pubkeyHex: pubkeyHex),
+          ),
+        );
+      },
     );
   }
 }

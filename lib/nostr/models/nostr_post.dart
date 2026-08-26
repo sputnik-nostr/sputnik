@@ -1,3 +1,19 @@
+import 'nostr_event.dart';
+
+NostrPost nostrPostFromEvent(NostrEvent event) {
+  final shortPubkey = event.pubkey.substring(0, 8);
+  return NostrPost(
+    id: event.id,
+    author: NostrAuthor(
+      pubkey: event.pubkey,
+      displayName: shortPubkey,
+      handle: shortPubkey,
+    ),
+    content: event.content,
+    createdAt: event.createdAt,
+  );
+}
+
 class NostrAuthor {
   const NostrAuthor({
     required this.pubkey,

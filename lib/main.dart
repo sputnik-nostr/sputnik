@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'models/app_seed_color.dart';
 import 'models/note.dart';
@@ -24,6 +25,8 @@ final ValueNotifier<Set<String>> bookmarkedIdsNotifier = ValueNotifier(
 final ValueNotifier<Set<String>> selectedRelaysNotifier = ValueNotifier(
   const {},
 );
+
+final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -89,6 +92,7 @@ class MainApp extends StatelessWidget {
             return MaterialApp(
               title: 'Sputnik',
               debugShowCheckedModeBanner: false,
+              navigatorKey: navigatorKey,
               themeMode: themeMode,
               theme: ThemeData(
                 useMaterial3: true,
@@ -101,6 +105,17 @@ class MainApp extends StatelessWidget {
                 colorSchemeSeed: seedColor.color,
               ),
               home: const RootScreen(),
+              builder: (context, child) => CallbackShortcuts(
+                bindings: {
+                  const SingleActivator(LogicalKeyboardKey.escape): () {
+                    final navigator = navigatorKey.currentState;
+                    if (navigator != null && navigator.canPop()) {
+                      navigator.pop();
+                    }
+                  },
+                },
+                child: Focus(autofocus: true, child: child!),
+              ),
             );
           },
         );

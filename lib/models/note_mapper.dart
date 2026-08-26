@@ -10,6 +10,7 @@ Note noteFromNostrPost(NostrPost post, {NostrMetadata? authorMetadata}) {
     pictureUrl: authorMetadata?.picture,
     content: post.content,
     postedAt: _relativeTime(post.createdAt),
+    createdAt: post.createdAt,
     replyCount: post.replyCount,
     repostCount: post.repostCount,
     likeCount: post.likeCount,

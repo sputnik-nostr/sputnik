@@ -8,7 +8,7 @@ void main() {
   testWidgets('Profile avatar opens the settings drawer', (
     WidgetTester tester,
   ) async {
-    notesNotifier.value = const [
+    notesNotifier.value = [
       Note(
         id: '1',
         pubkey:
@@ -17,6 +17,7 @@ void main() {
         handle: 'npub1alice...',
         content: 'hello',
         postedAt: '2m',
+        createdAt: DateTime.now(),
       ),
     ];
 

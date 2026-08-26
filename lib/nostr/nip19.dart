@@ -17,3 +17,14 @@ String? hexFromNpub(String npub) {
   if (bytes.isEmpty) return null;
   return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 }
+
+// Truncates an `npub` for display purposes.
+String truncateNpub(String npub) {
+  const totalLength = 20;
+  const suffixLength = 5;
+  if (npub.length <= totalLength) return npub;
+  final prefixLength = totalLength - suffixLength - 3;
+  final prefix = npub.substring(0, prefixLength);
+  final suffix = npub.substring(npub.length - suffixLength);
+  return '$prefix...$suffix';
+}

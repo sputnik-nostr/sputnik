@@ -12,17 +12,6 @@ const _bannerHeight = 140.0 * 0.8;
 const _avatarRadius = 40.0;
 const _avatarOverlap = _avatarRadius * 2 * 0.25;
 
-// Truncates the `npub`-encoded public key for readability.
-String _truncateNpub(String npub) {
-  const totalLength = 20;
-  const suffixLength = 5;
-  if (npub.length <= totalLength) return npub;
-  final prefixLength = totalLength - suffixLength - 3;
-  final prefix = npub.substring(0, prefixLength);
-  final suffix = npub.substring(npub.length - suffixLength);
-  return '$prefix...$suffix';
-}
-
 String _formatLastActiveFromPostedAt(String postedAt) {
   return postedAt == 'now'
       ? 'Last active just now'
@@ -202,7 +191,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              _truncateNpub(npub),
+                              truncateNpub(npub),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.outline,
                               ),
