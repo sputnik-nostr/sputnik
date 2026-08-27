@@ -4,6 +4,7 @@ import '../main.dart';
 import '../models/note.dart';
 import '../screens/post_screen.dart';
 import '../screens/profile_screen.dart';
+import 'fade_in_avatar.dart';
 import 'linkified_text.dart';
 
 class NoteTile extends StatelessWidget {
@@ -38,22 +39,13 @@ class NoteTile extends StatelessWidget {
           children: [
             GestureDetector(
               onTap: () => _openProfile(context),
-              child: CircleAvatar(
+              child: FadeInAvatar(
+                imageUrl: note.pictureUrl,
                 backgroundColor: theme.colorScheme.primaryContainer,
-                backgroundImage: note.pictureUrl != null
-                    ? NetworkImage(note.pictureUrl!)
-                    : null,
-                onBackgroundImageError: note.pictureUrl != null
-                    ? (_, _) {}
-                    : null,
-                child: note.pictureUrl == null
-                    ? Text(
-                        note.displayName[0].toUpperCase(),
-                        style: TextStyle(
-                          color: theme.colorScheme.onPrimaryContainer,
-                        ),
-                      )
-                    : null,
+                fallback: Text(
+                  note.displayName[0].toUpperCase(),
+                  style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+                ),
               ),
             ),
             const SizedBox(width: 12),

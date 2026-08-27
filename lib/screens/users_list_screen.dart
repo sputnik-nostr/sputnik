@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../main.dart';
@@ -22,13 +24,35 @@ class UsersListScreen extends StatefulWidget {
 }
 
 class _UsersListScreenState extends State<UsersListScreen> {
-  @override
-  void initState() {
-    super.initState();
+  // Only rows that actually get built (i.e. are visible or near-visible)
+  // request their profile, rather than eagerly fetching the whole list up
+  // front. Requests are debounced so a fast scroll batches into one fetch
+  // instead of firing per row.
+  final _requested = <String>{};
+  final _pending = <String>{};
+  Timer? _debounce;
+
+  void _ensureProfileRequested(String pubkeyHex) {
+    if (!_requested.add(pubkeyHex)) return;
+    _pending.add(pubkeyHex);
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 100), _flushPending);
+  }
+
+  void _flushPending() {
+    if (_pending.isEmpty) return;
+    final toFetch = Set<String>.of(_pending);
+    _pending.clear();
     const RelayProfileRepository().fetchProfiles(
-      widget.pubkeys.toSet(),
+      toFetch,
       selectedRelaysNotifier.value,
     );
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
   }
 
   @override
@@ -48,6 +72,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final pubkeyHex = widget.pubkeys[index];
+                    _ensureProfileRequested(pubkeyHex);
                     return ProfileResultTile(
                       pubkeyHex: pubkeyHex,
                       metadata: profileCache[pubkeyHex],

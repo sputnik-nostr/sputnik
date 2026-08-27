@@ -7,6 +7,7 @@ import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
 import '../widgets/count_label.dart';
+import '../widgets/fade_in_avatar.dart';
 import '../widgets/linkified_text.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/placeholder_tab.dart';
@@ -173,27 +174,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        Container(
-                          height: _bannerHeight,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            gradient: bannerUrl == null
-                                ? LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      theme.colorScheme.primary,
-                                      theme.colorScheme.tertiary,
-                                    ],
-                                  )
-                                : null,
-                            image: bannerUrl != null
-                                ? DecorationImage(
-                                    image: NetworkImage(bannerUrl),
+                        ClipRect(
+                          child: SizedBox(
+                            height: _bannerHeight,
+                            width: double.infinity,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        theme.colorScheme.primary,
+                                        theme.colorScheme.tertiary,
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                if (bannerUrl != null)
+                                  Image.network(
+                                    bannerUrl,
                                     fit: BoxFit.cover,
-                                    onError: (_, _) {},
-                                  )
-                                : null,
+                                    frameBuilder:
+                                        (
+                                          context,
+                                          child,
+                                          frame,
+                                          wasSynchronouslyLoaded,
+                                        ) {
+                                          if (wasSynchronouslyLoaded) {
+                                            return child;
+                                          }
+                                          return AnimatedOpacity(
+                                            opacity: frame == null ? 0 : 1,
+                                            duration: const Duration(
+                                              milliseconds: 300,
+                                            ),
+                                            curve: Curves.easeOut,
+                                            child: child,
+                                          );
+                                        },
+                                    errorBuilder: (_, _, _) =>
+                                        const SizedBox.shrink(),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                         Positioned(
@@ -215,28 +242,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               shape: BoxShape.circle,
                               color: theme.colorScheme.surface,
                             ),
-                            child: CircleAvatar(
+                            child: FadeInAvatar(
                               radius: _avatarRadius,
+                              imageUrl: pictureUrl,
                               backgroundColor:
                                   theme.colorScheme.primaryContainer,
-                              backgroundImage: pictureUrl != null
-                                  ? NetworkImage(pictureUrl)
-                                  : null,
-                              onBackgroundImageError: pictureUrl != null
-                                  ? (_, _) {}
-                                  : null,
-                              child: pictureUrl == null
-                                  ? Text(
-                                      displayName[0].toUpperCase(),
-                                      style: TextStyle(
-                                        color: theme
-                                            .colorScheme
-                                            .onPrimaryContainer,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 28,
-                                      ),
-                                    )
-                                  : null,
+                              fallback: Text(
+                                displayName[0].toUpperCase(),
+                                style: TextStyle(
+                                  color: theme.colorScheme.onPrimaryContainer,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 28,
+                                ),
+                              ),
                             ),
                           ),
                         ),

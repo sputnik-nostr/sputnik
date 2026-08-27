@@ -19,9 +19,7 @@
 
 - Use `LazyBox` for Hive, if that's preferable
 - Use Dart isolates to offload JSON parsing
-- Use `dart:convert` package for optimized decoding
 - Lazy-loading of Hive keys
-- Two-pass profile fetch: display raw keys first with a rolling `Set` of visible items, then only run requests for further info for visible items
 
 ## Less-relevant optimizations:
 

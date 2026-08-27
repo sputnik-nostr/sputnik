@@ -5,6 +5,7 @@ import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
 import '../widgets/count_label.dart';
+import '../widgets/fade_in_avatar.dart';
 import '../widgets/linkified_text.dart';
 import '../widgets/note_tile.dart';
 import 'profile_screen.dart';
@@ -201,23 +202,16 @@ class _PostHeader extends StatelessWidget {
                 onTap: () => _openProfile(context),
                 child: Row(
                   children: [
-                    CircleAvatar(
+                    FadeInAvatar(
                       radius: 22,
+                      imageUrl: note.pictureUrl,
                       backgroundColor: theme.colorScheme.primaryContainer,
-                      backgroundImage: note.pictureUrl != null
-                          ? NetworkImage(note.pictureUrl!)
-                          : null,
-                      onBackgroundImageError: note.pictureUrl != null
-                          ? (_, _) {}
-                          : null,
-                      child: note.pictureUrl == null
-                          ? Text(
-                              note.displayName[0].toUpperCase(),
-                              style: TextStyle(
-                                color: theme.colorScheme.onPrimaryContainer,
-                              ),
-                            )
-                          : null,
+                      fallback: Text(
+                        note.displayName[0].toUpperCase(),
+                        style: TextStyle(
+                          color: theme.colorScheme.onPrimaryContainer,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../nostr/nostr.dart';
 import '../screens/profile_screen.dart';
+import 'fade_in_avatar.dart';
 
 class ProfileResultTile extends StatelessWidget {
   const ProfileResultTile({
@@ -20,10 +21,10 @@ class ProfileResultTile extends StatelessWidget {
     final pictureUrl = metadata?.picture;
 
     return ListTile(
-      leading: CircleAvatar(
-        backgroundImage: pictureUrl != null ? NetworkImage(pictureUrl) : null,
-        onBackgroundImageError: pictureUrl != null ? (_, _) {} : null,
-        child: pictureUrl == null ? const Icon(Icons.person_outline) : null,
+      leading: FadeInAvatar(
+        imageUrl: pictureUrl,
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        fallback: const Icon(Icons.person_outline),
       ),
       title: Text(displayName ?? truncateNpub(npub)),
       subtitle: Text(displayName != null ? truncateNpub(npub) : 'View profile'),
