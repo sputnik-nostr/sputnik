@@ -11,6 +11,7 @@ import '../widgets/fade_in_avatar.dart';
 import '../widgets/linkified_text.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/placeholder_tab.dart';
+import 'image_viewer_screen.dart';
 import 'users_list_screen.dart';
 
 const _bannerHeight = 140.0 * 0.8;
@@ -62,6 +63,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<String>? _followers;
 
   bool get _isCurrentUser => widget.pubkeyHex == CurrentUser.pubkeyHex;
+
+  void _openImage(BuildContext context, String imageUrl) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ImageViewerScreen(imageUrl: imageUrl)),
+    );
+  }
 
   @override
   void initState() {
@@ -174,52 +182,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        ClipRect(
-                          child: SizedBox(
-                            height: _bannerHeight,
-                            width: double.infinity,
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        theme.colorScheme.primary,
-                                        theme.colorScheme.tertiary,
-                                      ],
+                        GestureDetector(
+                          onTap: bannerUrl != null
+                              ? () => _openImage(context, bannerUrl)
+                              : null,
+                          child: ClipRect(
+                            child: SizedBox(
+                              height: _bannerHeight,
+                              width: double.infinity,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          theme.colorScheme.primary,
+                                          theme.colorScheme.tertiary,
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                                if (bannerUrl != null)
-                                  Image.network(
-                                    bannerUrl,
-                                    fit: BoxFit.cover,
-                                    frameBuilder:
-                                        (
-                                          context,
-                                          child,
-                                          frame,
-                                          wasSynchronouslyLoaded,
-                                        ) {
-                                          if (wasSynchronouslyLoaded) {
-                                            return child;
-                                          }
-                                          return AnimatedOpacity(
-                                            opacity: frame == null ? 0 : 1,
-                                            duration: const Duration(
-                                              milliseconds: 300,
-                                            ),
-                                            curve: Curves.easeOut,
-                                            child: child,
-                                          );
-                                        },
-                                    errorBuilder: (_, _, _) =>
-                                        const SizedBox.shrink(),
-                                  ),
-                              ],
+                                  if (bannerUrl != null)
+                                    Image.network(
+                                      bannerUrl,
+                                      fit: BoxFit.cover,
+                                      frameBuilder:
+                                          (
+                                            context,
+                                            child,
+                                            frame,
+                                            wasSynchronouslyLoaded,
+                                          ) {
+                                            if (wasSynchronouslyLoaded) {
+                                              return child;
+                                            }
+                                            return AnimatedOpacity(
+                                              opacity: frame == null ? 0 : 1,
+                                              duration: const Duration(
+                                                milliseconds: 300,
+                                              ),
+                                              curve: Curves.easeOut,
+                                              child: child,
+                                            );
+                                          },
+                                      errorBuilder: (_, _, _) =>
+                                          const SizedBox.shrink(),
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -242,17 +255,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               shape: BoxShape.circle,
                               color: theme.colorScheme.surface,
                             ),
-                            child: FadeInAvatar(
-                              radius: _avatarRadius,
-                              imageUrl: pictureUrl,
-                              backgroundColor:
-                                  theme.colorScheme.primaryContainer,
-                              fallback: Text(
-                                displayName[0].toUpperCase(),
-                                style: TextStyle(
-                                  color: theme.colorScheme.onPrimaryContainer,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 28,
+                            child: GestureDetector(
+                              onTap: pictureUrl != null
+                                  ? () => _openImage(context, pictureUrl)
+                                  : null,
+                              child: FadeInAvatar(
+                                radius: _avatarRadius,
+                                imageUrl: pictureUrl,
+                                backgroundColor:
+                                    theme.colorScheme.primaryContainer,
+                                fallback: Text(
+                                  displayName[0].toUpperCase(),
+                                  style: TextStyle(
+                                    color: theme.colorScheme.onPrimaryContainer,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 28,
+                                  ),
                                 ),
                               ),
                             ),
