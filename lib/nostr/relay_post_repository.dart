@@ -21,6 +21,15 @@ class RelayPostRepository implements PostRepository {
   Future<List<NostrPost>> fetchPostsByAuthor(String pubkeyHex) =>
       _fetchPosts(authors: [pubkeyHex]);
 
+  Future<NostrPost?> fetchPostById(String id) async {
+    final events = await client.query(
+      relayUrls,
+      NostrFilter(ids: [id], kinds: const [1], limit: 1),
+    );
+    if (events.isEmpty) return null;
+    return nostrPostFromEvent(events.first);
+  }
+
   Future<List<NostrPost>> _fetchPosts({List<String>? authors}) async {
     final events = await client.query(
       relayUrls,

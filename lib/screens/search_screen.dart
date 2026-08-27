@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
+import '../models/note.dart';
+import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
+import '../widgets/note_tile.dart';
 import '../widgets/placeholder_tab.dart';
 import '../widgets/profile_result_tile.dart';
 
@@ -24,7 +27,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final npubPubkeyHex = hexFromNpub(_query.trim());
+    final target = decodeNostrUri(_query.trim());
 
     return Column(
       children: [
@@ -51,8 +54,16 @@ class _SearchScreenState extends State<SearchScreen> {
             }),
           ),
         ),
-        if (npubPubkeyHex != null)
-          _NpubResult(key: ValueKey(npubPubkeyHex), pubkeyHex: npubPubkeyHex)
+        if (target?.pubkeyHex != null)
+          _NpubResult(
+            key: ValueKey(target!.pubkeyHex),
+            pubkeyHex: target.pubkeyHex!,
+          )
+        else if (target?.eventIdHex != null)
+          _NoteResult(
+            key: ValueKey(target!.eventIdHex),
+            eventIdHex: target.eventIdHex!,
+          )
         else
           Expanded(
             child: _query.isEmpty
@@ -96,6 +107,60 @@ class _NpubResultState extends State<_NpubResult> {
           metadata: profileCache[widget.pubkeyHex],
         );
       },
+    );
+  }
+}
+
+class _NoteResult extends StatefulWidget {
+  const _NoteResult({super.key, required this.eventIdHex});
+
+  final String eventIdHex;
+
+  @override
+  State<_NoteResult> createState() => _NoteResultState();
+}
+
+class _NoteResultState extends State<_NoteResult> {
+  late final Future<Note?> _noteFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _noteFuture = _load();
+  }
+
+  Future<Note?> _load() async {
+    final relayUrls = selectedRelaysNotifier.value;
+    final post = await RelayPostRepository(relayUrls: relayUrls)
+        .fetchPostById(widget.eventIdHex);
+    if (post == null) return null;
+
+    final authorMetadata = await const RelayProfileRepository().fetchProfile(
+      post.author.pubkey,
+      relayUrls,
+    );
+    return noteFromNostrPost(post, authorMetadata: authorMetadata);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: FutureBuilder<Note?>(
+        future: _noteFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final note = snapshot.data;
+          if (note == null) {
+            return const PlaceholderTab(
+              icon: Icons.search_off,
+              label: 'Note not found',
+            );
+          }
+          return ListView(children: [NoteTile(note: note)]);
+        },
+      ),
     );
   }
 }
