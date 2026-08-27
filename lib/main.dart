@@ -34,24 +34,31 @@ final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await CacheStore.init();
 
-  themeModeNotifier.value = await SettingsStore.loadThemeMode();
+  final cacheInit = CacheStore.init();
+  final themeModeFuture = SettingsStore.loadThemeMode();
+  final seedColorFuture = SettingsStore.loadSeedColor();
+  final bookmarkedNotesFuture = SettingsStore.loadBookmarkedNotes();
+  final selectedRelaysFuture = SettingsStore.loadSelectedRelays();
+
+  await cacheInit;
+
+  themeModeNotifier.value = await themeModeFuture;
   themeModeNotifier.addListener(() {
     SettingsStore.saveThemeMode(themeModeNotifier.value);
   });
 
-  seedColorNotifier.value = await SettingsStore.loadSeedColor();
+  seedColorNotifier.value = await seedColorFuture;
   seedColorNotifier.addListener(() {
     SettingsStore.saveSeedColor(seedColorNotifier.value);
   });
 
-  bookmarkedNotesNotifier.value = await SettingsStore.loadBookmarkedNotes();
+  bookmarkedNotesNotifier.value = await bookmarkedNotesFuture;
   bookmarkedNotesNotifier.addListener(() {
     SettingsStore.saveBookmarkedNotes(bookmarkedNotesNotifier.value);
   });
 
-  selectedRelaysNotifier.value = await SettingsStore.loadSelectedRelays();
+  selectedRelaysNotifier.value = await selectedRelaysFuture;
   selectedRelaysNotifier.addListener(() {
     SettingsStore.saveSelectedRelays(selectedRelaysNotifier.value);
   });
@@ -69,6 +76,18 @@ Future<void> _loadFeed() async {
     relayUrls: relayUrls,
   );
   final posts = await postRepository.fetchPosts();
+
+  // Show posts right away, using already-cached profile metadata where
+  // available, instead of blocking the whole feed on the profile and
+  // reaction round trips below.
+  notesNotifier.value = posts
+      .map(
+        (post) => noteFromNostrPost(
+          post,
+          authorMetadata: profileCacheNotifier.value[post.author.pubkey],
+        ),
+      )
+      .toList();
 
   final authorPubkeys = posts.map((post) => post.author.pubkey).toSet();
   final profilesFuture = const RelayProfileRepository().fetchProfiles(

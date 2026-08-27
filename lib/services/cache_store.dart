@@ -15,8 +15,12 @@ class CacheStore {
 
   static Future<void> init() async {
     await Hive.initFlutter();
-    _profiles = await Hive.openBox<Map>('profiles');
-    _contacts = await Hive.openBox<Map>('contacts');
+    final boxes = await Future.wait([
+      Hive.openBox<Map>('profiles'),
+      Hive.openBox<Map>('contacts'),
+    ]);
+    _profiles = boxes[0];
+    _contacts = boxes[1];
   }
 
   static bool _isFresh(int? fetchedAtMillis) {
