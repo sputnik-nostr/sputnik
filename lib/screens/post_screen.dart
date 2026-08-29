@@ -87,11 +87,16 @@ class _PostScreenState extends State<PostScreen> {
     final authorPubkeys = thread.replies
         .map((post) => post.author.pubkey)
         .toSet();
-    final profilesByPubkey = await const RelayProfileRepository().fetchProfiles(
+    final profilesFuture = const RelayProfileRepository().fetchProfiles(
       authorPubkeys,
       relayUrls,
     );
+    final reactionsFuture = const RelayReactionsRepository().fetchReactions(
+      thread.replies.map((post) => post.id).toList(),
+      relayUrls,
+    );
 
+    final profilesByPubkey = await profilesFuture;
     final replyNotes = thread.replies
         .map(
           (post) => noteFromNostrPost(
@@ -101,8 +106,7 @@ class _PostScreenState extends State<PostScreen> {
         )
         .toList();
 
-    final reactionsByReplyId = await const RelayReactionsRepository()
-        .fetchReactions(replyNotes.map((note) => note.id).toList(), relayUrls);
+    final reactionsByReplyId = await reactionsFuture;
 
     return _PostThread(
       replies: applyReactionCounts(replyNotes, reactionsByReplyId),

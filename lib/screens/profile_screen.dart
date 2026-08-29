@@ -114,16 +114,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadContacts() async {
     final relayUrls = selectedRelaysNotifier.value;
     const repository = RelayContactsRepository();
-    final following = await repository.fetchFollowing(
+    final followingFuture = repository.fetchFollowing(
       widget.pubkeyHex,
       relayUrls,
     );
+    final followersFuture = repository.fetchFollowers(
+      widget.pubkeyHex,
+      relayUrls,
+    );
+
+    final following = await followingFuture;
     if (mounted) setState(() => _following = following);
 
-    final followers = await repository.fetchFollowers(
-      widget.pubkeyHex,
-      relayUrls,
-    );
+    final followers = await followersFuture;
     if (mounted) setState(() => _followers = followers);
   }
 
