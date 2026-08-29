@@ -7,6 +7,8 @@ import '../screens/profile_screen.dart';
 import 'fade_in_avatar.dart';
 import 'linkified_text.dart';
 
+const _feedContentFontSize = 14.5;
+
 class NoteTile extends StatelessWidget {
   const NoteTile({super.key, required this.note});
 
@@ -78,7 +80,9 @@ class NoteTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   LinkifiedText(
                     note.content,
-                    style: theme.textTheme.bodyMedium,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontSize: _feedContentFontSize,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   SingleChildScrollView(

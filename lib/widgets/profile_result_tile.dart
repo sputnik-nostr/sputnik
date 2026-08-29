@@ -16,18 +16,39 @@ class ProfileResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final npub = npubFromHex(pubkeyHex);
     final displayName = metadata?.resolvedName;
     final pictureUrl = metadata?.picture;
+    final bio = metadata?.about?.replaceAll('\n', ' ').trim();
+
+    final String subtitle;
+    if (metadata == null) {
+      subtitle = 'View profile';
+    } else if (bio != null && bio.isNotEmpty) {
+      subtitle = _truncateBio(bio);
+    } else {
+      subtitle = truncateNpub(npub);
+    }
 
     return ListTile(
       leading: FadeInAvatar(
         imageUrl: pictureUrl,
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        backgroundColor: theme.colorScheme.primaryContainer,
         fallback: const Icon(Icons.person_outline),
       ),
-      title: Text(displayName ?? truncateNpub(npub)),
-      subtitle: Text(displayName != null ? truncateNpub(npub) : 'View profile'),
+      title: Text(
+        displayName ?? truncateNpub(npub),
+        style: theme.textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.bodySmall,
+      ),
       onTap: () {
         Navigator.push(
           context,
@@ -38,4 +59,10 @@ class ProfileResultTile extends StatelessWidget {
       },
     );
   }
+}
+
+String _truncateBio(String bio) {
+  const maxLength = 80;
+  if (bio.length <= maxLength) return bio;
+  return '${bio.substring(0, maxLength).trimRight()}…';
 }

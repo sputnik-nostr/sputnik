@@ -220,7 +220,7 @@ class _PostHeader extends StatelessWidget {
                         children: [
                           Text(
                             note.displayName,
-                            style: theme.textTheme.titleMedium?.copyWith(
+                            style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                           ),
