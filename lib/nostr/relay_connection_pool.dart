@@ -1,10 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
+
+final _random = Random();
+
+String _generateSubscriptionId() {
+  final bytes = List<int>.generate(8, (_) => _random.nextInt(256));
+  return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+}
 
 class RelayConnectionPool {
   RelayConnectionPool._();
@@ -99,7 +107,7 @@ class _RelayConnection {
     Duration timeout,
   ) async {
     await ready;
-    final subscriptionId = 'sputnik-${DateTime.now().microsecondsSinceEpoch}';
+    final subscriptionId = _generateSubscriptionId();
     final events = <NostrEvent>[];
     final completer = Completer<void>();
     Timer? idleTimer;
