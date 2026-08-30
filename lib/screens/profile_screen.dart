@@ -5,6 +5,7 @@ import '../main.dart';
 import '../models/current_user.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
+import '../models/time_format.dart';
 import '../nostr/nostr.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/count_label.dart';
@@ -20,33 +21,8 @@ const _avatarRadius = 40.0;
 const _avatarOverlap = _avatarRadius * 2 * 0.25;
 const _avatarInitialFontSize = _avatarRadius * 0.7;
 
-String _formatLastActiveFromPostedAt(String postedAt) {
-  return postedAt == 'now'
-      ? 'Last active just now'
-      : 'Last active $postedAt ago';
-}
-
 String _shortPubkey(String pubkey) {
   return pubkey.length <= 8 ? pubkey : pubkey.substring(0, 8);
-}
-
-String _formatLastActive(DateTime time) {
-  final diff = DateTime.now().difference(time);
-  if (diff.inMinutes < 1) return 'Last active just now';
-  if (diff.inMinutes < 60) {
-    final m = diff.inMinutes;
-    return 'Last active $m minute${m == 1 ? '' : 's'} ago';
-  }
-  if (diff.inHours < 24) {
-    final h = diff.inHours;
-    return 'Last active $h hour${h == 1 ? '' : 's'} ago';
-  }
-  if (diff.inDays < 7) {
-    final d = diff.inDays;
-    return 'Last active $d day${d == 1 ? '' : 's'} ago';
-  }
-  final w = diff.inDays ~/ 7;
-  return 'Last active $w week${w == 1 ? '' : 's'} ago';
 }
 
 void openProfile(BuildContext context, String pubkeyHex) {
@@ -329,13 +305,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     if (_isCurrentUser) ...[
                       const SizedBox(height: 4),
                       Text(
-                        _formatLastActive(CurrentUser.lastActiveAt),
+                        formatLastActive(CurrentUser.lastActiveAt),
                         style: theme.metadata,
                       ),
                     ] else if (ownNotes.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                        _formatLastActiveFromPostedAt(ownNotes.first.postedAt),
+                        formatLastActiveFromPostedAt(ownNotes.first.postedAt),
                         style: theme.metadata,
                       ),
                     ],

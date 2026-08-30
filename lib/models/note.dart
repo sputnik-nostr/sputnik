@@ -1,4 +1,4 @@
-import 'relative_time.dart';
+import 'time_format.dart';
 
 class Note {
   const Note({

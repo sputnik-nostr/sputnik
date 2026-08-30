@@ -1,6 +1,6 @@
 import '../nostr/nostr.dart';
 import 'note.dart';
-import 'relative_time.dart';
+import 'time_format.dart';
 
 // Applies reaction counts to a [List] of notes.
 List<Note> applyReactionCounts(

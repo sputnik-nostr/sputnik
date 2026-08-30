@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
+import '../models/time_format.dart';
 import '../nostr/nostr.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/bookmark_button.dart';
@@ -12,30 +13,6 @@ import '../widgets/linkified_text.dart';
 import '../widgets/note_tile.dart';
 import 'profile_screen.dart';
 import 'users_list_screen.dart';
-
-const _monthNames = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
-
-String _formatAbsoluteTime(DateTime time) {
-  final local = time.toLocal();
-  final hour12 = local.hour % 12 == 0 ? 12 : local.hour % 12;
-  final minute = local.minute.toString().padLeft(2, '0');
-  final period = local.hour < 12 ? 'AM' : 'PM';
-  final month = _monthNames[local.month - 1];
-  return '$hour12:$minute $period · $month ${local.day}, ${local.year}';
-}
 
 class PostScreen extends StatefulWidget {
   const PostScreen({super.key, required this.note});
@@ -206,7 +183,7 @@ class _PostHeader extends StatelessWidget {
               const SizedBox(height: 16),
               LinkifiedText(note.content, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 16),
-              Text(_formatAbsoluteTime(note.createdAt), style: theme.metadata),
+              Text(formatAbsoluteTime(note.createdAt), style: theme.metadata),
             ],
           ),
         ),
