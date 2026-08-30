@@ -40,9 +40,7 @@ class _SearchScreenState extends State<SearchScreen> {
             onChanged: (value) => setState(() => _query = value),
             elevation: const WidgetStatePropertyAll(0),
             constraints: const BoxConstraints(minHeight: 40, maxHeight: 40),
-            shape: WidgetStatePropertyAll(
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
+            shape: const WidgetStatePropertyAll(StadiumBorder()),
             side: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.focused)) {
                 return BorderSide(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../models/current_user.dart';
+import '../theme/app_text_styles.dart';
 import '../widgets/app_drawer.dart';
 import 'bookmarks_screen.dart';
 import 'home_screen.dart';
@@ -39,11 +41,8 @@ class _RootScreenState extends State<RootScreen> {
               radius: 14,
               backgroundColor: Theme.of(context).colorScheme.primaryContainer,
               child: Text(
-                'A',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.bold,
-                ),
+                CurrentUser.displayName[0],
+                style: Theme.of(context).avatarFallback,
               ),
             ),
           ),

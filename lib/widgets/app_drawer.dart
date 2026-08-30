@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/current_user.dart';
 import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
+import '../theme/app_text_styles.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -34,17 +35,11 @@ class AppDrawer extends StatelessWidget {
                       backgroundColor: theme.colorScheme.primaryContainer,
                       child: Text(
                         CurrentUser.displayName[0],
-                        style: TextStyle(
-                          color: theme.colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: theme.avatarFallback,
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Text(
-                      CurrentUser.displayName,
-                      style: theme.textTheme.titleMedium,
-                    ),
+                    Text(CurrentUser.displayName, style: theme.avatarName),
                   ],
                 ),
               ),

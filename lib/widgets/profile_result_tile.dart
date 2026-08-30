@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../nostr/nostr.dart';
 import '../screens/profile_screen.dart';
+import '../theme/app_text_styles.dart';
 import 'fade_in_avatar.dart';
 
 class ProfileResultTile extends StatelessWidget {
@@ -37,12 +38,7 @@ class ProfileResultTile extends StatelessWidget {
         backgroundColor: theme.colorScheme.primaryContainer,
         fallback: const Icon(Icons.person_outline),
       ),
-      title: Text(
-        displayName ?? truncateNpub(npub),
-        style: theme.textTheme.titleSmall?.copyWith(
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      title: Text(displayName ?? truncateNpub(npub), style: theme.avatarName),
       subtitle: Text(
         subtitle,
         maxLines: 1,

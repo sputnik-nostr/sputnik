@@ -4,10 +4,9 @@ import '../main.dart';
 import '../models/note.dart';
 import '../screens/post_screen.dart';
 import '../screens/profile_screen.dart';
+import '../theme/app_text_styles.dart';
 import 'fade_in_avatar.dart';
 import 'linkified_text.dart';
-
-const _feedContentFontSize = 14.5;
 
 class NoteTile extends StatelessWidget {
   const NoteTile({super.key, required this.note});
@@ -46,7 +45,7 @@ class NoteTile extends StatelessWidget {
                 backgroundColor: theme.colorScheme.primaryContainer,
                 fallback: Text(
                   note.displayName[0].toUpperCase(),
-                  style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
+                  style: theme.avatarFallback,
                 ),
               ),
             ),
@@ -63,26 +62,17 @@ class NoteTile extends StatelessWidget {
                           child: Text(
                             note.displayName,
                             overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: theme.avatarName,
                           ),
                         ),
                       ),
-                      Text(
-                        note.postedAt,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.outline,
-                        ),
-                      ),
+                      Text(note.postedAt, style: theme.metadata),
                     ],
                   ),
                   const SizedBox(height: 4),
                   LinkifiedText(
                     note.content,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      fontSize: _feedContentFontSize,
-                    ),
+                    style: theme.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 8),
                   SingleChildScrollView(
@@ -126,7 +116,8 @@ class _StatButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.outline;
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.outline;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -134,11 +125,7 @@ class _StatButton extends StatelessWidget {
         Icon(icon, size: 16, color: color),
         if (count > 0) ...[
           const SizedBox(width: 4),
-          Text(
-            '$count',
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: color),
-          ),
+          Text('$count', style: theme.metadata),
         ],
       ],
     );

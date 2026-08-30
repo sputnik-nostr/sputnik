@@ -4,6 +4,7 @@ import '../main.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
+import '../theme/app_text_styles.dart';
 import '../widgets/count_label.dart';
 import '../widgets/fade_in_avatar.dart';
 import '../widgets/linkified_text.dart';
@@ -212,9 +213,7 @@ class _PostHeader extends StatelessWidget {
                       backgroundColor: theme.colorScheme.primaryContainer,
                       fallback: Text(
                         note.displayName[0].toUpperCase(),
-                        style: TextStyle(
-                          color: theme.colorScheme.onPrimaryContainer,
-                        ),
+                        style: theme.avatarFallback,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -222,18 +221,11 @@ class _PostHeader extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            note.displayName,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          Text(note.displayName, style: theme.avatarName),
                           Text(
                             truncateNpub(npub),
                             overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.outline,
-                            ),
+                            style: theme.metadata,
                           ),
                         ],
                       ),
@@ -242,14 +234,9 @@ class _PostHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              LinkifiedText(note.content, style: theme.textTheme.bodyLarge),
+              LinkifiedText(note.content, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 16),
-              Text(
-                _formatAbsoluteTime(note.createdAt),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.outline,
-                ),
-              ),
+              Text(_formatAbsoluteTime(note.createdAt), style: theme.metadata),
             ],
           ),
         ),

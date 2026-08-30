@@ -6,6 +6,7 @@ import '../models/current_user.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
+import '../theme/app_text_styles.dart';
 import '../widgets/count_label.dart';
 import '../widgets/fade_in_avatar.dart';
 import '../widgets/linkified_text.dart';
@@ -17,6 +18,7 @@ import 'users_list_screen.dart';
 const _bannerHeight = 140.0 * 0.8;
 const _avatarRadius = 40.0;
 const _avatarOverlap = _avatarRadius * 2 * 0.25;
+const _avatarInitialFontSize = _avatarRadius * 0.7;
 
 String _formatLastActiveFromPostedAt(String postedAt) {
   return postedAt == 'now'
@@ -269,10 +271,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     theme.colorScheme.primaryContainer,
                                 fallback: Text(
                                   displayName[0].toUpperCase(),
-                                  style: TextStyle(
-                                    color: theme.colorScheme.onPrimaryContainer,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 28,
+                                  style: theme.avatarFallback.copyWith(
+                                    fontSize: _avatarInitialFontSize,
                                   ),
                                 ),
                               ),
@@ -289,7 +289,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         Text(
                           displayName,
-                          style: theme.textTheme.titleLarge?.copyWith(
+                          style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -297,12 +297,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              truncateNpub(npub),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.outline,
-                              ),
-                            ),
+                            Text(truncateNpub(npub), style: theme.metadata),
                             const SizedBox(width: 4),
                             InkWell(
                               borderRadius: BorderRadius.circular(12),
@@ -329,9 +324,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const SizedBox(height: 4),
                           Text(
                             _formatLastActive(CurrentUser.lastActiveAt),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.outline,
-                            ),
+                            style: theme.metadata,
                           ),
                         ] else if (ownNotes.isNotEmpty) ...[
                           const SizedBox(height: 4),
@@ -339,9 +332,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _formatLastActiveFromPostedAt(
                               ownNotes.first.postedAt,
                             ),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.outline,
-                            ),
+                            style: theme.metadata,
                           ),
                         ],
                         if (hasBio) ...[
