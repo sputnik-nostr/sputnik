@@ -145,271 +145,265 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final npub = npubFromHex(pubkeyHex);
 
     return Scaffold(
-      body: ValueListenableBuilder<Map<String, NostrMetadata>>(
-        valueListenable: profileCacheNotifier,
-        builder: (context, profileCache, _) {
-          final metadata = _isCurrentUser ? null : profileCache[pubkeyHex];
+      body: AnimatedBuilder(
+        animation: Listenable.merge([profileCacheNotifier, notesNotifier]),
+        builder: (context, child) {
+          final metadata = _isCurrentUser
+              ? null
+              : profileCacheNotifier.value[pubkeyHex];
+          final notes = notesNotifier.value;
+          final ownNotesById = <String, Note>{
+            for (final note in (notes ?? const []))
+              if (note.pubkey == pubkeyHex) note.id: note,
+            for (final note in (_fetchedNotes ?? const [])) note.id: note,
+          };
+          // Notes may have been fetched (and their author metadata
+          // resolved) before this profile's own metadata query landed,
+          // so always re-apply whatever is currently cached rather than
+          // trusting what was baked in when each note was fetched.
+          final ownNotes =
+              ownNotesById.values
+                  .map(
+                    (note) => metadata == null
+                        ? note
+                        : note.copyWith(
+                            displayName: metadata.resolvedName,
+                            pictureUrl: metadata.picture,
+                          ),
+                  )
+                  .toList()
+                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          final displayName = _isCurrentUser
+              ? CurrentUser.displayName
+              : (metadata?.resolvedName ??
+                    (ownNotes.isNotEmpty
+                        ? ownNotes.first.displayName
+                        : _shortPubkey(pubkeyHex)));
+          final pictureUrl = metadata?.picture;
+          final bannerUrl = metadata?.banner;
+          final bio = _isCurrentUser ? CurrentUser.bio : metadata?.about;
+          final hasBio = bio != null && bio.trim().isNotEmpty;
 
-          return ValueListenableBuilder<List<Note>?>(
-            valueListenable: notesNotifier,
-            builder: (context, notes, _) {
-              final ownNotesById = <String, Note>{
-                for (final note in (notes ?? const []))
-                  if (note.pubkey == pubkeyHex) note.id: note,
-                for (final note in (_fetchedNotes ?? const [])) note.id: note,
-              };
-              // Notes may have been fetched (and their author metadata
-              // resolved) before this profile's own metadata query landed,
-              // so always re-apply whatever is currently cached rather than
-              // trusting what was baked in when each note was fetched.
-              final ownNotes =
-                  ownNotesById.values
-                      .map(
-                        (note) => metadata == null
-                            ? note
-                            : note.copyWith(
-                                displayName: metadata.resolvedName,
-                                pictureUrl: metadata.picture,
-                              ),
-                      )
-                      .toList()
-                    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-              final displayName = _isCurrentUser
-                  ? CurrentUser.displayName
-                  : (metadata?.resolvedName ??
-                        (ownNotes.isNotEmpty
-                            ? ownNotes.first.displayName
-                            : _shortPubkey(pubkeyHex)));
-              final pictureUrl = metadata?.picture;
-              final bannerUrl = metadata?.banner;
-              final bio = _isCurrentUser ? CurrentUser.bio : metadata?.about;
-              final hasBio = bio != null && bio.trim().isNotEmpty;
-
-              return ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  SizedBox(
-                    height: _bannerHeight + _avatarRadius * 2 - _avatarOverlap,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        GestureDetector(
-                          onTap: bannerUrl != null
-                              ? () => _openImage(context, bannerUrl)
-                              : null,
-                          child: ClipRect(
-                            child: SizedBox(
-                              height: _bannerHeight,
-                              width: double.infinity,
-                              child: Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          theme.colorScheme.primary,
-                                          theme.colorScheme.tertiary,
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  if (bannerUrl != null)
-                                    Image.network(
-                                      bannerUrl,
-                                      fit: BoxFit.cover,
-                                      frameBuilder:
-                                          (
-                                            context,
-                                            child,
-                                            frame,
-                                            wasSynchronouslyLoaded,
-                                          ) {
-                                            if (wasSynchronouslyLoaded) {
-                                              return child;
-                                            }
-                                            return AnimatedOpacity(
-                                              opacity: frame == null ? 0 : 1,
-                                              duration: const Duration(
-                                                milliseconds: 300,
-                                              ),
-                                              curve: Curves.easeOut,
-                                              child: child,
-                                            );
-                                          },
-                                      errorBuilder: (_, _, _) =>
-                                          const SizedBox.shrink(),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          top: 8,
-                          left: 8,
-                          child: SafeArea(
-                            bottom: false,
-                            child: _FloatingBackButton(
-                              onTap: () => Navigator.pop(context),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          top: _bannerHeight - _avatarOverlap,
-                          left: 16,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: theme.colorScheme.surface,
-                            ),
-                            child: GestureDetector(
-                              onTap: pictureUrl != null
-                                  ? () => _openImage(context, pictureUrl)
-                                  : null,
-                              child: FadeInAvatar(
-                                radius: _avatarRadius,
-                                imageUrl: pictureUrl,
-                                backgroundColor:
-                                    theme.colorScheme.primaryContainer,
-                                fallback: Text(
-                                  displayName[0].toUpperCase(),
-                                  style: theme.avatarFallback.copyWith(
-                                    fontSize: _avatarInitialFontSize,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          displayName,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(truncateNpub(npub), style: theme.metadata),
-                            const SizedBox(width: 4),
-                            InkWell(
-                              borderRadius: const BorderRadius.all(
-                                Radius.circular(12),
-                              ),
-                              onTap: () {
-                                Clipboard.setData(ClipboardData(text: npub));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Copied npub to clipboard'),
-                                  ),
-                                );
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(4),
-                                child: Icon(
-                                  Icons.copy,
-                                  size: 14,
-                                  color: theme.colorScheme.outline,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (_isCurrentUser) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            _formatLastActive(CurrentUser.lastActiveAt),
-                            style: theme.metadata,
-                          ),
-                        ] else if (ownNotes.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            _formatLastActiveFromPostedAt(
-                              ownNotes.first.postedAt,
-                            ),
-                            style: theme.metadata,
-                          ),
-                        ],
-                        if (hasBio) ...[
-                          const SizedBox(height: 8),
-                          LinkifiedText(bio, style: theme.textTheme.bodyMedium),
-                        ],
-                        if (!_isCurrentUser) ...[
-                          const SizedBox(height: 8),
-                          Row(
+          return ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              SizedBox(
+                height: _bannerHeight + _avatarRadius * 2 - _avatarOverlap,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    GestureDetector(
+                      onTap: bannerUrl != null
+                          ? () => _openImage(context, bannerUrl)
+                          : null,
+                      child: ClipRect(
+                        child: SizedBox(
+                          height: _bannerHeight,
+                          width: double.infinity,
+                          child: Stack(
+                            fit: StackFit.expand,
                             children: [
-                              CountLabel(
-                                count: _following?.length,
-                                label: 'following',
-                                onTap: _following == null
-                                    ? null
-                                    : () => Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => UsersListScreen(
-                                            title: 'Following',
-                                            pubkeys: _following!,
-                                          ),
-                                        ),
-                                      ),
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      theme.colorScheme.primary,
+                                      theme.colorScheme.tertiary,
+                                    ],
+                                  ),
+                                ),
                               ),
-                              const SizedBox(width: 16),
-                              CountLabel(
-                                count: _followers?.length,
-                                label: 'followers',
-                                onTap: _followers == null
-                                    ? null
-                                    : () => Navigator.push(
+                              if (bannerUrl != null)
+                                Image.network(
+                                  bannerUrl,
+                                  fit: BoxFit.cover,
+                                  frameBuilder:
+                                      (
                                         context,
-                                        MaterialPageRoute(
-                                          builder: (_) => UsersListScreen(
-                                            title: 'Followers',
-                                            pubkeys: _followers!,
+                                        child,
+                                        frame,
+                                        wasSynchronouslyLoaded,
+                                      ) {
+                                        if (wasSynchronouslyLoaded) {
+                                          return child;
+                                        }
+                                        return AnimatedOpacity(
+                                          opacity: frame == null ? 0 : 1,
+                                          duration: const Duration(
+                                            milliseconds: 300,
                                           ),
-                                        ),
-                                      ),
-                              ),
+                                          curve: Curves.easeOut,
+                                          child: child,
+                                        );
+                                      },
+                                  errorBuilder: (_, _, _) =>
+                                      const SizedBox.shrink(),
+                                ),
                             ],
                           ),
-                        ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: SafeArea(
+                        bottom: false,
+                        child: _FloatingBackButton(
+                          onTap: () => Navigator.pop(context),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: _bannerHeight - _avatarOverlap,
+                      left: 16,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: theme.colorScheme.surface,
+                        ),
+                        child: GestureDetector(
+                          onTap: pictureUrl != null
+                              ? () => _openImage(context, pictureUrl)
+                              : null,
+                          child: FadeInAvatar(
+                            radius: _avatarRadius,
+                            imageUrl: pictureUrl,
+                            backgroundColor: theme.colorScheme.primaryContainer,
+                            fallback: Text(
+                              displayName[0].toUpperCase(),
+                              style: theme.avatarFallback.copyWith(
+                                fontSize: _avatarInitialFontSize,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(truncateNpub(npub), style: theme.metadata),
+                        const SizedBox(width: 4),
+                        InkWell(
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(12),
+                          ),
+                          onTap: () {
+                            Clipboard.setData(ClipboardData(text: npub));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Copied npub to clipboard'),
+                              ),
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.copy,
+                              size: 14,
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                  const Divider(height: 1),
-                  if (ownNotes.isEmpty && _loadingNotes)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 48),
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  else if (ownNotes.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 48),
-                      child: PlaceholderTab(
-                        icon: Icons.notes_outlined,
-                        label: 'No posts yet',
+                    if (_isCurrentUser) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatLastActive(CurrentUser.lastActiveAt),
+                        style: theme.metadata,
                       ),
-                    )
-                  else
-                    for (final note in ownNotes) ...[
-                      NoteTile(note: note),
-                      const Divider(height: 1),
+                    ] else if (ownNotes.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatLastActiveFromPostedAt(ownNotes.first.postedAt),
+                        style: theme.metadata,
+                      ),
                     ],
+                    if (hasBio) ...[
+                      const SizedBox(height: 8),
+                      LinkifiedText(bio, style: theme.textTheme.bodyMedium),
+                    ],
+                    if (!_isCurrentUser) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          CountLabel(
+                            count: _following?.length,
+                            label: 'following',
+                            onTap: _following == null
+                                ? null
+                                : () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => UsersListScreen(
+                                        title: 'Following',
+                                        pubkeys: _following!,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(width: 16),
+                          CountLabel(
+                            count: _followers?.length,
+                            label: 'followers',
+                            onTap: _followers == null
+                                ? null
+                                : () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => UsersListScreen(
+                                        title: 'Followers',
+                                        pubkeys: _followers!,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              if (ownNotes.isEmpty && _loadingNotes)
+                const Padding(
+                  padding: EdgeInsets.only(top: 48),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (ownNotes.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 48),
+                  child: PlaceholderTab(
+                    icon: Icons.notes_outlined,
+                    label: 'No posts yet',
+                  ),
+                )
+              else
+                for (final note in ownNotes) ...[
+                  NoteTile(note: note),
+                  const Divider(height: 1),
                 ],
-              );
-            },
+            ],
           );
         },
       ),

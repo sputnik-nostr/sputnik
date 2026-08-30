@@ -1,7 +1,7 @@
+// Hardcoded placeholder data for the current user.
 class CurrentUser {
   const CurrentUser._();
 
-  // Placeholder hex pubkey for the current user. The NIP-19 `npub` is an encoding of this.
   static const pubkeyHex =
       'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
   static const displayName = 'Anon';

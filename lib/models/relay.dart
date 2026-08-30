@@ -3,6 +3,5 @@ const defaultRelays = [
   'wss://relay.damus.io',
   'wss://nos.lol',
   'wss://relay.primal.net',
-  'wss://cache1.primal.net',
   'wss://relay.snort.social',
 ];

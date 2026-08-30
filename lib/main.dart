@@ -35,6 +35,7 @@ final navigatorKey = GlobalKey<NavigatorState>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize cache store, load persistent settings
   final cacheInit = CacheStore.init();
   final themeModeBound = bindPersisted(
     themeModeNotifier,
@@ -63,6 +64,7 @@ Future<void> main() async {
   await bookmarkedNotesBound;
   await selectedRelaysBound;
 
+  // Load profile data from cache store
   profileCacheNotifier.value = CacheStore.loadAllProfiles();
 
   runApp(const MainApp());
@@ -75,41 +77,38 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeModeNotifier,
-      builder: (context, themeMode, _) {
-        return ValueListenableBuilder<AppSeedColor>(
-          valueListenable: seedColorNotifier,
-          builder: (context, seedColor, _) {
-            return MaterialApp(
-              title: 'Sputnik',
-              debugShowCheckedModeBanner: false,
-              navigatorKey: navigatorKey,
-              themeMode: themeMode,
-              theme: ThemeData(
-                useMaterial3: true,
-                brightness: Brightness.light,
-                colorSchemeSeed: seedColor.color,
-              ),
-              darkTheme: ThemeData(
-                useMaterial3: true,
-                brightness: Brightness.dark,
-                colorSchemeSeed: seedColor.color,
-              ),
-              home: const RootScreen(),
-              builder: (context, child) => CallbackShortcuts(
-                bindings: {
-                  const SingleActivator(LogicalKeyboardKey.escape): () {
-                    final navigator = navigatorKey.currentState;
-                    if (navigator != null && navigator.canPop()) {
-                      navigator.pop();
-                    }
-                  },
-                },
-                child: Focus(autofocus: true, child: child!),
-              ),
-            );
-          },
+    return AnimatedBuilder(
+      animation: Listenable.merge([themeModeNotifier, seedColorNotifier]),
+      builder: (context, child) {
+        final seedColor = seedColorNotifier.value.color;
+        return MaterialApp(
+          title: 'Sputnik',
+          debugShowCheckedModeBanner: false,
+          navigatorKey: navigatorKey,
+          themeMode: themeModeNotifier.value,
+          theme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.light,
+            colorSchemeSeed: seedColor,
+          ),
+          darkTheme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.dark,
+            colorSchemeSeed: seedColor,
+          ),
+          home: const RootScreen(),
+          builder: (context, child) => CallbackShortcuts(
+            bindings: {
+              // Go back when the escape key is pressed (mostly for desktop)
+              const SingleActivator(LogicalKeyboardKey.escape): () {
+                final navigator = navigatorKey.currentState;
+                if (navigator != null && navigator.canPop()) {
+                  navigator.pop();
+                }
+              },
+            },
+            child: Focus(autofocus: true, child: child!),
+          ),
         );
       },
     );

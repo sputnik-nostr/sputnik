@@ -2,6 +2,7 @@ import '../nostr/nostr.dart';
 import 'note.dart';
 import 'relative_time.dart';
 
+// Applies reaction counts to a [List] of notes.
 List<Note> applyReactionCounts(
   List<Note> notes,
   Map<String, PostReactions> reactionsByPostId,
@@ -16,6 +17,7 @@ List<Note> applyReactionCounts(
   }).toList();
 }
 
+// Turns a [NostrPost] into a [Note].
 Note noteFromNostrPost(NostrPost post, {NostrMetadata? authorMetadata}) {
   return Note(
     id: post.id,
@@ -32,6 +34,7 @@ Note noteFromNostrPost(NostrPost post, {NostrMetadata? authorMetadata}) {
   );
 }
 
+// Turns a [List] of [NostrPost]s into a [List] of [Note]s.
 List<Note> notesFromPosts(
   List<NostrPost> posts,
   Map<String, NostrMetadata> profilesByPubkey,
@@ -46,10 +49,9 @@ List<Note> notesFromPosts(
       .toList();
 }
 
-// Fetches author profiles (unless already known via [knownMetadata]) and
-// reaction counts for [posts] concurrently, then maps them into notes with
-// those reaction counts applied. Shared by every screen that turns a batch
-// of fetched posts into notes ready to render.
+// Fetches author profiles, either from the cache or by network request, as well
+// as reaction counts for [posts] concurrently. These are then mapped into notes
+// with reaction counts applied.
 Future<List<Note>> hydratePosts(
   List<NostrPost> posts,
   Set<String> relayUrls, {
