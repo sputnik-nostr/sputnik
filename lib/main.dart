@@ -3,10 +3,10 @@ import 'package:flutter/services.dart';
 
 import 'models/app_seed_color.dart';
 import 'models/note.dart';
-import 'models/note_mapper.dart';
 import 'nostr/nostr.dart';
 import 'screens/root_screen.dart';
 import 'services/cache_store.dart';
+import 'services/feed_loader.dart';
 import 'services/settings_store.dart';
 
 final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier(
@@ -36,81 +36,38 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final cacheInit = CacheStore.init();
-  final themeModeFuture = SettingsStore.loadThemeMode();
-  final seedColorFuture = SettingsStore.loadSeedColor();
-  final bookmarkedNotesFuture = SettingsStore.loadBookmarkedNotes();
-  final selectedRelaysFuture = SettingsStore.loadSelectedRelays();
+  final themeModeBound = bindPersisted(
+    themeModeNotifier,
+    SettingsStore.loadThemeMode,
+    SettingsStore.saveThemeMode,
+  );
+  final seedColorBound = bindPersisted(
+    seedColorNotifier,
+    SettingsStore.loadSeedColor,
+    SettingsStore.saveSeedColor,
+  );
+  final bookmarkedNotesBound = bindPersisted(
+    bookmarkedNotesNotifier,
+    SettingsStore.loadBookmarkedNotes,
+    SettingsStore.saveBookmarkedNotes,
+  );
+  final selectedRelaysBound = bindPersisted(
+    selectedRelaysNotifier,
+    SettingsStore.loadSelectedRelays,
+    SettingsStore.saveSelectedRelays,
+  );
 
   await cacheInit;
-
-  themeModeNotifier.value = await themeModeFuture;
-  themeModeNotifier.addListener(() {
-    SettingsStore.saveThemeMode(themeModeNotifier.value);
-  });
-
-  seedColorNotifier.value = await seedColorFuture;
-  seedColorNotifier.addListener(() {
-    SettingsStore.saveSeedColor(seedColorNotifier.value);
-  });
-
-  bookmarkedNotesNotifier.value = await bookmarkedNotesFuture;
-  bookmarkedNotesNotifier.addListener(() {
-    SettingsStore.saveBookmarkedNotes(bookmarkedNotesNotifier.value);
-  });
-
-  selectedRelaysNotifier.value = await selectedRelaysFuture;
-  selectedRelaysNotifier.addListener(() {
-    SettingsStore.saveSelectedRelays(selectedRelaysNotifier.value);
-  });
+  await themeModeBound;
+  await seedColorBound;
+  await bookmarkedNotesBound;
+  await selectedRelaysBound;
 
   profileCacheNotifier.value = CacheStore.loadAllProfiles();
 
   runApp(const MainApp());
 
-  _loadFeed();
-}
-
-Future<void> _loadFeed() async {
-  final relayUrls = selectedRelaysNotifier.value;
-  final PostRepository postRepository = RelayPostRepository(
-    relayUrls: relayUrls,
-  );
-  final posts = await postRepository.fetchPosts();
-
-  // Show posts right away, using already-cached profile metadata where
-  // available, instead of blocking the whole feed on the profile and
-  // reaction round trips below.
-  notesNotifier.value = posts
-      .map(
-        (post) => noteFromNostrPost(
-          post,
-          authorMetadata: profileCacheNotifier.value[post.author.pubkey],
-        ),
-      )
-      .toList();
-
-  final authorPubkeys = posts.map((post) => post.author.pubkey).toSet();
-  final profilesFuture = const RelayProfileRepository().fetchProfiles(
-    authorPubkeys,
-    relayUrls,
-  );
-  final reactionsFuture = const RelayReactionsRepository().fetchReactions(
-    posts.map((post) => post.id).toList(),
-    relayUrls,
-  );
-  final profilesByPubkey = await profilesFuture;
-  final reactionsByPostId = await reactionsFuture;
-
-  final notes = posts
-      .map(
-        (post) => noteFromNostrPost(
-          post,
-          authorMetadata: profilesByPubkey[post.author.pubkey],
-        ),
-      )
-      .toList();
-
-  notesNotifier.value = applyReactionCounts(notes, reactionsByPostId);
+  loadFeed();
 }
 
 class MainApp extends StatelessWidget {

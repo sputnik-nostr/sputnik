@@ -31,3 +31,41 @@ Note noteFromNostrPost(NostrPost post, {NostrMetadata? authorMetadata}) {
     likeCount: post.likeCount,
   );
 }
+
+List<Note> notesFromPosts(
+  List<NostrPost> posts,
+  Map<String, NostrMetadata> profilesByPubkey,
+) {
+  return posts
+      .map(
+        (post) => noteFromNostrPost(
+          post,
+          authorMetadata: profilesByPubkey[post.author.pubkey],
+        ),
+      )
+      .toList();
+}
+
+// Fetches author profiles (unless already known via [knownMetadata]) and
+// reaction counts for [posts] concurrently, then maps them into notes with
+// those reaction counts applied. Shared by every screen that turns a batch
+// of fetched posts into notes ready to render.
+Future<List<Note>> hydratePosts(
+  List<NostrPost> posts,
+  Set<String> relayUrls, {
+  Map<String, NostrMetadata>? knownMetadata,
+}) async {
+  final profilesFuture = knownMetadata != null
+      ? Future.value(knownMetadata)
+      : const RelayProfileRepository().fetchProfiles(
+          posts.map((post) => post.author.pubkey).toSet(),
+          relayUrls,
+        );
+  final reactionsFuture = const RelayReactionsRepository().fetchReactions(
+    posts.map((post) => post.id).toList(),
+    relayUrls,
+  );
+
+  final notes = notesFromPosts(posts, await profilesFuture);
+  return applyReactionCounts(notes, await reactionsFuture);
+}

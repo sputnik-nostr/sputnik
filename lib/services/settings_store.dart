@@ -7,6 +7,18 @@ import '../models/app_seed_color.dart';
 import '../models/note.dart';
 import '../models/relay.dart';
 
+// Loads a notifier's persisted value and wires it to save on every change.
+// Used to bind each of the app's settings notifiers without repeating the
+// "load, assign, add a saving listener" sequence for each one.
+Future<void> bindPersisted<T>(
+  ValueNotifier<T> notifier,
+  Future<T> Function() load,
+  Future<void> Function(T value) save,
+) async {
+  notifier.value = await load();
+  notifier.addListener(() => save(notifier.value));
+}
+
 class SettingsStore {
   SettingsStore._();
 

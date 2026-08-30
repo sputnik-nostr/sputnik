@@ -106,16 +106,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (!mounted) return;
 
     final metadata = profileCacheNotifier.value[widget.pubkeyHex];
-    final notes = posts
-        .map((post) => noteFromNostrPost(post, authorMetadata: metadata))
-        .toList();
-
-    final reactionsByPostId = await const RelayReactionsRepository()
-        .fetchReactions(notes.map((note) => note.id).toList(), relayUrls);
+    final notes = await hydratePosts(
+      posts,
+      relayUrls,
+      knownMetadata: metadata == null ? const {} : {widget.pubkeyHex: metadata},
+    );
     if (!mounted) return;
 
     setState(() {
-      _fetchedNotes = applyReactionCounts(notes, reactionsByPostId);
+      _fetchedNotes = notes;
       _loadingNotes = false;
     });
   }
