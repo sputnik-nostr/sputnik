@@ -103,12 +103,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     NostrUriTarget target,
   ) async {
     if (target.pubkeyHex != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProfileScreen(pubkeyHex: target.pubkeyHex!),
-        ),
-      );
+      openProfile(context, target.pubkeyHex!);
       return;
     }
 

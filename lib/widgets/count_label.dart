@@ -19,7 +19,7 @@ class CountLabel extends StatelessWidget {
     final theme = Theme.of(context);
 
     return InkWell(
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: const BorderRadius.all(Radius.circular(4)),
       onTap: onTap,
       child: RichText(
         text: TextSpan(

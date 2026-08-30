@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../main.dart';
 import '../models/note.dart';
 import '../screens/post_screen.dart';
 import '../screens/profile_screen.dart';
 import '../theme/app_text_styles.dart';
+import 'bookmark_button.dart';
 import 'fade_in_avatar.dart';
 import 'linkified_text.dart';
 
@@ -12,13 +12,6 @@ class NoteTile extends StatelessWidget {
   const NoteTile({super.key, required this.note});
 
   final Note note;
-
-  void _openProfile(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => ProfileScreen(pubkeyHex: note.pubkey)),
-    );
-  }
 
   void _openPost(BuildContext context) {
     Navigator.push(
@@ -39,7 +32,7 @@ class NoteTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             GestureDetector(
-              onTap: () => _openProfile(context),
+              onTap: () => openProfile(context, note.pubkey),
               child: FadeInAvatar(
                 imageUrl: note.pictureUrl,
                 backgroundColor: theme.colorScheme.primaryContainer,
@@ -58,7 +51,7 @@ class NoteTile extends StatelessWidget {
                     children: [
                       Expanded(
                         child: GestureDetector(
-                          onTap: () => _openProfile(context),
+                          onTap: () => openProfile(context, note.pubkey),
                           child: Text(
                             note.displayName,
                             overflow: TextOverflow.ellipsis,
@@ -94,7 +87,7 @@ class NoteTile extends StatelessWidget {
                           count: note.likeCount,
                         ),
                         const SizedBox(width: 20),
-                        _BookmarkButton(note: note),
+                        BookmarkButton(note: note),
                       ],
                     ),
                   ),
@@ -128,47 +121,6 @@ class _StatButton extends StatelessWidget {
           Text('$count', style: theme.metadata),
         ],
       ],
-    );
-  }
-}
-
-class _BookmarkButton extends StatelessWidget {
-  const _BookmarkButton({required this.note});
-
-  final Note note;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return ValueListenableBuilder<Map<String, Note>>(
-      valueListenable: bookmarkedNotesNotifier,
-      builder: (context, bookmarkedNotes, _) {
-        final bookmarked = bookmarkedNotes.containsKey(note.id);
-
-        return InkWell(
-          onTap: () {
-            final updated = Map<String, Note>.from(bookmarkedNotes);
-            if (bookmarked) {
-              updated.remove(note.id);
-            } else {
-              updated[note.id] = note;
-            }
-            bookmarkedNotesNotifier.value = updated;
-          },
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(4),
-            child: Icon(
-              bookmarked ? Icons.bookmark : Icons.bookmark_border,
-              size: 18,
-              color: bookmarked
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.outline,
-            ),
-          ),
-        );
-      },
     );
   }
 }

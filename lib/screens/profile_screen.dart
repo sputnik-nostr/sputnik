@@ -49,6 +49,13 @@ String _formatLastActive(DateTime time) {
   return 'Last active $w week${w == 1 ? '' : 's'} ago';
 }
 
+void openProfile(BuildContext context, String pubkeyHex) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => ProfileScreen(pubkeyHex: pubkeyHex)),
+  );
+}
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, this.pubkeyHex = CurrentUser.pubkeyHex});
 
@@ -300,7 +307,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             Text(truncateNpub(npub), style: theme.metadata),
                             const SizedBox(width: 4),
                             InkWell(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: const BorderRadius.all(
+                                Radius.circular(12),
+                              ),
                               onTap: () {
                                 Clipboard.setData(ClipboardData(text: npub));
                                 ScaffoldMessenger.of(context).showSnackBar(

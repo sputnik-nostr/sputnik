@@ -5,6 +5,7 @@ import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
 import '../theme/app_text_styles.dart';
+import '../widgets/bookmark_button.dart';
 import '../widgets/count_label.dart';
 import '../widgets/fade_in_avatar.dart';
 import '../widgets/linkified_text.dart';
@@ -170,13 +171,6 @@ class _PostHeader extends StatelessWidget {
   final List<String>? likerPubkeys;
   final List<String>? reposterPubkeys;
 
-  void _openProfile(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => ProfileScreen(pubkeyHex: note.pubkey)),
-    );
-  }
-
   void _openUsersList(
     BuildContext context,
     String title,
@@ -204,7 +198,7 @@ class _PostHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               GestureDetector(
-                onTap: () => _openProfile(context),
+                onTap: () => openProfile(context, note.pubkey),
                 child: Row(
                   children: [
                     FadeInAvatar(
@@ -267,52 +261,11 @@ class _PostHeader extends StatelessWidget {
                     : () => _openUsersList(context, 'Likes', likerPubkeys!),
               ),
               const Spacer(),
-              _HeaderBookmarkButton(note: note),
+              BookmarkButton(note: note, size: 20),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _HeaderBookmarkButton extends StatelessWidget {
-  const _HeaderBookmarkButton({required this.note});
-
-  final Note note;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return ValueListenableBuilder<Map<String, Note>>(
-      valueListenable: bookmarkedNotesNotifier,
-      builder: (context, bookmarkedNotes, _) {
-        final bookmarked = bookmarkedNotes.containsKey(note.id);
-
-        return InkWell(
-          onTap: () {
-            final updated = Map<String, Note>.from(bookmarkedNotes);
-            if (bookmarked) {
-              updated.remove(note.id);
-            } else {
-              updated[note.id] = note;
-            }
-            bookmarkedNotesNotifier.value = updated;
-          },
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(4),
-            child: Icon(
-              bookmarked ? Icons.bookmark : Icons.bookmark_border,
-              size: 20,
-              color: bookmarked
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.outline,
-            ),
-          ),
-        );
-      },
     );
   }
 }

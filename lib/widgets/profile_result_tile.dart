@@ -45,14 +45,7 @@ class ProfileResultTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: theme.textTheme.bodySmall,
       ),
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProfileScreen(pubkeyHex: pubkeyHex),
-          ),
-        );
-      },
+      onTap: () => openProfile(context, pubkeyHex),
     );
   }
 }
