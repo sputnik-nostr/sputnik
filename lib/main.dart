@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'models/app_seed_color.dart';
+import 'models/identity.dart';
 import 'models/note.dart';
 import 'nostr/nostr.dart';
 import 'screens/root_screen.dart';
@@ -30,6 +31,12 @@ final ValueNotifier<Set<String>> selectedRelaysNotifier = ValueNotifier(
 final ValueNotifier<Map<String, NostrMetadata>> profileCacheNotifier =
     ValueNotifier(const {});
 
+final ValueNotifier<List<Identity>> identitiesNotifier = ValueNotifier(
+  const [],
+);
+
+final ValueNotifier<String?> activeIdentityPubkeyNotifier = ValueNotifier(null);
+
 final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
@@ -57,12 +64,24 @@ Future<void> main() async {
     SettingsStore.loadSelectedRelays,
     SettingsStore.saveSelectedRelays,
   );
+  final identitiesBound = bindPersisted(
+    identitiesNotifier,
+    SettingsStore.loadIdentities,
+    SettingsStore.saveIdentities,
+  );
+  final activeIdentityPubkeyBound = bindPersisted(
+    activeIdentityPubkeyNotifier,
+    SettingsStore.loadActiveIdentityPubkey,
+    SettingsStore.saveActiveIdentityPubkey,
+  );
 
   await cacheInit;
   await themeModeBound;
   await seedColorBound;
   await bookmarkedNotesBound;
   await selectedRelaysBound;
+  await identitiesBound;
+  await activeIdentityPubkeyBound;
 
   // Load profile data from cache store
   profileCacheNotifier.value = CacheStore.loadAllProfiles();

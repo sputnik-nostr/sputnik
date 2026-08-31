@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../main.dart';
 import '../models/app_seed_color.dart';
+import '../models/identity.dart';
 import '../services/cache_store.dart';
+import 'identities_screen.dart';
 import 'relays_screen.dart';
 
 Future<void> _confirmClearCache(BuildContext context) async {
@@ -86,6 +88,26 @@ class SettingsScreen extends StatelessWidget {
                   );
                 },
               ),
+              ValueListenableBuilder<List<Identity>>(
+                valueListenable: identitiesNotifier,
+                builder: (context, identities, _) {
+                  return ListTile(
+                    key: const Key('identitiesCard'),
+                    leading: const Icon(Icons.key_outlined),
+                    title: const Text('Identities'),
+                    subtitle: Text('${identities.length} saved'),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const IdentitiesScreen(),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+              const Divider(height: 1),
               ListTile(
                 key: const Key('clearCacheCard'),
                 leading: const Icon(Icons.delete_outline),

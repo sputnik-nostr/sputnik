@@ -35,6 +35,14 @@ void main() {
     expect(hexFromNpub('not a bech32 string'), isNull);
   });
 
+  test('encodes a hex seckey to the matching nsec', () {
+    const seckeyHex =
+        '67dea2ed018072d675f5415ecfaed7d2597555e202d85b3d65ea4e58d2d92ffa';
+    const nsec =
+        'nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5';
+    expect(nsecFromHex(seckeyHex), nsec);
+  });
+
   test('encodes and decodes a hex event id as note', () {
     final note = noteFromHex(hex1);
     expect(hexFromNote(note), hex1);

@@ -44,6 +44,14 @@ String npubFromHex(String pubkeyHex) {
 // Decodes an `npub`-formatted pubkey into its raw hex form.
 String? hexFromNpub(String npub) => _hexFromBareEntity(npub, 'npub');
 
+// Encodes a hex secret key into the canonical `nsec` format.
+String nsecFromHex(String seckeyHex) {
+  return bech32Encode(
+    'nsec',
+    convertBits(_bytesFromHex(seckeyHex), 8, 5, pad: true),
+  );
+}
+
 String noteFromHex(String eventIdHex) {
   return bech32Encode(
     'note',

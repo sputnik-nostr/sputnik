@@ -71,6 +71,7 @@ class NostrSecp256k1Bindings {
     _openNostrSecp256k1(),
   );
 
+  // ignore: unused_field
   final DynamicLibrary _lib;
 
   final CreateFn create;

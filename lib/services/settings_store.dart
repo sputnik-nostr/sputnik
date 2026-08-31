@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_seed_color.dart';
+import '../models/identity.dart';
 import '../models/note.dart';
 import '../models/relay.dart';
 
@@ -26,6 +27,8 @@ class SettingsStore {
   static const _seedColorKey = 'seed_color';
   static const _bookmarkedNotesKey = 'bookmarked_notes';
   static const _selectedRelaysKey = 'selected_relays';
+  static const _identitiesKey = 'identities';
+  static const _activeIdentityPubkeyKey = 'active_identity_pubkey';
 
   static Future<ThemeMode> loadThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
@@ -98,5 +101,45 @@ class SettingsStore {
   static Future<void> saveSelectedRelays(Set<String> relays) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_selectedRelaysKey, relays.toList());
+  }
+
+  static Future<List<Identity>> loadIdentities() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_identitiesKey);
+    if (raw == null) return [];
+
+    try {
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      return [
+        for (final item in decoded)
+          Identity.fromJson(item as Map<String, dynamic>),
+      ];
+    } catch (_) {
+      // Cached identity data is malformed; start with an empty set rather
+      // than crash the app on startup.
+      return [];
+    }
+  }
+
+  static Future<void> saveIdentities(List<Identity> identities) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _identitiesKey,
+      jsonEncode([for (final identity in identities) identity.toJson()]),
+    );
+  }
+
+  static Future<String?> loadActiveIdentityPubkey() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_activeIdentityPubkeyKey);
+  }
+
+  static Future<void> saveActiveIdentityPubkey(String? pubkeyHex) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (pubkeyHex == null) {
+      await prefs.remove(_activeIdentityPubkeyKey);
+    } else {
+      await prefs.setString(_activeIdentityPubkeyKey, pubkeyHex);
+    }
   }
 }
