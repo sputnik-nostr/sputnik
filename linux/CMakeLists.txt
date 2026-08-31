@@ -1,6 +1,7 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.13)
 project(runner LANGUAGES CXX)
+enable_language(C)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
@@ -53,6 +54,28 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 # System-level dependencies.
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
+find_package(OpenSSL REQUIRED)
+
+set(BUILD_SHARED_LIBS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(SECP256K1_BUILD_BENCHMARK OFF CACHE BOOL "" FORCE)
+set(SECP256K1_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(SECP256K1_BUILD_EXHAUSTIVE_TESTS OFF CACHE BOOL "" FORCE)
+set(SECP256K1_BUILD_CTIME_TESTS OFF CACHE BOOL "" FORCE)
+set(SECP256K1_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(SECP256K1_INSTALL OFF CACHE BOOL "" FORCE)
+set(SECP256K1_ENABLE_MODULE_ECDH OFF CACHE BOOL "" FORCE)
+set(SECP256K1_ENABLE_MODULE_RECOVERY OFF CACHE BOOL "" FORCE)
+set(SECP256K1_ENABLE_MODULE_EXTRAKEYS ON CACHE BOOL "" FORCE)
+set(SECP256K1_ENABLE_MODULE_SCHNORRSIG OFF CACHE BOOL "" FORCE)
+set(SECP256K1_ENABLE_MODULE_MUSIG OFF CACHE BOOL "" FORCE)
+set(SECP256K1_ENABLE_MODULE_ELLSWIFT OFF CACHE BOOL "" FORCE)
+set(SECP256K1_ENABLE_MODULE_SILENTPAYMENTS OFF CACHE BOOL "" FORCE)
+add_subdirectory("${CMAKE_SOURCE_DIR}/../src/secp256k1" secp256k1)
+
+add_library(nostr_secp256k1 SHARED "${CMAKE_SOURCE_DIR}/../src/nostr_secp256k1.c")
+target_link_libraries(nostr_secp256k1 PRIVATE secp256k1 OpenSSL::Crypto)
+target_compile_options(nostr_secp256k1 PRIVATE -Wall -Wextra -Werror)
 
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
@@ -74,6 +97,7 @@ set_target_properties(${BINARY_NAME}
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+list(APPEND PLUGIN_BUNDLED_LIBRARIES $<TARGET_FILE:nostr_secp256k1>)
 
 # === Installation ===
 # By default, "installing" just makes a relocatable bundle in the build

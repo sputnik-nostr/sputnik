@@ -1,4 +1,5 @@
 export 'bech32.dart';
+export 'keys.dart';
 export 'models/nostr_event.dart';
 export 'models/nostr_filter.dart';
 export 'models/nostr_metadata.dart';
