@@ -60,7 +60,7 @@ int nostr_secp256k1_pubkey_from_seckey(
     int ok = secp256k1_ec_seckey_verify(wrapper->ctx, seckey32) && secp256k1_keypair_create(wrapper->ctx, &keypair, seckey32) && secp256k1_keypair_xonly_pub(wrapper->ctx, &xonly_pubkey, NULL, &keypair) && secp256k1_xonly_pubkey_serialize(wrapper->ctx, pubkey32_out, &xonly_pubkey);
 
     OPENSSL_cleanse(&keypair, sizeof(keypair));
-    return ok ? 1 : 0;
+    return ok;
 }
 
 int nostr_secp256k1_generate_keypair(
