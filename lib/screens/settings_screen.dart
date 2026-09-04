@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import '../models/app_seed_color.dart';
 import '../models/identity.dart';
+import '../models/relay.dart';
 import '../services/cache_store.dart';
 import 'identities_screen.dart';
 import 'relays_screen.dart';
@@ -36,6 +37,39 @@ Future<void> _confirmClearCache(BuildContext context) async {
   if (context.mounted) {
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('Cleared cached data')));
+  }
+}
+
+Future<void> _confirmResetPreferences(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Reset preferences?'),
+      content: const Text(
+        'This resets the theme, theme color, and relay selection back to '
+        'their defaults. Identities and bookmarks are not affected.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Reset'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+
+  themeModeNotifier.value = ThemeMode.system;
+  seedColorNotifier.value = AppSeedColor.blue;
+  selectedRelaysNotifier.value = defaultRelays.toSet();
+
+  if (context.mounted) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Preferences reset')));
   }
 }
 
@@ -132,6 +166,13 @@ class SettingsScreen extends StatelessWidget {
                 title: const Text('Clear cached data'),
                 subtitle: const Text('Cached profile info'),
                 onTap: () => _confirmClearCache(context),
+              ),
+              ListTile(
+                key: const Key('resetPreferencesCard'),
+                leading: const Icon(Icons.restore_outlined),
+                title: const Text('Reset preferences'),
+                subtitle: const Text('Theme, color, and relays'),
+                onTap: () => _confirmResetPreferences(context),
               ),
               const Divider(height: 1),
               ValueListenableBuilder<Set<String>>(
