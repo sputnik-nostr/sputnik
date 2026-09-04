@@ -124,11 +124,16 @@ class IdentitiesScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Identities'),
         actions: [
-          IconButton(
-            key: const Key('generateIdentityButton'),
-            icon: const Icon(Icons.add),
-            tooltip: 'Generate new keypair',
-            onPressed: () => _generateIdentity(context),
+          SizedBox(
+            width: kToolbarHeight,
+            child: Center(
+              child: IconButton(
+                key: const Key('generateIdentityButton'),
+                icon: const Icon(Icons.add),
+                tooltip: 'Generate new keypair',
+                onPressed: () => _generateIdentity(context),
+              ),
+            ),
           ),
         ],
       ),
