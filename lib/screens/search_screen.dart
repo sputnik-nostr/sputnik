@@ -37,6 +37,17 @@ class _SearchScreenState extends State<SearchScreen> {
             controller: _controller,
             hintText: 'Search notes and people',
             leading: const Icon(Icons.search),
+            trailing: _query.isEmpty
+                ? null
+                : [
+                    IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _controller.clear();
+                        setState(() => _query = '');
+                      },
+                    ),
+                  ],
             onChanged: (value) => setState(() => _query = value),
             elevation: const WidgetStatePropertyAll(0),
             constraints: const BoxConstraints(minHeight: 40, maxHeight: 40),
