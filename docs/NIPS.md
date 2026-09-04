@@ -1,6 +1,6 @@
 # NIPs
 
-A list of Nostr NIPS, detailing which ones we plan to implement (or not).
+A list of Nostr NIPs, detailing which ones we plan to implement (or not).
 
 | NIP  | Description                                          | Status          |
 | :--- | :--------------------------------------------------- | :-------------- |
@@ -33,5 +33,5 @@ A list of Nostr NIPS, detailing which ones we plan to implement (or not).
 - "Data Vending Machines"
 - Classified listings
 - Short-form video content
-- Things related to the Lightning Network
+- Anything related to the Lightning Network
 - Legacy DMs
