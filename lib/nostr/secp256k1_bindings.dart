@@ -30,14 +30,16 @@ typedef GenerateKeypairFn = int Function(
 );
 
 DynamicLibrary _openNostrSecp256k1() {
-  if (!Platform.isLinux) {
-    throw UnsupportedError(
-      'secp256k1 FFI bindings are only wired up for Linux right now',
-    );
-  }
-
   final override = Platform.environment['SPUTNIK_NOSTR_SECP256K1_LIBRARY'];
   if (override != null) return DynamicLibrary.open(override);
+
+  if (Platform.isAndroid) return DynamicLibrary.open('libnostr_secp256k1.so');
+
+  if (!Platform.isLinux) {
+    throw UnsupportedError(
+      'secp256k1 FFI bindings are only wired up for Linux and Android right now',
+    );
+  }
 
   final exeDir = File(Platform.resolvedExecutable).parent;
   final bundled = File('${exeDir.path}/lib/libnostr_secp256k1.so');

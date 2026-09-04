@@ -1,3 +1,4 @@
 BasedOnStyle: WebKit
 BreakBeforeBraces: Allman
 AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true

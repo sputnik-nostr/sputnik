@@ -54,7 +54,6 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 # System-level dependencies.
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
-find_package(OpenSSL REQUIRED)
 
 set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -74,7 +73,7 @@ set(SECP256K1_ENABLE_MODULE_SILENTPAYMENTS OFF CACHE BOOL "" FORCE)
 add_subdirectory("${CMAKE_SOURCE_DIR}/../src/secp256k1" secp256k1)
 
 add_library(nostr_secp256k1 SHARED "${CMAKE_SOURCE_DIR}/../src/nostr_secp256k1.c")
-target_link_libraries(nostr_secp256k1 PRIVATE secp256k1 OpenSSL::Crypto)
+target_link_libraries(nostr_secp256k1 PRIVATE secp256k1)
 target_compile_options(nostr_secp256k1 PRIVATE -Wall -Wextra -Werror)
 
 # Application build; see runner/CMakeLists.txt.
