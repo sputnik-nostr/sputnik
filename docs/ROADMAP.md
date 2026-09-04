@@ -10,7 +10,7 @@
 - [ ] Allow copying text
 - [ ] Separate posts and replies on profiles
 - [ ] Add support for profile URLs
-- [ ] Add support for crypto addresses on profiles
+- [ ] Add support for crypto addresses on profiles (payment targets)
 - [ ] Add support for Blossom and other media types
 - [ ] Show relay lists on profiles
 - [ ] Add UI for compose button
