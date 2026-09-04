@@ -33,17 +33,19 @@ class SettingsStore {
   static Future<ThemeMode> loadThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
     return switch (prefs.getString(_themeModeKey)) {
+      'light' => ThemeMode.light,
       'dark' => ThemeMode.dark,
-      _ => ThemeMode.light,
+      _ => ThemeMode.system,
     };
   }
 
   static Future<void> saveThemeMode(ThemeMode mode) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _themeModeKey,
-      mode == ThemeMode.dark ? 'dark' : 'light',
-    );
+    await prefs.setString(_themeModeKey, switch (mode) {
+      ThemeMode.light => 'light',
+      ThemeMode.dark => 'dark',
+      ThemeMode.system => 'system',
+    });
   }
 
   static Future<AppSeedColor> loadSeedColor() async {

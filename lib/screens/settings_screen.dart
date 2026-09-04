@@ -49,20 +49,38 @@ class SettingsScreen extends StatelessWidget {
       body: ValueListenableBuilder<ThemeMode>(
         valueListenable: themeModeNotifier,
         builder: (context, themeMode, _) {
-          final isDark = themeMode == ThemeMode.dark;
           return ListView(
             children: [
-              SwitchListTile(
-                title: const Text('Dark mode'),
-                secondary: Icon(
-                  isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+              ListTile(
+                leading: const Icon(Icons.brightness_6_outlined),
+                title: const Text('Theme'),
+                trailing: DropdownMenu<ThemeMode>(
+                  initialSelection: themeMode,
+                  requestFocusOnTap: false,
+                  width: 160,
+                  textStyle: Theme.of(context).textTheme.bodyMedium,
+                  inputDecorationTheme: InputDecorationTheme(
+                    filled: true,
+                    fillColor: WidgetStateColor.resolveWith((states) {
+                      if (states.contains(WidgetState.hovered)) {
+                        return Theme.of(context).colorScheme.onSurface
+                            .withValues(alpha: 0.08);
+                      }
+                      return Colors.transparent;
+                    }),
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  onSelected: (mode) {
+                    if (mode != null) themeModeNotifier.value = mode;
+                  },
+                  dropdownMenuEntries: const [
+                    DropdownMenuEntry(value: ThemeMode.system, label: 'System'),
+                    DropdownMenuEntry(value: ThemeMode.light, label: 'Light'),
+                    DropdownMenuEntry(value: ThemeMode.dark, label: 'Dark'),
+                  ],
                 ),
-                value: isDark,
-                onChanged: (value) {
-                  themeModeNotifier.value = value
-                      ? ThemeMode.dark
-                      : ThemeMode.light;
-                },
               ),
               const ListTile(
                 leading: Icon(Icons.palette_outlined),

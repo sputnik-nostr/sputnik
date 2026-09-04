@@ -11,7 +11,7 @@ import 'services/feed_loader.dart';
 import 'services/settings_store.dart';
 
 final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier(
-  ThemeMode.light,
+  ThemeMode.system,
 );
 
 final ValueNotifier<AppSeedColor> seedColorNotifier = ValueNotifier(

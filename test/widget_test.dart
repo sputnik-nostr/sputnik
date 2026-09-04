@@ -35,6 +35,6 @@ void main() {
     await tester.tap(find.byKey(const Key('settingsCard')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Dark mode'), findsOneWidget);
+    expect(find.text('Theme'), findsOneWidget);
   });
 }
