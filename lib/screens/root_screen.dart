@@ -4,6 +4,7 @@ import '../models/current_user.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/app_drawer.dart';
 import 'bookmarks_screen.dart';
+import 'compose_screen.dart';
 import 'home_screen.dart';
 import 'notifications_screen.dart';
 import 'search_screen.dart';
@@ -54,7 +55,13 @@ class _RootScreenState extends State<RootScreen> {
         key: const ValueKey('composeFab'),
         child: _index == 0
             ? FloatingActionButton.small(
-                onPressed: () {},
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ComposeScreen(),
+                    fullscreenDialog: true,
+                  ),
+                ),
                 tooltip: 'New note',
                 elevation: 0,
                 highlightElevation: 0,
