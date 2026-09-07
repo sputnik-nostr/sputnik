@@ -1,6 +1,7 @@
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import '../nostr/models/nostr_metadata.dart';
+import '../nostr/models/nostr_payment_target.dart';
 
 /// Local Hive-backed cache for data fetched from relays. Each entry is
 /// stored with a fetch timestamp so callers can decide whether it's fresh
@@ -12,15 +13,18 @@ class CacheStore {
 
   static late final Box<Map> _profiles;
   static late final Box<Map> _contacts;
+  static late final Box<Map> _paymentTargets;
 
   static Future<void> init() async {
     await Hive.initFlutter();
     final boxes = await Future.wait([
       Hive.openBox<Map>('profiles'),
       Hive.openBox<Map>('contacts'),
+      Hive.openBox<Map>('paymentTargets'),
     ]);
     _profiles = boxes[0];
     _contacts = boxes[1];
+    _paymentTargets = boxes[2];
   }
 
   static bool _isFresh(int? fetchedAtMillis) {
@@ -90,6 +94,31 @@ class CacheStore {
   static Future<void> _putList(String key, List<String> pubkeys) {
     return _contacts.put(key, {
       'pubkeys': pubkeys,
+      'fetchedAt': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  // --- Payment targets (kind 10133) ---
+
+  static List<NostrPaymentTarget>? getPaymentTargets(String pubkeyHex) {
+    final data = _paymentTargets.get(pubkeyHex)?['data'] as List?;
+    if (data == null) return null;
+    return [
+      for (final item in data)
+        NostrPaymentTarget.fromJson(Map<String, dynamic>.from(item as Map)),
+    ];
+  }
+
+  static bool isPaymentTargetsFresh(String pubkeyHex) {
+    return _isFresh(_paymentTargets.get(pubkeyHex)?['fetchedAt'] as int?);
+  }
+
+  static Future<void> putPaymentTargets(
+    String pubkeyHex,
+    List<NostrPaymentTarget> targets,
+  ) {
+    return _paymentTargets.put(pubkeyHex, {
+      'data': [for (final target in targets) target.toJson()],
       'fetchedAt': DateTime.now().millisecondsSinceEpoch,
     });
   }

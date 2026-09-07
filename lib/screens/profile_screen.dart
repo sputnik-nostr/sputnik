@@ -12,6 +12,7 @@ import '../widgets/count_label.dart';
 import '../widgets/fade_in_avatar.dart';
 import '../widgets/linkified_text.dart';
 import '../widgets/note_tile.dart';
+import '../widgets/payment_target_chip.dart';
 import '../widgets/placeholder_tab.dart';
 import 'image_viewer_screen.dart';
 import 'users_list_screen.dart';
@@ -46,6 +47,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _loadingNotes = true;
   List<String>? _following;
   List<String>? _followers;
+  List<NostrPaymentTarget>? _paymentTargets;
 
   bool get _isCurrentUser => widget.pubkeyHex == CurrentUser.pubkeyHex;
 
@@ -72,6 +74,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
       _loadAuthorPosts();
       _loadContacts();
+      _loadPaymentTargets();
     }
   }
 
@@ -112,6 +115,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final followers = await followersFuture;
     if (mounted) setState(() => _followers = followers);
+  }
+
+  Future<void> _loadPaymentTargets() async {
+    final targets = await const RelayPaymentTargetsRepository()
+        .fetchPaymentTargets(widget.pubkeyHex, selectedRelaysNotifier.value);
+    if (mounted) setState(() => _paymentTargets = targets);
   }
 
   @override
@@ -356,6 +365,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ],
                       ),
+                      if (_paymentTargets != null &&
+                          _paymentTargets!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final target in _paymentTargets!)
+                              PaymentTargetChip(target: target),
+                          ],
+                        ),
+                      ],
                     ],
                   ],
                 ),
