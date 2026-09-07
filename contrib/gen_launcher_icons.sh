@@ -3,7 +3,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-svg="$repo_root/logo.svg"
+svg="$repo_root/assets/logo.svg"
 master="$repo_root/assets/icon/icon.png"
 foreground="$repo_root/assets/icon/icon_foreground.png"
 
