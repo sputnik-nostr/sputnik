@@ -88,11 +88,16 @@ class _RelayConnection {
   bool get isClosed => _closed;
 
   void _handleMessage(dynamic raw) {
-    final message = jsonDecode(raw as String);
-    if (message is! List || message.length < 2) return;
-    final subscriptionId = message[1];
-    if (subscriptionId is! String) return;
-    _handlers[subscriptionId]?.call(message);
+    try {
+      final message = jsonDecode(raw as String);
+      if (message is! List || message.length < 2) return;
+      final subscriptionId = message[1];
+      if (subscriptionId is! String) return;
+      _handlers[subscriptionId]?.call(message);
+    } catch (_) {
+      // Malformed or unexpected message from the relay; ignore it rather
+      // than letting a bad payload take down the stream listener.
+    }
   }
 
   void _fail() {

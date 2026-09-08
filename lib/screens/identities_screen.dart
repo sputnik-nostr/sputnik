@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -65,6 +67,17 @@ Future<void> _confirmDeleteIdentity(
   }
 }
 
+const _clipboardClearDelay = Duration(seconds: 60);
+
+void _scheduleClipboardClear(String nsec) {
+  Timer(_clipboardClearDelay, () async {
+    final current = await Clipboard.getData(Clipboard.kTextPlain);
+    if (current?.text == nsec) {
+      await Clipboard.setData(const ClipboardData(text: ''));
+    }
+  });
+}
+
 Future<void> _showNsec(BuildContext context, Identity identity) async {
   final reveal = await showDialog<bool>(
     context: context,
@@ -100,8 +113,13 @@ Future<void> _showNsec(BuildContext context, Identity identity) async {
         TextButton(
           onPressed: () {
             Clipboard.setData(ClipboardData(text: nsec));
+            _scheduleClipboardClear(nsec);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Copied private key to clipboard')),
+              const SnackBar(
+                content: Text(
+                  'Copied private key to clipboard (clears in 60s)',
+                ),
+              ),
             );
           },
           child: const Text('Copy'),

@@ -52,10 +52,23 @@ class PaymentTargetChip extends StatelessWidget {
   final NostrPaymentTarget target;
 
   Future<void> _open(BuildContext context) async {
-    final opened = await launchUrl(
-      target.launchUri,
-      mode: LaunchMode.externalApplication,
-    );
+    final bool opened;
+    try {
+      opened = await launchUrl(
+        target.launchUri,
+        mode: LaunchMode.externalApplication,
+      );
+    } on FormatException {
+      // The event tag data behind this target didn't form a valid URI.
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('This ${target.type} address looks malformed'),
+          ),
+        );
+      }
+      return;
+    }
     if (!opened && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
