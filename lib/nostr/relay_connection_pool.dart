@@ -6,6 +6,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
+import 'relay_message_parser.dart';
 
 final _random = Random();
 
@@ -81,23 +82,20 @@ class _RelayConnection {
   late final Future<void> ready;
   late final StreamSubscription<dynamic> _streamSubscription;
 
-  final _handlers = <String, void Function(dynamic message)>{};
+  final _handlers = <String, void Function(ParsedRelayMessage message)>{};
   final _completers = <String, Completer<void>>{};
   bool _closed = false;
+
+  Future<void> _dispatchQueue = Future.value();
 
   bool get isClosed => _closed;
 
   void _handleMessage(dynamic raw) {
-    try {
-      final message = jsonDecode(raw as String);
-      if (message is! List || message.length < 2) return;
-      final subscriptionId = message[1];
-      if (subscriptionId is! String) return;
-      _handlers[subscriptionId]?.call(message);
-    } catch (_) {
-      // Malformed or unexpected message from the relay; ignore it rather
-      // than letting a bad payload take down the stream listener.
-    }
+    _dispatchQueue = _dispatchQueue.then((_) async {
+      final parsed = await RelayMessageParser.instance.parse(raw as String);
+      if (parsed == null) return;
+      _handlers[parsed.subscriptionId]?.call(parsed);
+    });
   }
 
   void _fail() {
@@ -126,9 +124,10 @@ class _RelayConnection {
 
     _handlers[subscriptionId] = (message) {
       resetIdleTimer();
-      switch (message[0]) {
+      switch (message.type) {
         case 'EVENT':
-          events.add(NostrEvent.fromJson(message[2] as Map<String, dynamic>));
+          final event = message.event;
+          if (event != null) events.add(event);
         case 'EOSE':
         case 'CLOSED':
           if (!completer.isCompleted) completer.complete();
