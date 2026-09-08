@@ -10,6 +10,8 @@ import 'relay_message_parser.dart';
 
 final _random = Random();
 
+const _firstResponseTimeout = Duration(seconds: 2);
+
 String _generateSubscriptionId() {
   final bytes = List<int>.generate(8, (_) => _random.nextInt(256));
   return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
@@ -46,7 +48,7 @@ class RelayConnectionPool {
     Duration timeout,
   ) async {
     try {
-      final connection = await _connectionFor(relayUrl);
+      final connection = await _connectionFor(relayUrl, timeout);
       return await connection.subscribe(filter, timeout);
     } catch (_) {
       // Relay is unreachable, or the persistent connection just failed;
@@ -56,13 +58,16 @@ class RelayConnectionPool {
     }
   }
 
-  Future<_RelayConnection> _connectionFor(String relayUrl) async {
+  Future<_RelayConnection> _connectionFor(
+    String relayUrl,
+    Duration connectTimeout,
+  ) async {
     final existing = _connections[relayUrl];
     if (existing != null && !existing.isClosed) return existing;
 
     final connection = _RelayConnection(relayUrl);
     _connections[relayUrl] = connection;
-    await connection.ready;
+    await connection.ready.timeout(connectTimeout);
     return connection;
   }
 }
@@ -114,15 +119,20 @@ class _RelayConnection {
     final events = <NostrEvent>[];
     final completer = Completer<void>();
     Timer? idleTimer;
+    var receivedAny = false;
 
     void resetIdleTimer() {
       idleTimer?.cancel();
-      idleTimer = Timer(timeout, () {
+      final duration = receivedAny
+          ? timeout
+          : (timeout < _firstResponseTimeout ? timeout : _firstResponseTimeout);
+      idleTimer = Timer(duration, () {
         if (!completer.isCompleted) completer.complete();
       });
     }
 
     _handlers[subscriptionId] = (message) {
+      receivedAny = true;
       resetIdleTimer();
       switch (message.type) {
         case 'EVENT':
