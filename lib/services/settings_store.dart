@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_seed_color.dart';
@@ -29,6 +30,9 @@ class SettingsStore {
   static const _selectedRelaysKey = 'selected_relays';
   static const _identitiesKey = 'identities';
   static const _activeIdentityPubkeyKey = 'active_identity_pubkey';
+
+  // Identities are kept in the platform keystore/keychain for secure storage.
+  static const _secureStorage = FlutterSecureStorage();
 
   static Future<ThemeMode> loadThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
@@ -106,8 +110,7 @@ class SettingsStore {
   }
 
   static Future<List<Identity>> loadIdentities() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_identitiesKey);
+    final raw = await _secureStorage.read(key: _identitiesKey);
     if (raw == null) return [];
 
     try {
@@ -124,10 +127,9 @@ class SettingsStore {
   }
 
   static Future<void> saveIdentities(List<Identity> identities) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _identitiesKey,
-      jsonEncode([for (final identity in identities) identity.toJson()]),
+    await _secureStorage.write(
+      key: _identitiesKey,
+      value: jsonEncode([for (final identity in identities) identity.toJson()]),
     );
   }
 

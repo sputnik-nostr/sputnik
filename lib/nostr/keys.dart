@@ -20,6 +20,12 @@ void _bytesFromHexInto(Pointer<Uint8> dest, String hex) {
   }
 }
 
+void _wipe(Pointer<Uint8> buffer, int length) {
+  for (var i = 0; i < length; i++) {
+    buffer[i] = 0;
+  }
+}
+
 Pointer<Void> _createWrapper(NostrSecp256k1Bindings bindings) {
   final wrapper = bindings.create();
   if (wrapper == nullptr) {
@@ -44,6 +50,7 @@ String xonlyPubkeyHexFromSeckeyHex(String seckeyHex) {
 
     return _hexFromPointer(pubkeyOut, 32);
   } finally {
+    _wipe(seckey, 32);
     calloc.free(seckey);
     calloc.free(pubkeyOut);
     bindings.destroy(wrapper);
@@ -67,6 +74,7 @@ NostrKeyPair generateNostrKeyPair() {
       publicKeyHex: _hexFromPointer(pubkeyOut, 32),
     );
   } finally {
+    _wipe(seckeyOut, 32);
     calloc.free(seckeyOut);
     calloc.free(pubkeyOut);
     bindings.destroy(wrapper);
