@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
+import '../models/current_user.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/fade_in_avatar.dart';
 
@@ -46,9 +47,14 @@ class _ComposeScreenState extends State<ComposeScreen> {
     final metadata = pubkeyHex == null
         ? null
         : profileCacheNotifier.value[pubkeyHex];
-    final fallbackLabel = metadata?.resolvedName?.trim().isNotEmpty == true
-        ? metadata!.resolvedName!.trim()[0].toUpperCase()
-        : '?';
+    final isCurrentUser =
+        pubkeyHex == null || pubkeyHex == CurrentUser.pubkeyHex;
+    final resolvedName = metadata?.resolvedName?.trim();
+    final fallbackLabel = resolvedName?.isNotEmpty == true
+        ? resolvedName![0].toUpperCase()
+        : isCurrentUser
+        ? CurrentUser.displayName[0].toUpperCase()
+        : pubkeyHex[0].toUpperCase();
 
     return Scaffold(
       appBar: AppBar(
@@ -90,6 +96,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                 minLines: 6,
                 textCapitalization: TextCapitalization.sentences,
                 style: theme.textTheme.bodyLarge,
+                cursorHeight: (theme.textTheme.bodyLarge?.fontSize ?? 16) * 1.2,
                 decoration: const InputDecoration.collapsed(
                   hintText: "What's happening?",
                 ),
