@@ -5,6 +5,7 @@ import 'models/app_seed_color.dart';
 import 'models/current_user.dart';
 import 'models/identity.dart';
 import 'models/note.dart';
+import 'models/relay.dart';
 import 'nostr/nostr.dart';
 import 'screens/root_screen.dart';
 import 'services/cache_store.dart';
@@ -29,6 +30,8 @@ final ValueNotifier<Set<String>> selectedRelaysNotifier = ValueNotifier(
   const {},
 );
 
+final ValueNotifier<Set<String>> customRelaysNotifier = ValueNotifier(const {});
+
 final ValueNotifier<Map<String, NostrMetadata>> profileCacheNotifier =
     ValueNotifier(const {});
 
@@ -39,12 +42,7 @@ final ValueNotifier<List<Identity>> identitiesNotifier = ValueNotifier(
 final ValueNotifier<String?> activeIdentityPubkeyNotifier = ValueNotifier(null);
 
 final ValueNotifier<CurrentUserProfile> currentUserProfileNotifier =
-    ValueNotifier(
-      const CurrentUserProfile(
-        displayName: CurrentUser.displayName,
-        bio: CurrentUser.bio,
-      ),
-    );
+    ValueNotifier(CurrentUserProfile.fallback);
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -68,10 +66,10 @@ Future<void> main() async {
     SettingsStore.loadBookmarkedNotes,
     SettingsStore.saveBookmarkedNotes,
   );
-  final selectedRelaysBound = bindPersisted(
-    selectedRelaysNotifier,
-    SettingsStore.loadSelectedRelays,
-    SettingsStore.saveSelectedRelays,
+  final customRelaysBound = bindPersisted(
+    customRelaysNotifier,
+    SettingsStore.loadCustomRelays,
+    SettingsStore.saveCustomRelays,
   );
   final identitiesBound = bindPersisted(
     identitiesNotifier,
@@ -83,14 +81,28 @@ Future<void> main() async {
     SettingsStore.loadActiveIdentityPubkey,
     SettingsStore.saveActiveIdentityPubkey,
   );
+  final currentUserProfileBound = bindPersisted(
+    currentUserProfileNotifier,
+    SettingsStore.loadCurrentUserProfile,
+    SettingsStore.saveCurrentUserProfile,
+  );
 
   await cacheInit;
   await themeModeBound;
   await seedColorBound;
   await bookmarkedNotesBound;
-  await selectedRelaysBound;
+  await customRelaysBound;
   await identitiesBound;
   await activeIdentityPubkeyBound;
+  await currentUserProfileBound;
+
+  selectedRelaysNotifier.value = await SettingsStore.loadSelectedRelays({
+    ...defaultRelays,
+    ...customRelaysNotifier.value,
+  });
+  selectedRelaysNotifier.addListener(
+    () => SettingsStore.saveSelectedRelays(selectedRelaysNotifier.value),
+  );
 
   // Load profile data from cache store
   profileCacheNotifier.value = CacheStore.loadAllProfiles();

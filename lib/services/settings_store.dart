@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_seed_color.dart';
+import '../models/current_user.dart';
 import '../models/identity.dart';
 import '../models/note.dart';
 import '../models/relay.dart';
@@ -28,8 +29,10 @@ class SettingsStore {
   static const _seedColorKey = 'seed_color';
   static const _bookmarkedNotesKey = 'bookmarked_notes';
   static const _selectedRelaysKey = 'selected_relays';
+  static const _customRelaysKey = 'custom_relays';
   static const _identitiesKey = 'identities';
   static const _activeIdentityPubkeyKey = 'active_identity_pubkey';
+  static const _currentUserProfileKey = 'current_user_profile';
 
   // Identities are kept in the platform keystore/keychain for secure storage.
   static const _secureStorage = FlutterSecureStorage();
@@ -91,12 +94,12 @@ class SettingsStore {
     await prefs.setString(_bookmarkedNotesKey, jsonEncode(encoded));
   }
 
-  static Future<Set<String>> loadSelectedRelays() async {
+  static Future<Set<String>> loadSelectedRelays(Set<String> knownRelays) async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getStringList(_selectedRelaysKey);
     if (saved == null) return defaultRelays.toSet();
 
-    final stillKnown = saved.toSet().intersection(defaultRelays.toSet());
+    final stillKnown = saved.toSet().intersection(knownRelays);
     if (stillKnown.isEmpty) {
       await saveSelectedRelays(defaultRelays.toSet());
       return defaultRelays.toSet();
@@ -107,6 +110,17 @@ class SettingsStore {
   static Future<void> saveSelectedRelays(Set<String> relays) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_selectedRelaysKey, relays.toList());
+  }
+
+  static Future<Set<String>> loadCustomRelays() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList(_customRelaysKey);
+    return saved == null ? {} : saved.toSet();
+  }
+
+  static Future<void> saveCustomRelays(Set<String> relays) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_customRelaysKey, relays.toList());
   }
 
   static Future<List<Identity>> loadIdentities() async {
@@ -145,5 +159,25 @@ class SettingsStore {
     } else {
       await prefs.setString(_activeIdentityPubkeyKey, pubkeyHex);
     }
+  }
+
+  static Future<CurrentUserProfile> loadCurrentUserProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_currentUserProfileKey);
+    if (raw == null) return CurrentUserProfile.fallback;
+
+    try {
+      return CurrentUserProfile.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
+    } catch (_) {
+      // Cached profile data is malformed; fall back to the sample defaults.
+      return CurrentUserProfile.fallback;
+    }
+  }
+
+  static Future<void> saveCurrentUserProfile(CurrentUserProfile profile) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_currentUserProfileKey, jsonEncode(profile.toJson()));
   }
 }

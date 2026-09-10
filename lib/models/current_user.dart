@@ -14,6 +14,17 @@ class CurrentUser {
 class CurrentUserProfile {
   const CurrentUserProfile({required this.displayName, required this.bio});
 
+  factory CurrentUserProfile.fromJson(Map<String, dynamic> json) =>
+      CurrentUserProfile(
+        displayName: json['displayName'] as String? ?? CurrentUser.displayName,
+        bio: json['bio'] as String? ?? CurrentUser.bio,
+      );
+
+  static const fallback = CurrentUserProfile(
+    displayName: CurrentUser.displayName,
+    bio: CurrentUser.bio,
+  );
+
   final String displayName;
   final String bio;
 
@@ -23,4 +34,6 @@ class CurrentUserProfile {
       bio: bio ?? this.bio,
     );
   }
+
+  Map<String, dynamic> toJson() => {'displayName': displayName, 'bio': bio};
 }
