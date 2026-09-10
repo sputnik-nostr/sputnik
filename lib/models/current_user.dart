@@ -10,3 +10,17 @@ class CurrentUser {
     const Duration(days: 2, hours: 4),
   );
 }
+
+class CurrentUserProfile {
+  const CurrentUserProfile({required this.displayName, required this.bio});
+
+  final String displayName;
+  final String bio;
+
+  CurrentUserProfile copyWith({String? displayName, String? bio}) {
+    return CurrentUserProfile(
+      displayName: displayName ?? this.displayName,
+      bio: bio ?? this.bio,
+    );
+  }
+}

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'models/app_seed_color.dart';
+import 'models/current_user.dart';
 import 'models/identity.dart';
 import 'models/note.dart';
 import 'nostr/nostr.dart';
@@ -36,6 +37,14 @@ final ValueNotifier<List<Identity>> identitiesNotifier = ValueNotifier(
 );
 
 final ValueNotifier<String?> activeIdentityPubkeyNotifier = ValueNotifier(null);
+
+final ValueNotifier<CurrentUserProfile> currentUserProfileNotifier =
+    ValueNotifier(
+      const CurrentUserProfile(
+        displayName: CurrentUser.displayName,
+        bio: CurrentUser.bio,
+      ),
+    );
 
 final navigatorKey = GlobalKey<NavigatorState>();
 

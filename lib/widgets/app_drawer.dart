@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../main.dart';
 import '../models/current_user.dart';
 import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
@@ -28,19 +29,22 @@ class AppDrawer extends StatelessWidget {
               },
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: theme.colorScheme.primaryContainer,
-                      child: Text(
-                        CurrentUser.displayName[0],
-                        style: theme.avatarFallback,
+                child: ValueListenableBuilder<CurrentUserProfile>(
+                  valueListenable: currentUserProfileNotifier,
+                  builder: (context, profile, _) => Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: theme.colorScheme.primaryContainer,
+                        child: Text(
+                          profile.displayName[0].toUpperCase(),
+                          style: theme.avatarFallback,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(CurrentUser.displayName, style: theme.avatarName),
-                  ],
+                      const SizedBox(width: 12),
+                      Text(profile.displayName, style: theme.avatarName),
+                    ],
+                  ),
                 ),
               ),
             ),

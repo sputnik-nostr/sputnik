@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../main.dart';
 import '../models/current_user.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/app_drawer.dart';
@@ -38,12 +39,15 @@ class _RootScreenState extends State<RootScreen> {
           child: GestureDetector(
             key: const Key('profileAvatarButton'),
             onTap: () => _scaffoldKey.currentState?.openDrawer(),
-            child: CircleAvatar(
-              radius: 14,
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              child: Text(
-                CurrentUser.displayName[0],
-                style: Theme.of(context).avatarFallback,
+            child: ValueListenableBuilder<CurrentUserProfile>(
+              valueListenable: currentUserProfileNotifier,
+              builder: (context, profile, _) => CircleAvatar(
+                radius: 14,
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                child: Text(
+                  profile.displayName[0].toUpperCase(),
+                  style: Theme.of(context).avatarFallback,
+                ),
               ),
             ),
           ),

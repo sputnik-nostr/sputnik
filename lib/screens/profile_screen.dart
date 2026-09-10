@@ -14,6 +14,7 @@ import '../widgets/linkified_text.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/payment_target_chip.dart';
 import '../widgets/placeholder_tab.dart';
+import 'edit_profile_screen.dart';
 import 'image_viewer_screen.dart';
 import 'users_list_screen.dart';
 
@@ -48,6 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<String>? _following;
   List<String>? _followers;
   List<NostrPaymentTarget>? _paymentTargets;
+  bool _followingLocally = false;
 
   bool get _isCurrentUser => widget.pubkeyHex == CurrentUser.pubkeyHex;
 
@@ -55,6 +57,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ImageViewerScreen(imageUrl: imageUrl)),
+    );
+  }
+
+  void _toggleFollow(BuildContext context) {
+    setState(() => _followingLocally = !_followingLocally);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Publishing follows to relays is not implemented yet'),
+      ),
     );
   }
 
@@ -131,7 +142,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       body: AnimatedBuilder(
-        animation: Listenable.merge([profileCacheNotifier, notesNotifier]),
+        animation: Listenable.merge([
+          profileCacheNotifier,
+          notesNotifier,
+          currentUserProfileNotifier,
+        ]),
         builder: (context, child) {
           final metadata = _isCurrentUser
               ? null
@@ -159,14 +174,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   .toList()
                 ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
           final displayName = _isCurrentUser
-              ? CurrentUser.displayName
+              ? currentUserProfileNotifier.value.displayName
               : (metadata?.resolvedName ??
                     (ownNotes.isNotEmpty
                         ? ownNotes.first.displayName
                         : _shortPubkey(pubkeyHex)));
           final pictureUrl = metadata?.picture;
           final bannerUrl = metadata?.banner;
-          final bio = _isCurrentUser ? CurrentUser.bio : metadata?.about;
+          final bio = _isCurrentUser
+              ? currentUserProfileNotifier.value.bio
+              : metadata?.about;
           final hasBio = bio != null && bio.trim().isNotEmpty;
 
           return ListView(
@@ -240,6 +257,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           onTap: () => Navigator.pop(context),
                         ),
                       ),
+                    ),
+                    Positioned(
+                      bottom: 8,
+                      right: 16,
+                      child: _isCurrentUser
+                          ? IconButton.filled(
+                              key: const Key('editProfileButton'),
+                              tooltip: 'Edit profile',
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const EditProfileScreen(),
+                                ),
+                              ),
+                              icon: const Icon(Icons.edit_outlined, size: 16),
+                              style: IconButton.styleFrom(
+                                backgroundColor:
+                                    theme.colorScheme.inverseSurface,
+                                foregroundColor:
+                                    theme.colorScheme.onInverseSurface,
+                                shape: const StadiumBorder(),
+                                minimumSize: const Size(44, 30),
+                                padding: EdgeInsets.zero,
+                              ),
+                            )
+                          : _followingLocally
+                          ? OutlinedButton(
+                              key: const Key('followButton'),
+                              onPressed: () => _toggleFollow(context),
+                              child: const Text('Following'),
+                            )
+                          : FilledButton(
+                              key: const Key('followButton'),
+                              onPressed: () => _toggleFollow(context),
+                              child: const Text('Follow'),
+                            ),
                     ),
                     Positioned(
                       top: _bannerHeight - _avatarOverlap,

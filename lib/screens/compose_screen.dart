@@ -53,7 +53,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
     final fallbackLabel = resolvedName?.isNotEmpty == true
         ? resolvedName![0].toUpperCase()
         : isCurrentUser
-        ? CurrentUser.displayName[0].toUpperCase()
+        ? currentUserProfileNotifier.value.displayName[0].toUpperCase()
         : pubkeyHex[0].toUpperCase();
 
     return Scaffold(
