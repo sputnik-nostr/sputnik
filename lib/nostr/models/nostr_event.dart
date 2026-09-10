@@ -1,3 +1,8 @@
+final _hexPattern = RegExp(r'^[0-9a-fA-F]+$');
+
+bool _isHex(String value, int byteLength) =>
+    value.length == byteLength * 2 && _hexPattern.hasMatch(value);
+
 class NostrEvent {
   const NostrEvent({
     required this.id,
@@ -10,9 +15,16 @@ class NostrEvent {
   });
 
   factory NostrEvent.fromJson(Map<String, dynamic> json) {
+    final id = json['id'] as String;
+    final pubkey = json['pubkey'] as String;
+    final sig = json['sig'] as String;
+    if (!_isHex(id, 32) || !_isHex(pubkey, 32) || !_isHex(sig, 64)) {
+      throw const FormatException('Malformed event id, pubkey, or sig');
+    }
+
     return NostrEvent(
-      id: json['id'] as String,
-      pubkey: json['pubkey'] as String,
+      id: id,
+      pubkey: pubkey,
       createdAt: DateTime.fromMillisecondsSinceEpoch(
         (json['created_at'] as int) * 1000,
       ),
@@ -21,7 +33,7 @@ class NostrEvent {
           .map((tag) => (tag as List<dynamic>).cast<String>())
           .toList(),
       content: json['content'] as String,
-      sig: json['sig'] as String,
+      sig: sig,
     );
   }
 
