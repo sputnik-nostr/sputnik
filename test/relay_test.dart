@@ -48,4 +48,32 @@ void main() {
     expect(isRelayUrl('not a url'), isFalse);
     expect(isRelayUrl(''), isFalse);
   });
+
+  test('canonicalRelayUrl lowercases scheme and host', () {
+    expect(
+      canonicalRelayUrl('WSS://Relay.Example.COM'),
+      'wss://relay.example.com',
+    );
+  });
+
+  test('canonicalRelayUrl drops a bare root path', () {
+    expect(
+      canonicalRelayUrl('wss://relay.example.com/'),
+      'wss://relay.example.com',
+    );
+  });
+
+  test('canonicalRelayUrl keeps a non-root path as-is', () {
+    expect(
+      canonicalRelayUrl('wss://relay.example.com/path'),
+      'wss://relay.example.com/path',
+    );
+  });
+
+  test('canonicalRelayUrl makes case/trailing-slash variants match', () {
+    expect(
+      canonicalRelayUrl('WSS://Relay.Example.COM/'),
+      canonicalRelayUrl('wss://relay.example.com'),
+    );
+  });
 }

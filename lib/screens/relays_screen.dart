@@ -24,6 +24,13 @@ void _removeCustomRelay(String relay) {
 }
 
 Future<void> _addRelay(BuildContext context) async {
+  if (customRelaysNotifier.value.length >= maxCustomRelays) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('You can add up to $maxCustomRelays relays')),
+    );
+    return;
+  }
+
   final controller = TextEditingController();
   String? error;
 
@@ -70,14 +77,14 @@ Future<void> _addRelay(BuildContext context) async {
   );
   if (url == null) return;
 
-  final trimmed = url.trim();
-  if (defaultRelays.contains(trimmed) ||
-      customRelaysNotifier.value.contains(trimmed)) {
+  final relay = canonicalRelayUrl(url);
+  if (defaultRelays.contains(relay) ||
+      customRelaysNotifier.value.contains(relay)) {
     return;
   }
 
-  customRelaysNotifier.value = {...customRelaysNotifier.value, trimmed};
-  _setSelected(trimmed, true);
+  customRelaysNotifier.value = {...customRelaysNotifier.value, relay};
+  _setSelected(relay, true);
 }
 
 class RelaysScreen extends StatelessWidget {
