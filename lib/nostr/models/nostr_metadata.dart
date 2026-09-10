@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'text_sanitizer.dart';
+
 class NostrMetadata {
   const NostrMetadata({
     this.name,
@@ -14,10 +16,15 @@ class NostrMetadata {
   factory NostrMetadata.fromContent(String content) {
     final json = jsonDecode(content) as Map<String, dynamic>;
     String? string(String key) => json[key] as String?;
+    String? text(String key) {
+      final value = string(key);
+      return value == null ? null : sanitizeUtf16(value);
+    }
+
     return NostrMetadata(
-      name: string('name'),
-      displayName: string('display_name') ?? string('displayName'),
-      about: string('about'),
+      name: text('name'),
+      displayName: text('display_name') ?? text('displayName'),
+      about: text('about'),
       picture: string('picture'),
       banner: string('banner'),
       nip05: string('nip05'),

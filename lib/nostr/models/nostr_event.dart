@@ -1,3 +1,5 @@
+import 'text_sanitizer.dart';
+
 final _hexPattern = RegExp(r'^[0-9a-fA-F]+$');
 
 bool _isHex(String value, int byteLength) =>
@@ -32,7 +34,7 @@ class NostrEvent {
       tags: (json['tags'] as List<dynamic>)
           .map((tag) => (tag as List<dynamic>).cast<String>())
           .toList(),
-      content: json['content'] as String,
+      content: sanitizeUtf16(json['content'] as String),
       sig: sig,
     );
   }
