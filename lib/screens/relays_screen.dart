@@ -23,11 +23,6 @@ void _removeCustomRelay(String relay) {
   }
 }
 
-bool _isRelayUrl(String input) {
-  final uri = Uri.tryParse(input);
-  return uri != null && (uri.scheme == 'ws' || uri.scheme == 'wss');
-}
-
 Future<void> _addRelay(BuildContext context) async {
   final controller = TextEditingController();
   String? error;
@@ -59,7 +54,7 @@ Future<void> _addRelay(BuildContext context) async {
                 key: const Key('confirmAddRelayButton'),
                 onPressed: () {
                   final input = controller.text.trim();
-                  if (!_isRelayUrl(input)) {
+                  if (!isRelayUrl(input)) {
                     setState(() => error = 'Enter a valid ws:// or wss:// URL');
                     return;
                   }
