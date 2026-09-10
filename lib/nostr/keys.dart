@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
@@ -77,6 +78,32 @@ NostrKeyPair generateNostrKeyPair() {
     _wipe(seckeyOut, 32);
     calloc.free(seckeyOut);
     calloc.free(pubkeyOut);
+    bindings.destroy(wrapper);
+  }
+}
+
+bool verifySchnorrSignature({
+  required Uint8List msg32,
+  required Uint8List sig64,
+  required Uint8List pubkey32,
+}) {
+  final bindings = NostrSecp256k1Bindings.instance;
+  final wrapper = _createWrapper(bindings);
+
+  final msg = calloc<Uint8>(32);
+  final sig = calloc<Uint8>(64);
+  final pubkey = calloc<Uint8>(32);
+
+  try {
+    msg.asTypedList(32).setAll(0, msg32);
+    sig.asTypedList(64).setAll(0, sig64);
+    pubkey.asTypedList(32).setAll(0, pubkey32);
+
+    return bindings.verifySchnorr(wrapper, msg, sig, pubkey) == 1;
+  } finally {
+    calloc.free(msg);
+    calloc.free(sig);
+    calloc.free(pubkey);
     bindings.destroy(wrapper);
   }
 }

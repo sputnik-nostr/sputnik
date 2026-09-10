@@ -1,31 +1,24 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/nostr/models/nostr_event.dart';
 
-Map<String, dynamic> _json({
-  String? id,
-  String? pubkey,
-  String? sig,
-  String? content,
-}) {
+// Format-only checks: these mutate a field to be structurally invalid hex,
+// which is rejected before NostrEvent.fromJson ever reaches signature
+// verification, so a real signature isn't needed here. See
+// nostr_event_verification_test.dart for authenticity checks against real
+// signed events, and nostr_metadata_test.dart for content sanitization.
+Map<String, dynamic> _json({String? id, String? pubkey, String? sig}) {
   return {
     'id': id ?? 'a' * 64,
     'pubkey': pubkey ?? 'b' * 64,
     'created_at': 0,
     'kind': 1,
     'tags': <List<String>>[],
-    'content': content ?? '',
+    'content': '',
     'sig': sig ?? 'c' * 128,
   };
 }
 
 void main() {
-  test('parses an event with well-formed hex id/pubkey/sig', () {
-    final event = NostrEvent.fromJson(_json());
-    expect(event.id, 'a' * 64);
-    expect(event.pubkey, 'b' * 64);
-    expect(event.sig, 'c' * 128);
-  });
-
   test('rejects a wrong-length pubkey', () {
     expect(
       () => NostrEvent.fromJson(_json(pubkey: 'b' * 63)),
@@ -52,10 +45,5 @@ void main() {
       () => NostrEvent.fromJson(_json(sig: 'c' * 127)),
       throwsFormatException,
     );
-  });
-
-  test('sanitizes a lone surrogate in content instead of throwing later', () {
-    final event = NostrEvent.fromJson(_json(content: 'bad\ud800content'));
-    expect(event.content, 'bad�content');
   });
 }

@@ -8,6 +8,7 @@
 
 #include <secp256k1.h>
 #include <secp256k1_extrakeys.h>
+#include <secp256k1_schnorrsig.h>
 
 struct nostr_secp256k1
 {
@@ -124,4 +125,18 @@ int nostr_secp256k1_generate_keypair(
     } while (!secp256k1_ec_seckey_verify(wrapper->ctx, seckey32_out));
 
     return nostr_secp256k1_pubkey_from_seckey(wrapper, seckey32_out, pubkey32_out);
+}
+
+int nostr_secp256k1_verify_schnorr(
+    nostr_secp256k1* wrapper,
+    const uint8_t msg32[32],
+    const uint8_t sig64[64],
+    const uint8_t pubkey32[32])
+{
+    if (wrapper == NULL || msg32 == NULL || sig64 == NULL || pubkey32 == NULL) return 0;
+
+    secp256k1_xonly_pubkey xonly_pubkey;
+    if (!secp256k1_xonly_pubkey_parse(wrapper->ctx, &xonly_pubkey, pubkey32)) return 0;
+
+    return secp256k1_schnorrsig_verify(wrapper->ctx, sig64, msg32, 32, &xonly_pubkey);
 }

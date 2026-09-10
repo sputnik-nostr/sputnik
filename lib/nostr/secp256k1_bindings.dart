@@ -29,6 +29,19 @@ typedef GenerateKeypairFn = int Function(
   Pointer<Uint8> pubkey32Out,
 );
 
+typedef _VerifySchnorrNative = Int32 Function(
+  Pointer<Void> wrapper,
+  Pointer<Uint8> msg32,
+  Pointer<Uint8> sig64,
+  Pointer<Uint8> pubkey32,
+);
+typedef VerifySchnorrFn = int Function(
+  Pointer<Void> wrapper,
+  Pointer<Uint8> msg32,
+  Pointer<Uint8> sig64,
+  Pointer<Uint8> pubkey32,
+);
+
 DynamicLibrary _openNostrSecp256k1() {
   final override = Platform.environment['SPUTNIK_NOSTR_SECP256K1_LIBRARY'];
   if (override != null) return DynamicLibrary.open(override);
@@ -67,6 +80,10 @@ class NostrSecp256k1Bindings {
       generateKeypair = _lib
           .lookupFunction<_GenerateKeypairNative, GenerateKeypairFn>(
             'nostr_secp256k1_generate_keypair',
+          ),
+      verifySchnorr = _lib
+          .lookupFunction<_VerifySchnorrNative, VerifySchnorrFn>(
+            'nostr_secp256k1_verify_schnorr',
           );
 
   static final NostrSecp256k1Bindings instance = NostrSecp256k1Bindings._(
@@ -80,4 +97,5 @@ class NostrSecp256k1Bindings {
   final DestroyFn destroy;
   final PubkeyFromSeckeyFn pubkeyFromSeckey;
   final GenerateKeypairFn generateKeypair;
+  final VerifySchnorrFn verifySchnorr;
 }

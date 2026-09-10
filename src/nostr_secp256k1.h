@@ -17,3 +17,9 @@ int nostr_secp256k1_generate_keypair(
     nostr_secp256k1* wrapper,
     uint8_t seckey32_out[32],
     uint8_t pubkey32_out[32]);
+
+int nostr_secp256k1_verify_schnorr(
+    nostr_secp256k1* wrapper,
+    const uint8_t msg32[32],
+    const uint8_t sig64[64],
+    const uint8_t pubkey32[32]);
