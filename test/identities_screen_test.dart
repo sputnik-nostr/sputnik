@@ -65,4 +65,63 @@ void main() {
     expect(activeIdentityPubkeyNotifier.value, isNull);
     expect(find.text('No identities yet'), findsOneWidget);
   });
+
+  const seckeyHex =
+      '67dea2ed018072d675f5415ecfaed7d2597555e202d85b3d65ea4e58d2d92ffa';
+  const nsec =
+      'nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5';
+
+  testWidgets('imports an nsec and makes it the active identity', (
+    tester,
+  ) async {
+    await openIdentitiesScreen(tester);
+
+    await tester.tap(find.byKey(const Key('importIdentityButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), nsec);
+    await tester.tap(find.text('Import'));
+    await tester.pumpAndSettle();
+
+    expect(identitiesNotifier.value, hasLength(1));
+    expect(identitiesNotifier.value.single.privkeyHex, seckeyHex);
+    expect(
+      activeIdentityPubkeyNotifier.value,
+      identitiesNotifier.value.single.pubkeyHex,
+    );
+  });
+
+  testWidgets('rejects a malformed nsec without adding an identity', (
+    tester,
+  ) async {
+    await openIdentitiesScreen(tester);
+
+    await tester.tap(find.byKey(const Key('importIdentityButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), 'not an nsec');
+    await tester.tap(find.text('Import'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Enter a valid nsec key'), findsOneWidget);
+    expect(identitiesNotifier.value, isEmpty);
+  });
+
+  testWidgets('rejects importing an already-imported identity', (tester) async {
+    await openIdentitiesScreen(tester);
+
+    await tester.tap(find.byKey(const Key('importIdentityButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), nsec);
+    await tester.tap(find.text('Import'));
+    await tester.pumpAndSettle();
+    expect(identitiesNotifier.value, hasLength(1));
+
+    await tester.tap(find.byKey(const Key('importIdentityButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), nsec);
+    await tester.tap(find.text('Import'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('This identity is already imported'), findsOneWidget);
+    expect(identitiesNotifier.value, hasLength(1));
+  });
 }

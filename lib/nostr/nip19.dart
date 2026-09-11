@@ -8,11 +8,15 @@ List<int> _bytesFromHex(String hex) => [
     int.parse(hex.substring(i, i + 2), radix: 16),
 ];
 
-String? _hexFromBareEntity(String input, String expectedHrp) {
+String? _hexFromBareEntity(
+  String input,
+  String expectedHrp,
+  int expectedByteLength,
+) {
   final decoded = bech32Decode(input);
   if (decoded == null || decoded.hrp != expectedHrp) return null;
   final bytes = convertBits(decoded.data, 5, 8, pad: false);
-  if (bytes.isEmpty) return null;
+  if (bytes.length != expectedByteLength) return null;
   return _hexFromBytes(bytes);
 }
 
@@ -42,7 +46,10 @@ String npubFromHex(String pubkeyHex) {
 }
 
 // Decodes an `npub`-formatted pubkey into its raw hex form.
-String? hexFromNpub(String npub) => _hexFromBareEntity(npub, 'npub');
+String? hexFromNpub(String npub) => _hexFromBareEntity(npub, 'npub', 32);
+
+// Decodes an `nsec`-formatted secret key into its raw hex form.
+String? hexFromNsec(String nsec) => _hexFromBareEntity(nsec, 'nsec', 32);
 
 // Encodes a hex secret key into the canonical `nsec` format.
 String nsecFromHex(String seckeyHex) {
@@ -59,7 +66,7 @@ String noteFromHex(String eventIdHex) {
   );
 }
 
-String? hexFromNote(String note) => _hexFromBareEntity(note, 'note');
+String? hexFromNote(String note) => _hexFromBareEntity(note, 'note', 32);
 
 String? hexFromNprofile(String nprofile) =>
     _hexFromTlvSpecial(nprofile, 'nprofile');

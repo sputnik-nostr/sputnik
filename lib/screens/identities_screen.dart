@@ -9,21 +9,86 @@ import '../models/time_format.dart';
 import '../nostr/nostr.dart';
 import '../widgets/placeholder_tab.dart';
 
+void _addIdentity(String pubkeyHex, String privkeyHex) {
+  final identity = Identity(
+    pubkeyHex: pubkeyHex,
+    privkeyHex: privkeyHex,
+    createdAt: DateTime.now(),
+  );
+  identitiesNotifier.value = [...identitiesNotifier.value, identity];
+  activeIdentityPubkeyNotifier.value = identity.pubkeyHex;
+}
+
 Future<void> _generateIdentity(BuildContext context) async {
   try {
     final keyPair = generateNostrKeyPair();
-    final identity = Identity(
-      pubkeyHex: keyPair.publicKeyHex,
-      privkeyHex: keyPair.privateKeyHex,
-      createdAt: DateTime.now(),
-    );
-    identitiesNotifier.value = [...identitiesNotifier.value, identity];
-    activeIdentityPubkeyNotifier.value = identity.pubkeyHex;
+    _addIdentity(keyPair.publicKeyHex, keyPair.privateKeyHex);
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not generate a keypair: $e')),
       );
+    }
+  }
+}
+
+Future<void> _importIdentity(BuildContext context) async {
+  final controller = TextEditingController();
+  final formKey = GlobalKey<FormState>();
+
+  final nsec = await showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Import private key'),
+      content: Form(
+        key: formKey,
+        child: TextFormField(
+          controller: controller,
+          autofocus: true,
+          obscureText: true,
+          decoration: const InputDecoration(
+            labelText: 'nsec',
+            hintText: 'nsec1...',
+          ),
+          validator: (value) {
+            final seckeyHex = hexFromNsec((value ?? '').trim());
+            if (seckeyHex == null) return 'Enter a valid nsec key';
+            if (identitiesNotifier.value.any(
+              (i) => i.privkeyHex == seckeyHex,
+            )) {
+              return 'This identity is already imported';
+            }
+            return null;
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () {
+            if (formKey.currentState!.validate()) {
+              Navigator.pop(context, controller.text.trim());
+            }
+          },
+          child: const Text('Import'),
+        ),
+      ],
+    ),
+  );
+  if (nsec == null) return;
+
+  final seckeyHex = hexFromNsec(nsec)!;
+  try {
+    final pubkeyHex = xonlyPubkeyHexFromSeckeyHex(seckeyHex);
+    _addIdentity(pubkeyHex, seckeyHex);
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not import this key: $e')));
     }
   }
 }
@@ -142,6 +207,17 @@ class IdentitiesScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Identities'),
         actions: [
+          SizedBox(
+            width: kToolbarHeight,
+            child: Center(
+              child: IconButton(
+                key: const Key('importIdentityButton'),
+                icon: const Icon(Icons.key_outlined),
+                tooltip: 'Import private key',
+                onPressed: () => _importIdentity(context),
+              ),
+            ),
+          ),
           SizedBox(
             width: kToolbarHeight,
             child: Center(

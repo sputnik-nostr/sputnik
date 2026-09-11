@@ -35,12 +35,34 @@ void main() {
     expect(hexFromNpub('not a bech32 string'), isNull);
   });
 
+  const seckeyHex =
+      '67dea2ed018072d675f5415ecfaed7d2597555e202d85b3d65ea4e58d2d92ffa';
+  const nsec =
+      'nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5';
+
   test('encodes a hex seckey to the matching nsec', () {
-    const seckeyHex =
-        '67dea2ed018072d675f5415ecfaed7d2597555e202d85b3d65ea4e58d2d92ffa';
-    const nsec =
-        'nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5';
     expect(nsecFromHex(seckeyHex), nsec);
+  });
+
+  test('decodes an nsec to the matching hex seckey', () {
+    expect(hexFromNsec(nsec), seckeyHex);
+  });
+
+  test('rejects a non-nsec bech32 string', () {
+    expect(hexFromNsec(npub1), isNull);
+  });
+
+  test('rejects a bech32 payload with the wrong byte length', () {
+    final shortHex = hex1.substring(0, 40);
+    final shortBytes = [
+      for (var i = 0; i < shortHex.length; i += 2)
+        int.parse(shortHex.substring(i, i + 2), radix: 16),
+    ];
+    final shortPayload = bech32Encode(
+      'nsec',
+      convertBits(shortBytes, 8, 5, pad: true),
+    );
+    expect(hexFromNsec(shortPayload), isNull);
   });
 
   test('encodes and decodes a hex event id as note', () {
