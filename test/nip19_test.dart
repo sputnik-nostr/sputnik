@@ -87,6 +87,19 @@ void main() {
     expect(hexFromNevent(nevent), hex1);
   });
 
+  test('rejects a TLV special value that is not 32 bytes', () {
+    final idBytes = [
+      for (var i = 0; i < hex1.length; i += 2)
+        int.parse(hex1.substring(i, i + 2), radix: 16),
+    ];
+    final truncated = idBytes.sublist(0, 16);
+    final data = <int>[0, truncated.length, ...truncated];
+    final payload = convertBits(data, 8, 5, pad: true);
+
+    expect(hexFromNevent(bech32Encode('nevent', payload)), isNull);
+    expect(hexFromNprofile(bech32Encode('nprofile', payload)), isNull);
+  });
+
   test('decodeNostrUri resolves npub and nostr:npub the same way', () {
     expect(decodeNostrUri(npub1), (pubkeyHex: hex1, eventIdHex: null));
     expect(decodeNostrUri('nostr:$npub1'), (pubkeyHex: hex1, eventIdHex: null));
