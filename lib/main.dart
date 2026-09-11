@@ -109,7 +109,16 @@ Future<void> main() async {
 
   runApp(const MainApp());
 
-  loadFeed();
+  loadFeed().catchError((Object error, StackTrace stack) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stack,
+        library: 'sputnik',
+        context: ErrorDescription('loading the initial feed'),
+      ),
+    );
+  });
 }
 
 class MainApp extends StatelessWidget {
