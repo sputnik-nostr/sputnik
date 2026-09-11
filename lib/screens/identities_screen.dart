@@ -32,18 +32,31 @@ Future<void> _generateIdentity(BuildContext context) async {
   }
 }
 
-Future<void> _importIdentity(BuildContext context) async {
-  final controller = TextEditingController();
-  final formKey = GlobalKey<FormState>();
+class _ImportIdentityDialog extends StatefulWidget {
+  const _ImportIdentityDialog();
 
-  final nsec = await showDialog<String>(
-    context: context,
-    builder: (context) => AlertDialog(
+  @override
+  State<_ImportIdentityDialog> createState() => _ImportIdentityDialogState();
+}
+
+class _ImportIdentityDialogState extends State<_ImportIdentityDialog> {
+  final _controller = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
       title: const Text('Import private key'),
       content: Form(
-        key: formKey,
+        key: _formKey,
         child: TextFormField(
-          controller: controller,
+          controller: _controller,
           autofocus: true,
           obscureText: true,
           decoration: const InputDecoration(
@@ -69,18 +82,27 @@ Future<void> _importIdentity(BuildContext context) async {
         ),
         TextButton(
           onPressed: () {
-            if (formKey.currentState!.validate()) {
-              Navigator.pop(context, controller.text.trim());
+            if (_formKey.currentState!.validate()) {
+              Navigator.pop(context, _controller.text.trim());
             }
           },
           child: const Text('Import'),
         ),
       ],
-    ),
+    );
+  }
+}
+
+Future<void> _importIdentity(BuildContext context) async {
+  final nsec = await showDialog<String>(
+    context: context,
+    builder: (context) => const _ImportIdentityDialog(),
   );
   if (nsec == null) return;
 
-  final seckeyHex = hexFromNsec(nsec)!;
+  final seckeyHex = hexFromNsec(nsec);
+  if (seckeyHex == null) return;
+
   try {
     final pubkeyHex = xonlyPubkeyHexFromSeckeyHex(seckeyHex);
     _addIdentity(pubkeyHex, seckeyHex);
