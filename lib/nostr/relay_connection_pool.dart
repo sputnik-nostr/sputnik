@@ -100,11 +100,14 @@ class _RelayConnection {
   bool get isClosed => _closed;
 
   void _handleMessage(dynamic raw) {
-    _dispatchQueue = _dispatchQueue.then((_) async {
-      final parsed = await RelayMessageParser.instance.parse(raw as String);
+    if (raw is! String) return;
+
+    final dispatched = _dispatchQueue.then((_) async {
+      final parsed = await RelayMessageParser.instance.parse(raw);
       if (parsed == null) return;
       _handlers[parsed.subscriptionId]?.call(parsed);
     });
+    _dispatchQueue = dispatched.catchError((Object _) {});
   }
 
   void _fail() {
