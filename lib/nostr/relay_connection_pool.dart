@@ -12,6 +12,10 @@ final _random = Random();
 
 const _firstResponseTimeout = Duration(seconds: 2);
 
+const _maxSubscriptionDuration = Duration(seconds: 30);
+
+const _maxEventsPerSubscription = 2000;
+
 String _generateSubscriptionId() {
   final bytes = List<int>.generate(8, (_) => _random.nextInt(256));
   return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
@@ -138,6 +142,10 @@ class _RelayConnection {
         case 'EVENT':
           final event = message.event;
           if (event != null) events.add(event);
+          if (events.length >= _maxEventsPerSubscription &&
+              !completer.isCompleted) {
+            completer.complete();
+          }
         case 'EOSE':
         case 'CLOSED':
           if (!completer.isCompleted) completer.complete();
@@ -145,13 +153,25 @@ class _RelayConnection {
     };
     _completers[subscriptionId] = completer;
 
-    resetIdleTimer();
-    _channel.sink.add(jsonEncode(['REQ', subscriptionId, filter.toJson()]));
+    final overallTimer = Timer(
+      timeout > _maxSubscriptionDuration ? timeout : _maxSubscriptionDuration,
+      () {
+        if (!completer.isCompleted) completer.complete();
+      },
+    );
 
-    await completer.future;
-    idleTimer?.cancel();
-    _handlers.remove(subscriptionId);
-    _completers.remove(subscriptionId);
+    resetIdleTimer();
+
+    try {
+      _channel.sink.add(jsonEncode(['REQ', subscriptionId, filter.toJson()]));
+      await completer.future;
+    } finally {
+      idleTimer?.cancel();
+      overallTimer.cancel();
+      _handlers.remove(subscriptionId);
+      _completers.remove(subscriptionId);
+    }
+
     if (!_closed) {
       _channel.sink.add(jsonEncode(['CLOSE', subscriptionId]));
     }
