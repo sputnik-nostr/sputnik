@@ -27,17 +27,17 @@ void _wipe(Pointer<Uint8> buffer, int length) {
   }
 }
 
-Pointer<Void> _createWrapper(NostrSecp256k1Bindings bindings) {
-  final wrapper = bindings.create();
+final _sharedWrapper = () {
+  final wrapper = NostrSecp256k1Bindings.instance.create();
   if (wrapper == nullptr) {
     throw StateError('nostr_secp256k1_create failed');
   }
   return wrapper;
-}
+}();
 
 String xonlyPubkeyHexFromSeckeyHex(String seckeyHex) {
   final bindings = NostrSecp256k1Bindings.instance;
-  final wrapper = _createWrapper(bindings);
+  final wrapper = _sharedWrapper;
 
   final seckey = calloc<Uint8>(32);
   final pubkeyOut = calloc<Uint8>(32);
@@ -54,13 +54,12 @@ String xonlyPubkeyHexFromSeckeyHex(String seckeyHex) {
     _wipe(seckey, 32);
     calloc.free(seckey);
     calloc.free(pubkeyOut);
-    bindings.destroy(wrapper);
   }
 }
 
 NostrKeyPair generateNostrKeyPair() {
   final bindings = NostrSecp256k1Bindings.instance;
-  final wrapper = _createWrapper(bindings);
+  final wrapper = _sharedWrapper;
 
   final seckeyOut = calloc<Uint8>(32);
   final pubkeyOut = calloc<Uint8>(32);
@@ -78,7 +77,6 @@ NostrKeyPair generateNostrKeyPair() {
     _wipe(seckeyOut, 32);
     calloc.free(seckeyOut);
     calloc.free(pubkeyOut);
-    bindings.destroy(wrapper);
   }
 }
 
@@ -88,7 +86,7 @@ bool verifySchnorrSignature({
   required Uint8List pubkey32,
 }) {
   final bindings = NostrSecp256k1Bindings.instance;
-  final wrapper = _createWrapper(bindings);
+  final wrapper = _sharedWrapper;
 
   final msg = calloc<Uint8>(32);
   final sig = calloc<Uint8>(64);
@@ -104,6 +102,5 @@ bool verifySchnorrSignature({
     calloc.free(msg);
     calloc.free(sig);
     calloc.free(pubkey);
-    bindings.destroy(wrapper);
   }
 }
