@@ -96,12 +96,13 @@ Future<void> main() async {
   await activeIdentityPubkeyBound;
   await currentUserProfileBound;
 
-  selectedRelaysNotifier.value = await SettingsStore.loadSelectedRelays({
-    ...defaultRelays,
-    ...customRelaysNotifier.value,
-  });
-  selectedRelaysNotifier.addListener(
-    () => SettingsStore.saveSelectedRelays(selectedRelaysNotifier.value),
+  await bindPersisted(
+    selectedRelaysNotifier,
+    () => SettingsStore.loadSelectedRelays({
+      ...defaultRelays,
+      ...customRelaysNotifier.value,
+    }),
+    SettingsStore.saveSelectedRelays,
   );
 
   // Load profile data from cache store
