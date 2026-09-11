@@ -20,6 +20,8 @@ String? _hexFromBareEntity(
   return _hexFromBytes(bytes);
 }
 
+const _tlvSpecialByteLength = 32;
+
 String? _hexFromTlvSpecial(String input, String expectedHrp) {
   final decoded = bech32Decode(input);
   if (decoded == null || decoded.hrp != expectedHrp) return null;
@@ -31,7 +33,10 @@ String? _hexFromTlvSpecial(String input, String expectedHrp) {
     final length = bytes[i + 1];
     final valueEnd = i + 2 + length;
     if (valueEnd > bytes.length) return null;
-    if (type == 0) return _hexFromBytes(bytes.sublist(i + 2, valueEnd));
+    if (type == 0) {
+      if (length != _tlvSpecialByteLength) return null;
+      return _hexFromBytes(bytes.sublist(i + 2, valueEnd));
+    }
     i = valueEnd;
   }
   return null;
