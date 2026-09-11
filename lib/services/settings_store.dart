@@ -13,13 +13,39 @@ import '../models/relay.dart';
 // Loads a notifier's persisted value and wires it to save on every change.
 // Used to bind each of the app's settings notifiers without repeating the
 // "load, assign, add a saving listener" sequence for each one.
+void _reportPersistenceError(String what, Object error, StackTrace stack) {
+  FlutterError.reportError(
+    FlutterErrorDetails(
+      exception: error,
+      stack: stack,
+      library: 'sputnik',
+      context: ErrorDescription(what),
+    ),
+  );
+}
+
 Future<void> bindPersisted<T>(
   ValueNotifier<T> notifier,
   Future<T> Function() load,
   Future<void> Function(T value) save,
 ) async {
-  notifier.value = await load();
-  notifier.addListener(() => save(notifier.value));
+  try {
+    notifier.value = await load();
+  } catch (error, stack) {
+    _reportPersistenceError('loading persisted $T', error, stack);
+    return;
+  }
+  var pending = Future<void>.value();
+  notifier.addListener(() {
+    final value = notifier.value;
+    pending = pending.then((_) async {
+      try {
+        await save(value);
+      } catch (error, stack) {
+        _reportPersistenceError('saving $T', error, stack);
+      }
+    });
+  });
 }
 
 class SettingsStore {
@@ -127,17 +153,16 @@ class SettingsStore {
     final raw = await _secureStorage.read(key: _identitiesKey);
     if (raw == null) return [];
 
-    try {
-      final decoded = jsonDecode(raw) as List<dynamic>;
-      return [
-        for (final item in decoded)
-          Identity.fromJson(item as Map<String, dynamic>),
-      ];
-    } catch (_) {
-      // Cached identity data is malformed; start with an empty set rather
-      // than crash the app on startup.
-      return [];
+    final decoded = jsonDecode(raw) as List<dynamic>;
+    final identities = <Identity>[];
+    for (final item in decoded) {
+      try {
+        identities.add(Identity.fromJson(item as Map<String, dynamic>));
+      } catch (_) {
+        // Skip malformed identity entries.
+      }
     }
+    return identities;
   }
 
   static Future<void> saveIdentities(List<Identity> identities) async {
