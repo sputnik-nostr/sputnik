@@ -15,7 +15,11 @@ class NostrMetadata {
 
   factory NostrMetadata.fromContent(String content) {
     final json = jsonDecode(content) as Map<String, dynamic>;
-    String? string(String key) => json[key] as String?;
+    String? string(String key) {
+      final value = json[key];
+      return value is String ? value : null;
+    }
+
     String? text(String key) {
       final value = string(key);
       return value == null ? null : sanitizeUtf16(value);
@@ -33,14 +37,19 @@ class NostrMetadata {
   }
 
   factory NostrMetadata.fromJson(Map<String, dynamic> json) {
+    String? string(String key) {
+      final value = json[key];
+      return value is String ? value : null;
+    }
+
     return NostrMetadata(
-      name: json['name'] as String?,
-      displayName: json['displayName'] as String?,
-      about: json['about'] as String?,
-      picture: json['picture'] as String?,
-      banner: json['banner'] as String?,
-      nip05: json['nip05'] as String?,
-      website: json['website'] as String?,
+      name: string('name'),
+      displayName: string('displayName'),
+      about: string('about'),
+      picture: string('picture'),
+      banner: string('banner'),
+      nip05: string('nip05'),
+      website: string('website'),
     );
   }
 

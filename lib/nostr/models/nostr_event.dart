@@ -27,6 +27,25 @@ bool _bytesEqual(List<int> a, List<int> b) {
   return true;
 }
 
+List<List<String>> _tagsFromJson(Object? raw) {
+  if (raw is! List) throw const FormatException('Malformed tags');
+  final tags = <List<String>>[];
+  for (final tag in raw) {
+    if (tag is! List) continue;
+    final values = <String>[];
+    var wellFormed = true;
+    for (final value in tag) {
+      if (value is! String) {
+        wellFormed = false;
+        break;
+      }
+      values.add(sanitizeUtf16(value));
+    }
+    if (wellFormed) tags.add(values);
+  }
+  return tags;
+}
+
 bool _isAuthentic(
   Map<String, dynamic> json,
   String id,
@@ -71,6 +90,7 @@ class NostrEvent {
     if (!_isHex(id, 32) || !_isHex(pubkey, 32) || !_isHex(sig, 64)) {
       throw const FormatException('Malformed event id, pubkey, or sig');
     }
+    final tags = _tagsFromJson(json['tags']);
     if (!_isAuthentic(json, id, pubkey, sig)) {
       throw const FormatException("Event id/sig doesn't match its content");
     }
@@ -82,9 +102,7 @@ class NostrEvent {
         (json['created_at'] as int) * 1000,
       ),
       kind: json['kind'] as int,
-      tags: (json['tags'] as List<dynamic>)
-          .map((tag) => (tag as List<dynamic>).cast<String>())
-          .toList(),
+      tags: tags,
       content: sanitizeUtf16(json['content'] as String),
       sig: sig,
     );

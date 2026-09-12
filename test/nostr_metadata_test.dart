@@ -24,4 +24,14 @@ void main() {
     final metadata = NostrMetadata.fromContent('{"name": "hi \\ud83d\\ude00"}');
     expect(metadata.name, 'hi 😀');
   });
+
+  test('keeps the rest of a profile when one field is not a string', () {
+    final metadata = NostrMetadata.fromContent(
+      '{"name": "alice", "nip05": 12345, "about": []}',
+    );
+
+    expect(metadata.name, 'alice');
+    expect(metadata.nip05, isNull);
+    expect(metadata.about, isNull);
+  });
 }
