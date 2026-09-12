@@ -5,15 +5,19 @@ import 'relay_client.dart';
 
 // The pubkeys of authors of events (kind 6 reposts, kind 7 likes) that tag
 // one of the given post ids, grouped by which post id they tagged.
+const _reactionLimit = 500;
+
 Map<String, List<String>> _authorsByTaggedPost(
   List<NostrEvent> events,
   Set<String> postIds,
+  int kind,
 ) {
   final seenByPost = <String, Set<String>>{};
   for (final event in events) {
+    if (event.kind != kind) continue;
     for (final tag in event.tags) {
       if (tag.length < 2 || tag[0] != 'e') continue;
-      final postId = tag[1];
+      final postId = tag[1].toLowerCase();
       if (!postIds.contains(postId)) continue;
       seenByPost.putIfAbsent(postId, () => {}).add(event.pubkey);
     }
@@ -37,28 +41,37 @@ class RelayReactionsRepository {
     Set<String> relayUrls,
   ) async {
     if (postIds.isEmpty) return {};
-    final postIdSet = postIds.toSet();
+    final postIdSet = {for (final id in postIds) id.toLowerCase()};
 
     final likesFuture = client.query(
       relayUrls,
-      NostrFilter(kinds: const [7], tags: {'e': postIds}),
+      NostrFilter(
+        kinds: const [7],
+        tags: {'e': postIds},
+        limit: _reactionLimit,
+      ),
     );
     final repostsFuture = client.query(
       relayUrls,
-      NostrFilter(kinds: const [6], tags: {'e': postIds}),
+      NostrFilter(
+        kinds: const [6],
+        tags: {'e': postIds},
+        limit: _reactionLimit,
+      ),
     );
 
-    final likersByPost = _authorsByTaggedPost(await likesFuture, postIdSet);
+    final likersByPost = _authorsByTaggedPost(await likesFuture, postIdSet, 7);
     final repostersByPost = _authorsByTaggedPost(
       await repostsFuture,
       postIdSet,
+      6,
     );
 
     return {
       for (final postId in postIds)
         postId: PostReactions(
-          likerPubkeys: likersByPost[postId] ?? const [],
-          reposterPubkeys: repostersByPost[postId] ?? const [],
+          likerPubkeys: likersByPost[postId.toLowerCase()] ?? const [],
+          reposterPubkeys: repostersByPost[postId.toLowerCase()] ?? const [],
         ),
     };
   }

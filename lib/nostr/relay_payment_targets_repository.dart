@@ -23,10 +23,17 @@ class RelayPaymentTargetsRepository {
       NostrFilter(kinds: const [10133], authors: [pubkeyHex], limit: 1),
     );
 
-    final targets = events.isEmpty
-        ? const <NostrPaymentTarget>[]
-        : paymentTargetsFromEvent((events..sort(compareNewestFirst)).first);
+    if (events.isEmpty) return const <NostrPaymentTarget>[];
 
+    final author = pubkeyHex.toLowerCase();
+    final own = [
+      for (final event in events)
+        if (event.kind == 10133 && event.pubkey == author) event,
+    ]..sort(compareNewestFirst);
+
+    if (own.isEmpty) return const <NostrPaymentTarget>[];
+
+    final targets = paymentTargetsFromEvent(own.first);
     await CacheStore.putPaymentTargets(pubkeyHex, targets);
     return targets;
   }
