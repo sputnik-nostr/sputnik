@@ -76,4 +76,28 @@ void main() {
       canonicalRelayUrl('wss://relay.example.com'),
     );
   });
+
+  test('rejects an authority that carries userinfo', () {
+    expect(isRelayUrl('wss://relay.damus.io@158.51.42.7'), isFalse);
+    expect(isRelayUrl('wss://relay.damus.io@evil.example.com'), isFalse);
+    expect(isRelayUrl('wss://user:pass@relay.example.com'), isFalse);
+    expect(isRelayUrl('wss://relay.example.com'), isTrue);
+  });
+
+  test('anything accepted stays accepted once canonicalised', () {
+    const inputs = [
+      'wss://relay.example.com',
+      'WSS://Relay.Example.COM/',
+      'wss://relay.example.com:8080',
+      'ws://192.0.2.1',
+      'wss://[2001:db8::1]',
+    ];
+
+    for (final input in inputs) {
+      expect(isRelayUrl(input), isTrue, reason: input);
+      final canonical = canonicalRelayUrl(input);
+      expect(isRelayUrl(canonical), isTrue, reason: canonical);
+      expect(canonicalRelayUrl(canonical), canonical, reason: canonical);
+    }
+  });
 }

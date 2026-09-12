@@ -34,6 +34,7 @@ bool isRelayUrl(String input) {
   final uri = Uri.tryParse(input);
   if (uri == null || !uri.hasAuthority) return false;
   if (uri.scheme != 'ws' && uri.scheme != 'wss') return false;
+  if (uri.userInfo.isNotEmpty) return false;
   return _isValidHost(uri.host);
 }
 

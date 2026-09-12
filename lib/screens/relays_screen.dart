@@ -39,6 +39,15 @@ Future<void> _addRelay(BuildContext context) async {
     builder: (context) {
       return StatefulBuilder(
         builder: (context, setState) {
+          void submit() {
+            final input = canonicalRelayUrl(controller.text);
+            if (!isRelayUrl(input)) {
+              setState(() => error = 'Enter a valid ws:// or wss:// URL');
+              return;
+            }
+            Navigator.pop(context, input);
+          }
+
           return AlertDialog(
             title: const Text('Add relay'),
             content: TextField(
@@ -50,7 +59,7 @@ Future<void> _addRelay(BuildContext context) async {
                 hintText: 'wss://relay.example.com',
                 errorText: error,
               ),
-              onSubmitted: (_) => Navigator.pop(context, controller.text),
+              onSubmitted: (_) => submit(),
             ),
             actions: [
               TextButton(
@@ -59,14 +68,7 @@ Future<void> _addRelay(BuildContext context) async {
               ),
               TextButton(
                 key: const Key('confirmAddRelayButton'),
-                onPressed: () {
-                  final input = controller.text.trim();
-                  if (!isRelayUrl(input)) {
-                    setState(() => error = 'Enter a valid ws:// or wss:// URL');
-                    return;
-                  }
-                  Navigator.pop(context, input);
-                },
+                onPressed: submit,
                 child: const Text('Add'),
               ),
             ],
