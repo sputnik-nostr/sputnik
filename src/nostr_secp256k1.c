@@ -26,10 +26,9 @@ static int nostr_secure_random(uint8_t* buf, size_t len)
         long ret = -1;
         errno = ENOSYS;
 #endif
-        if (ret < 0)
+        if (ret <= 0)
         {
-            if (errno == EINTR) continue;
-            if (errno != ENOSYS) return 0;
+            if (ret < 0 && errno == EINTR) continue;
             break;
         }
         filled += (size_t)ret;
@@ -43,9 +42,9 @@ static int nostr_secure_random(uint8_t* buf, size_t len)
     while (filled < len)
     {
         ssize_t ret = read(fd, buf + filled, len - filled);
-        if (ret < 0)
+        if (ret <= 0)
         {
-            if (errno == EINTR) continue;
+            if (ret < 0 && errno == EINTR) continue;
             close(fd);
             return 0;
         }
