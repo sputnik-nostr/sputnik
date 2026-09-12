@@ -54,6 +54,7 @@ class NoteTile extends StatelessWidget {
                           onTap: () => openProfile(context, note.pubkey),
                           child: Text(
                             note.displayName,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.avatarName,
                           ),

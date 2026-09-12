@@ -21,6 +21,8 @@ class FadeInAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = imageUrl;
     final diameter = radius * 2;
+    final decodeExtent = (diameter * MediaQuery.devicePixelRatioOf(context))
+        .round();
 
     return ClipOval(
       child: SizedBox(
@@ -34,8 +36,13 @@ class FadeInAvatar extends StatelessWidget {
               child: Center(child: fallback),
             ),
             if (url != null)
-              Image.network(
-                url,
+              Image(
+                image: ResizeImage(
+                  NetworkImage(url),
+                  width: decodeExtent,
+                  height: decodeExtent,
+                  policy: ResizeImagePolicy.fit,
+                ),
                 fit: BoxFit.cover,
                 frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
                   if (wasSynchronouslyLoaded) return child;

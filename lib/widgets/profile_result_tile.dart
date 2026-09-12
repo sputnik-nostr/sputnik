@@ -38,7 +38,12 @@ class ProfileResultTile extends StatelessWidget {
         backgroundColor: theme.colorScheme.primaryContainer,
         fallback: const Icon(Icons.person_outline),
       ),
-      title: Text(displayName ?? truncateNpub(npub), style: theme.avatarName),
+      title: Text(
+        displayName ?? truncateNpub(npub),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.avatarName,
+      ),
       subtitle: Text(
         subtitle,
         maxLines: 1,

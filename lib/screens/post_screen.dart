@@ -15,9 +15,14 @@ import 'profile_screen.dart';
 import 'users_list_screen.dart';
 
 class PostScreen extends StatefulWidget {
-  const PostScreen({super.key, required this.note});
+  const PostScreen({
+    super.key,
+    required this.note,
+    this.threadRepository = const RelayThreadRepository(),
+  });
 
   final Note note;
+  final RelayThreadRepository threadRepository;
 
   @override
   State<PostScreen> createState() => _PostScreenState();
@@ -46,7 +51,7 @@ class _PostScreenState extends State<PostScreen> {
 
   Future<_PostThread> _loadThread() async {
     final relayUrls = selectedRelaysNotifier.value;
-    final thread = await const RelayThreadRepository().fetchThread(
+    final thread = await widget.threadRepository.fetchThread(
       widget.note.id,
       relayUrls,
     );
@@ -79,31 +84,42 @@ class _PostScreenState extends State<PostScreen> {
         builder: (context, snapshot) {
           final thread = snapshot.data;
           final replies = thread?.replies;
-          return ListView(
-            children: [
-              _PostHeader(
-                note: widget.note,
-                replyCount: replies?.length,
-                likerPubkeys: thread?.likerPubkeys,
-                reposterPubkeys: thread?.reposterPubkeys,
-              ),
-              const Divider(height: 1),
-              if (snapshot.connectionState == ConnectionState.waiting)
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (replies == null || replies.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: Text('No replies yet')),
-                )
-              else
-                for (final reply in replies) ...[
-                  NoteTile(note: reply),
+          final loading = snapshot.connectionState == ConnectionState.waiting;
+          final replyList = (loading ? null : replies) ?? const <Note>[];
+          final showPlaceholder = replyList.isEmpty;
+
+          return ListView.builder(
+            itemCount: showPlaceholder ? 3 : 2 + replyList.length,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _PostHeader(
+                  note: widget.note,
+                  replyCount: replies?.length,
+                  likerPubkeys: thread?.likerPubkeys,
+                  reposterPubkeys: thread?.reposterPubkeys,
+                );
+              }
+              if (index == 1) {
+                return const Divider(height: 1);
+              }
+              if (showPlaceholder) {
+                return Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Center(
+                    child: loading
+                        ? const CircularProgressIndicator()
+                        : const Text('No replies yet'),
+                  ),
+                );
+              }
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  NoteTile(note: replyList[index - 2]),
                   const Divider(height: 1),
                 ],
-            ],
+              );
+            },
           );
         },
       ),
@@ -168,7 +184,12 @@ class _PostHeader extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(note.displayName, style: theme.avatarName),
+                          Text(
+                            note.displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.avatarName,
+                          ),
                           Text(
                             truncateNpub(npub),
                             overflow: TextOverflow.ellipsis,

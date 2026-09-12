@@ -218,8 +218,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                               ),
                               if (bannerUrl != null)
-                                Image.network(
-                                  bannerUrl,
+                                Image(
+                                  image: ResizeImage(
+                                    NetworkImage(bannerUrl),
+                                    width:
+                                        (MediaQuery.sizeOf(context).width *
+                                                MediaQuery.devicePixelRatioOf(
+                                                  context,
+                                                ))
+                                            .round()
+                                            .clamp(1, 4096),
+                                    height:
+                                        (_bannerHeight *
+                                                MediaQuery.devicePixelRatioOf(
+                                                  context,
+                                                ))
+                                            .round()
+                                            .clamp(1, 4096),
+                                    policy: ResizeImagePolicy.fit,
+                                  ),
                                   fit: BoxFit.cover,
                                   frameBuilder:
                                       (
@@ -331,6 +348,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     Text(
                       displayName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
