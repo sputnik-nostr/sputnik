@@ -1,5 +1,5 @@
-import 'models/nostr_filter.dart';
 import 'models/nostr_event.dart';
+import 'models/nostr_filter.dart';
 import 'models/nostr_post.dart';
 import 'models/post_reactions.dart';
 import 'relay_client.dart';
@@ -20,6 +20,18 @@ class ThreadData {
   int get repostCount => reposterPubkeys.length;
 }
 
+const _replyLimit = 200;
+
+bool _referencesPost(NostrEvent event, String postId) {
+  final wanted = postId.toLowerCase();
+  for (final tag in event.tags) {
+    if (tag.length > 1 && tag[0] == 'e' && tag[1].toLowerCase() == wanted) {
+      return true;
+    }
+  }
+  return false;
+}
+
 class RelayThreadRepository {
   const RelayThreadRepository({
     this.client = const RelayClient(),
@@ -37,13 +49,18 @@ class RelayThreadRepository {
         tags: {
           'e': [postId],
         },
+        limit: _replyLimit,
       ),
     );
     final reactionsFuture = reactionsRepository.fetchReactions([
       postId,
     ], relayUrls);
 
-    final replyEvents = (await repliesFuture)..sort(compareNewestFirst);
+    final matchingReplies = [
+      for (final event in await repliesFuture)
+        if (event.kind == 1 && _referencesPost(event, postId)) event,
+    ]..sort(compareNewestFirst);
+    final replyEvents = matchingReplies.take(_replyLimit).toList();
     final reactions = (await reactionsFuture)[postId] ?? const PostReactions();
 
     return ThreadData(
