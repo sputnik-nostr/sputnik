@@ -154,17 +154,6 @@ Future<void> _confirmDeleteIdentity(
   }
 }
 
-const _clipboardClearDelay = Duration(seconds: 60);
-
-void _scheduleClipboardClear(String nsec) {
-  Timer(_clipboardClearDelay, () async {
-    final current = await Clipboard.getData(Clipboard.kTextPlain);
-    if (current?.text == nsec) {
-      await Clipboard.setData(const ClipboardData(text: ''));
-    }
-  });
-}
-
 Future<void> _showNsec(BuildContext context, Identity identity) async {
   final reveal = await showDialog<bool>(
     context: context,
@@ -198,13 +187,21 @@ Future<void> _showNsec(BuildContext context, Identity identity) async {
       content: SelectableText(nsec),
       actions: [
         TextButton(
-          onPressed: () {
-            Clipboard.setData(ClipboardData(text: nsec));
-            _scheduleClipboardClear(nsec);
-            ScaffoldMessenger.of(context).showSnackBar(
+          onPressed: () async {
+            final messenger = ScaffoldMessenger.of(context);
+            try {
+              await Clipboard.setData(ClipboardData(text: nsec));
+            } catch (_) {
+              messenger.showSnackBar(
+                const SnackBar(content: Text('Could not copy the private key')),
+              );
+              return;
+            }
+            messenger.showSnackBar(
               const SnackBar(
                 content: Text(
-                  'Copied private key to clipboard (clears in 60s)',
+                  'Copied private key. Clear your clipboard once you have '
+                  'stored it somewhere safe.',
                 ),
               ),
             );
