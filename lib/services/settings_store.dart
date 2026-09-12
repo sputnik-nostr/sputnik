@@ -125,7 +125,10 @@ class SettingsStore {
     final saved = prefs.getStringList(_selectedRelaysKey);
     if (saved == null) return defaultRelays.toSet();
 
-    final stillKnown = saved.toSet().intersection(knownRelays);
+    final stillKnown = saved
+        .where(isRelayUrl)
+        .toSet()
+        .intersection(knownRelays);
     if (stillKnown.isEmpty) {
       await saveSelectedRelays(defaultRelays.toSet());
       return defaultRelays.toSet();
@@ -141,7 +144,8 @@ class SettingsStore {
   static Future<Set<String>> loadCustomRelays() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getStringList(_customRelaysKey);
-    return saved == null ? {} : saved.toSet();
+    if (saved == null) return {};
+    return saved.where(isRelayUrl).toSet();
   }
 
   static Future<void> saveCustomRelays(Set<String> relays) async {
