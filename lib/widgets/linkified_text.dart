@@ -1,4 +1,5 @@
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -26,24 +27,26 @@ class LinkifiedText extends StatefulWidget {
 }
 
 class _LinkifiedTextState extends State<LinkifiedText> {
-  final _recognizers = <TapGestureRecognizer>[];
-
-  void _disposeRecognizers() {
-    for (final recognizer in _recognizers) {
-      recognizer.dispose();
-    }
-    _recognizers.clear();
-  }
+  final _recognizers = <String, TapGestureRecognizer>{};
 
   @override
   void dispose() {
-    _disposeRecognizers();
+    for (final recognizer in _recognizers.values) {
+      recognizer.dispose();
+    }
+    _recognizers.clear();
     super.dispose();
+  }
+
+  TapGestureRecognizer _recognizerFor(String key, VoidCallback onTap) {
+    final existing = _recognizers[key];
+    if (existing != null) return existing..onTap = onTap;
+    return _recognizers[key] = TapGestureRecognizer()..onTap = onTap;
   }
 
   @override
   Widget build(BuildContext context) {
-    _disposeRecognizers();
+    final live = <String>{};
 
     final linkColor = Theme.of(context).colorScheme.primary;
     final spans = <InlineSpan>[];
@@ -68,14 +71,14 @@ class _LinkifiedTextState extends State<LinkifiedText> {
         continue;
       }
 
-      final recognizer = TapGestureRecognizer()
-        ..onTap = () => httpUrl != null
-            ? launchUrl(
-                Uri.parse(httpUrl),
-                mode: LaunchMode.externalApplication,
-              )
-            : _openNostrUri(context, nostrTarget!);
-      _recognizers.add(recognizer);
+      final key = '${match.start}:$matchedText';
+      live.add(key);
+      final recognizer = _recognizerFor(
+        key,
+        () => httpUrl != null
+            ? _openHttpUrl(context, httpUrl)
+            : _openNostrUri(context, nostrTarget!),
+      );
 
       spans.add(
         TextSpan(
@@ -95,7 +98,37 @@ class _LinkifiedTextState extends State<LinkifiedText> {
       spans.add(TextSpan(text: widget.text.substring(start)));
     }
 
+    for (final key in _recognizers.keys.toList()) {
+      if (!live.contains(key)) _recognizers.remove(key)?.dispose();
+    }
+
     return Text.rich(TextSpan(style: widget.style, children: spans));
+  }
+
+  Future<void> _openHttpUrl(BuildContext context, String url) async {
+    final Uri uri;
+    try {
+      uri = Uri.parse(url);
+    } on FormatException {
+      _reportUnopenable(context);
+      return;
+    }
+
+    var opened = false;
+    try {
+      opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } on PlatformException {
+      opened = false;
+    } on MissingPluginException {
+      opened = false;
+    }
+    if (!opened && context.mounted) _reportUnopenable(context);
+  }
+
+  void _reportUnopenable(BuildContext context) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Could not open this link')));
   }
 
   Future<void> _openNostrUri(

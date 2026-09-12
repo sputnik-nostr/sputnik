@@ -76,7 +76,13 @@ class RelayMessageParser {
 
   Future<ParsedRelayMessage?> parse(String raw) async {
     if (_workerSendPort == null) {
-      await (_spawning ??= _spawn());
+      final spawning = _spawning ??= _spawn();
+      try {
+        await spawning;
+      } catch (_) {
+        if (identical(_spawning, spawning)) _spawning = null;
+        rethrow;
+      }
     }
 
     final id = _nextRequestId++;
@@ -88,9 +94,42 @@ class RelayMessageParser {
 
   Future<void> _spawn() async {
     final receivePort = ReceivePort();
-    await Isolate.spawn(_parserIsolateMain, receivePort.sendPort);
-
+    final exitPort = ReceivePort();
     final sendPortCompleter = Completer<SendPort>();
+
+    void discardWorker() {
+      _workerSendPort = null;
+      _spawning = null;
+      for (final completer in _pending.values) {
+        if (!completer.isCompleted) completer.complete(null);
+      }
+      _pending.clear();
+      receivePort.close();
+      exitPort.close();
+    }
+
+    exitPort.listen((dynamic _) {
+      if (!sendPortCompleter.isCompleted) {
+        sendPortCompleter.completeError(
+          StateError('parser isolate exited before it was ready'),
+        );
+      }
+      discardWorker();
+    });
+
+    try {
+      await Isolate.spawn(
+        _parserIsolateMain,
+        receivePort.sendPort,
+        onExit: exitPort.sendPort,
+        onError: exitPort.sendPort,
+      );
+    } catch (_) {
+      receivePort.close();
+      exitPort.close();
+      rethrow;
+    }
+
     receivePort.listen((dynamic data) {
       if (data is SendPort) {
         sendPortCompleter.complete(data);
@@ -99,6 +138,7 @@ class RelayMessageParser {
       final response = data as _ParseResponse;
       _pending.remove(response.id)?.complete(response.message);
     });
+
     _workerSendPort = await sendPortCompleter.future;
   }
 }

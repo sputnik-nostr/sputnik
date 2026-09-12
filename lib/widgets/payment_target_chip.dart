@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../nostr/models/nostr_payment_target.dart';
@@ -52,12 +53,16 @@ class PaymentTargetChip extends StatelessWidget {
   final NostrPaymentTarget target;
 
   Future<void> _open(BuildContext context) async {
-    final bool opened;
+    bool opened;
     try {
       opened = await launchUrl(
         target.launchUri,
         mode: LaunchMode.externalApplication,
       );
+    } on PlatformException {
+      opened = false;
+    } on MissingPluginException {
+      opened = false;
     } on FormatException {
       // The event tag data behind this target didn't form a valid URI.
       if (context.mounted) {
