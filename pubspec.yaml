@@ -13,7 +13,7 @@ dependencies:
 
   crypto: ^3.0.6
   ffi: ^2.1.4
-  flutter_secure_storage: ^11.0.0
+  flutter_secure_storage: ^11.1.1
   hive_ce: ^2.19.3
   hive_ce_flutter: ^2.3.4
   intl: ^0.20.3
