@@ -5,6 +5,20 @@ import 'package:sputnik/main.dart';
 import 'package:sputnik/models/identity.dart';
 import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/screens/compose_screen.dart';
+import 'package:sputnik/services/settings_store.dart';
+
+class _FakeSecretStore implements SecretStore {
+  final _values = <String, String>{};
+
+  @override
+  Future<String?> read(String key) async => _values[key];
+
+  @override
+  Future<void> write(String key, String value) async => _values[key] = value;
+
+  @override
+  Future<void> delete(String key) async => _values.remove(key);
+}
 
 class _FakeRelayClient extends RelayClient {
   _FakeRelayClient(this._outcome, {this.message});
@@ -29,7 +43,7 @@ class _FakeRelayClient extends RelayClient {
 void main() {
   late Identity identity;
 
-  setUp(() {
+  setUp(() async {
     // Avoid HomeScreen's indefinite loading spinner, which would keep
     // pumpAndSettle spinning forever.
     notesNotifier.value = const [];
@@ -39,12 +53,17 @@ void main() {
     final keypair = generateNostrKeyPair();
     identity = Identity(
       pubkeyHex: keypair.publicKeyHex,
-      privkeyHex: keypair.privateKeyHex,
       createdAt: DateTime.now(),
     );
     identitiesNotifier.value = [identity];
     activeIdentityPubkeyNotifier.value = identity.pubkeyHex;
     selectedRelaysNotifier.value = {'wss://relay.example'};
+
+    SettingsStore.secretStore = _FakeSecretStore();
+    await SettingsStore.savePrivateKey(
+      identity.pubkeyHex,
+      keypair.privateKeyHex,
+    );
   });
 
   Future<void> openComposeScreenViaFab(WidgetTester tester) async {

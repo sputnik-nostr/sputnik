@@ -63,5 +63,22 @@ void main() {
       );
       expect(status, Nip05Status.unreachable);
     });
+
+    // Regression test: connectionFactory must actually complete a real
+    // TLS handshake, which fakes can't catch.
+    test('completes a real TLS handshake and verifies a known identifier', () async {
+      final verified = await verifyNip05(
+        identifier: 'jb55@damus.io',
+        pubkeyHex:
+            '32e1827635450ebb3c5a7d12c1f8e7b2b514439ac10a67eef3d9fd9c5c68e245',
+      );
+      expect(verified, Nip05Status.verified);
+
+      final mismatch = await verifyNip05(
+        identifier: 'jb55@damus.io',
+        pubkeyHex: pubkey,
+      );
+      expect(mismatch, Nip05Status.mismatch);
+    });
   });
 }

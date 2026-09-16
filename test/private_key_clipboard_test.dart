@@ -4,6 +4,20 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sputnik/main.dart';
 import 'package:sputnik/screens/identities_screen.dart';
+import 'package:sputnik/services/settings_store.dart';
+
+class _FakeSecretStore implements SecretStore {
+  final _values = <String, String>{};
+
+  @override
+  Future<String?> read(String key) async => _values[key];
+
+  @override
+  Future<void> write(String key, String value) async => _values[key] = value;
+
+  @override
+  Future<void> delete(String key) async => _values.remove(key);
+}
 
 void main() {
   late List<String> copied;
@@ -17,6 +31,7 @@ void main() {
     notesNotifier.value = const [];
     identitiesNotifier.value = const [];
     activeIdentityPubkeyNotifier.value = null;
+    SettingsStore.secretStore = _FakeSecretStore();
 
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(SystemChannels.platform, (call) async {

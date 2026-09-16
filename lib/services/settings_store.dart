@@ -9,6 +9,28 @@ import '../models/identity.dart';
 import '../models/note.dart';
 import '../models/relay.dart';
 
+/// Storage seam so tests can fake [SettingsStore.secretStore].
+abstract class SecretStore {
+  Future<String?> read(String key);
+  Future<void> write(String key, String value);
+  Future<void> delete(String key);
+}
+
+class _SecureSecretStore implements SecretStore {
+  const _SecureSecretStore();
+  static const _storage = FlutterSecureStorage();
+
+  @override
+  Future<String?> read(String key) => _storage.read(key: key);
+
+  @override
+  Future<void> write(String key, String value) =>
+      _storage.write(key: key, value: value);
+
+  @override
+  Future<void> delete(String key) => _storage.delete(key: key);
+}
+
 // Loads a notifier's persisted value and wires it to save on every change.
 // Used to bind each of the app's settings notifiers without repeating the
 // "load, assign, add a saving listener" sequence for each one.
@@ -57,9 +79,12 @@ class SettingsStore {
   static const _customRelaysKey = 'custom_relays';
   static const _identitiesKey = 'identities';
   static const _activeIdentityPubkeyKey = 'active_identity_pubkey';
+  static const _identitySecretPrefix = 'identity_secret_';
+  static const _loadMediaKey = 'load_media';
 
-  // Identities are kept in the platform keystore/keychain for secure storage.
-  static const _secureStorage = FlutterSecureStorage();
+  // Backs the identity index and each identity's private key.
+  @visibleForTesting
+  static SecretStore secretStore = const _SecureSecretStore();
 
   static Future<ThemeMode> loadThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
@@ -152,25 +177,42 @@ class SettingsStore {
   }
 
   static Future<List<Identity>> loadIdentities() async {
-    final raw = await _secureStorage.read(key: _identitiesKey);
+    final raw = await secretStore.read(_identitiesKey);
     if (raw == null) return [];
 
     final decoded = jsonDecode(raw) as List<dynamic>;
     final identities = <Identity>[];
+    var migratedAny = false;
+
     for (final item in decoded) {
       try {
-        identities.add(Identity.fromJson(item as Map<String, dynamic>));
+        final map = item as Map<String, dynamic>;
+        identities.add(Identity.fromJson(map));
+
+        // Migrate a private key that used to live inline here.
+        final legacyPrivkeyHex = map['privkeyHex'];
+        if (legacyPrivkeyHex is String) {
+          final pubkeyHex = map['pubkeyHex'] as String;
+          if (await loadPrivateKey(pubkeyHex) == null) {
+            await savePrivateKey(pubkeyHex, legacyPrivkeyHex);
+          }
+          migratedAny = true;
+        }
       } catch (_) {
         // Skip malformed identity entries.
       }
     }
+
+    // Persist so this doesn't repeat next load.
+    if (migratedAny) await saveIdentities(identities);
+
     return identities;
   }
 
   static Future<void> saveIdentities(List<Identity> identities) async {
-    await _secureStorage.write(
-      key: _identitiesKey,
-      value: jsonEncode([for (final identity in identities) identity.toJson()]),
+    await secretStore.write(
+      _identitiesKey,
+      jsonEncode([for (final identity in identities) identity.toJson()]),
     );
   }
 
@@ -186,5 +228,28 @@ class SettingsStore {
     } else {
       await prefs.setString(_activeIdentityPubkeyKey, pubkeyHex);
     }
+  }
+
+  // One secure-storage entry per identity, read only when needed.
+  static Future<String?> loadPrivateKey(String pubkeyHex) {
+    return secretStore.read('$_identitySecretPrefix$pubkeyHex');
+  }
+
+  static Future<void> savePrivateKey(String pubkeyHex, String privkeyHex) {
+    return secretStore.write('$_identitySecretPrefix$pubkeyHex', privkeyHex);
+  }
+
+  static Future<void> deletePrivateKey(String pubkeyHex) {
+    return secretStore.delete('$_identitySecretPrefix$pubkeyHex');
+  }
+
+  static Future<bool> loadLoadMedia() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_loadMediaKey) ?? true;
+  }
+
+  static Future<void> saveLoadMedia(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_loadMediaKey, value);
   }
 }

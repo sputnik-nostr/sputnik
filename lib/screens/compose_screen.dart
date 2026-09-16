@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import '../models/identity.dart';
 import '../nostr/nostr.dart';
+import '../services/settings_store.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/fade_in_avatar.dart';
 
@@ -70,10 +71,22 @@ class _ComposeScreenState extends State<ComposeScreen> {
     final relayUrls = selectedRelaysNotifier.value;
     if (!await _confirmPost(relayUrls.length) || !mounted) return;
 
+    // Only touch secure storage once the user has actually confirmed.
+    final privkeyHex = await SettingsStore.loadPrivateKey(identity.pubkeyHex);
+    if (!mounted) return;
+    if (privkeyHex == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Could not find this identity's private key"),
+        ),
+      );
+      return;
+    }
+
     final NostrEvent event;
     try {
       event = signEvent(
-        seckeyHex: identity.privkeyHex,
+        seckeyHex: privkeyHex,
         pubkeyHex: identity.pubkeyHex,
         kind: 1,
         content: _controller.text.trim(),

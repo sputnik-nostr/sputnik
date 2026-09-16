@@ -75,7 +75,15 @@ Future<ConnectionTask<Socket>> _guardedConnect(
   if (address == null) {
     throw SocketException('No public address found for ${url.host}');
   }
-  return Socket.startConnect(address, url.port);
+
+  final rawTask = await Socket.startConnect(address, url.port);
+  if (url.scheme != 'https') return rawTask;
+
+  // connectionFactory doesn't wrap https in TLS itself; do it here, pinned
+  // to the vetted address but validated against the hostname, not the IP.
+  final rawSocket = await rawTask.socket;
+  final secureSocket = SecureSocket.secure(rawSocket, host: url.host);
+  return ConnectionTask.fromSocket(secureSocket, rawTask.cancel);
 }
 
 Future<List<int>?> _readBounded(HttpClientResponse response) async {

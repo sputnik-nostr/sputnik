@@ -40,6 +40,8 @@ final ValueNotifier<List<Identity>> identitiesNotifier = ValueNotifier(
 
 final ValueNotifier<String?> activeIdentityPubkeyNotifier = ValueNotifier(null);
 
+final ValueNotifier<bool> loadMediaNotifier = ValueNotifier(true);
+
 final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
@@ -77,6 +79,11 @@ Future<void> main() async {
     SettingsStore.loadActiveIdentityPubkey,
     SettingsStore.saveActiveIdentityPubkey,
   );
+  final loadMediaBound = bindPersisted(
+    loadMediaNotifier,
+    SettingsStore.loadLoadMedia,
+    SettingsStore.saveLoadMedia,
+  );
 
   await cacheInit;
   await themeModeBound;
@@ -85,6 +92,7 @@ Future<void> main() async {
   await customRelaysBound;
   await identitiesBound;
   await activeIdentityPubkeyBound;
+  await loadMediaBound;
 
   await bindPersisted(
     selectedRelaysNotifier,

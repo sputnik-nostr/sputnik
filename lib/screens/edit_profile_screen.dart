@@ -6,6 +6,7 @@ import '../main.dart';
 import '../models/identity.dart';
 import '../nostr/nostr.dart';
 import '../services/cache_store.dart';
+import '../services/settings_store.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key, this.relayClient = const RelayClient()});
@@ -81,10 +82,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       about: _bioController.text.trim(),
     );
 
+    // Only touch secure storage once the user has actually confirmed.
+    final privkeyHex = await SettingsStore.loadPrivateKey(identity.pubkeyHex);
+    if (!mounted) return;
+    if (privkeyHex == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Could not find this identity's private key"),
+        ),
+      );
+      return;
+    }
+
     final NostrEvent event;
     try {
       event = signEvent(
-        seckeyHex: identity.privkeyHex,
+        seckeyHex: privkeyHex,
         pubkeyHex: identity.pubkeyHex,
         kind: 0,
         content: jsonEncode(updated.toEventContent()),

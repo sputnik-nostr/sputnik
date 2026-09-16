@@ -37,6 +37,27 @@ void main() {
     expect(parsed.message, isNull);
   });
 
+  test('truncates an excessively long OK message', () async {
+    final raw = jsonEncode(['OK', 'a' * 64, false, 'x' * 1000]);
+
+    final parsed = await parser.parse(raw);
+
+    expect(parsed, isNotNull);
+    expect(parsed!.message, hasLength(300));
+  });
+
+  test('sanitizes a lone surrogate in an OK message', () async {
+    // A lone high surrogate (\ud800) with no matching low surrogate.
+    final raw = '["OK","${'a' * 64}",false,"broken\\ud800message"]';
+
+    final parsed = await parser.parse(raw);
+
+    expect(parsed, isNotNull);
+    // The lone surrogate is replaced with U+FFFD rather than left dangling
+    // (which would make the string unsafe to render).
+    expect(parsed!.message, 'broken�message');
+  });
+
   test('an EVENT message has no accepted/message fields', () async {
     final eventJson =
         '{"id":"${'a' * 64}","pubkey":"${'b' * 64}","created_at":0,'

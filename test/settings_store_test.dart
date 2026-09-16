@@ -1,9 +1,28 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sputnik/services/settings_store.dart';
 
+class _FakeSecretStore implements SecretStore {
+  final _values = <String, String>{};
+
+  @override
+  Future<String?> read(String key) async => _values[key];
+
+  @override
+  Future<void> write(String key, String value) async => _values[key] = value;
+
+  @override
+  Future<void> delete(String key) async => _values.remove(key);
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SettingsStore.secretStore = _FakeSecretStore();
+  });
 
   test('drops persisted relays that no longer pass validation', () async {
     SharedPreferences.setMockInitialValues({
@@ -35,4 +54,83 @@ void main() {
       expect(selected, {'wss://good.example.com'});
     },
   );
+
+  test('a private key is not found until it has been saved', () async {
+    expect(await SettingsStore.loadPrivateKey('a' * 64), isNull);
+
+    await SettingsStore.savePrivateKey('a' * 64, 'seckeyhex');
+    expect(await SettingsStore.loadPrivateKey('a' * 64), 'seckeyhex');
+  });
+
+  test('deleting a private key makes it unreadable again', () async {
+    await SettingsStore.savePrivateKey('a' * 64, 'seckeyhex');
+    await SettingsStore.deletePrivateKey('a' * 64);
+
+    expect(await SettingsStore.loadPrivateKey('a' * 64), isNull);
+  });
+
+  test('each identity has its own private key slot', () async {
+    await SettingsStore.savePrivateKey('a' * 64, 'seckey-a');
+    await SettingsStore.savePrivateKey('b' * 64, 'seckey-b');
+
+    expect(await SettingsStore.loadPrivateKey('a' * 64), 'seckey-a');
+    expect(await SettingsStore.loadPrivateKey('b' * 64), 'seckey-b');
+  });
+
+  test(
+    'migrates a legacy identity whose private key was stored inline',
+    () async {
+      // The format used before private keys got their own secure-storage
+      // slot: privkeyHex embedded right in the identity index.
+      await SettingsStore.secretStore.write(
+        'identities',
+        jsonEncode([
+          {
+            'pubkeyHex': 'a' * 64,
+            'privkeyHex': 'legacy-secret',
+            'createdAt': DateTime(2024).millisecondsSinceEpoch,
+          },
+        ]),
+      );
+
+      final identities = await SettingsStore.loadIdentities();
+
+      expect(identities, hasLength(1));
+      expect(identities.single.pubkeyHex, 'a' * 64);
+      expect(await SettingsStore.loadPrivateKey('a' * 64), 'legacy-secret');
+
+      // The index itself no longer carries the secret, so this doesn't
+      // need to migrate again next time.
+      final rewritten = await SettingsStore.secretStore.read('identities');
+      expect(rewritten, isNot(contains('legacy-secret')));
+    },
+  );
+
+  test('migration does not clobber an already-recovered private key', () async {
+    await SettingsStore.savePrivateKey('a' * 64, 'current-secret');
+    await SettingsStore.secretStore.write(
+      'identities',
+      jsonEncode([
+        {'pubkeyHex': 'a' * 64, 'privkeyHex': 'stale-secret', 'createdAt': 0},
+      ]),
+    );
+
+    await SettingsStore.loadIdentities();
+
+    expect(await SettingsStore.loadPrivateKey('a' * 64), 'current-secret');
+  });
+
+  test('load media defaults to on', () async {
+    SharedPreferences.setMockInitialValues({});
+
+    expect(await SettingsStore.loadLoadMedia(), isTrue);
+  });
+
+  test('load media persists once saved', () async {
+    SharedPreferences.setMockInitialValues({});
+
+    await SettingsStore.saveLoadMedia(false);
+
+    expect(await SettingsStore.loadLoadMedia(), isFalse);
+  });
 }

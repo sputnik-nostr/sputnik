@@ -160,6 +160,22 @@ class SettingsScreen extends StatelessWidget {
                 },
               ),
               const Divider(height: 1),
+              ValueListenableBuilder<bool>(
+                valueListenable: loadMediaNotifier,
+                builder: (context, loadMedia, _) {
+                  return SwitchListTile(
+                    key: const Key('loadMediaSwitch'),
+                    secondary: const Icon(Icons.image_outlined),
+                    title: const Text('Load media automatically'),
+                    subtitle: const Text(
+                      "Can reveal your IP to a profile's image host.",
+                    ),
+                    value: loadMedia,
+                    onChanged: (value) => loadMediaNotifier.value = value,
+                  );
+                },
+              ),
+              const Divider(height: 1),
               ListTile(
                 key: const Key('clearCacheCard'),
                 leading: const Icon(Icons.delete_outline),

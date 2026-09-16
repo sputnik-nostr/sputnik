@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sputnik/nostr/keys.dart';
 import 'package:sputnik/nostr/models/nostr_event.dart';
 import 'package:sputnik/nostr/models/nostr_filter.dart';
 import 'package:sputnik/nostr/relay_client.dart';
@@ -18,6 +19,37 @@ class _RelayReturning extends RelayClient {
     Set<String> relayUrls,
     NostrFilter filter,
   ) async => events;
+}
+
+// A mutable sibling of _RelayReturning for tests that also publish -- kept
+// separate since _RelayReturning's const constructor is relied on elsewhere
+// (e.g. the top-level _noReactions below).
+class _RelayReturningAndPublishing extends RelayClient {
+  _RelayReturningAndPublishing(
+    this.events, {
+    this.publishOutcome = RelayPublishOutcome.accepted,
+  });
+
+  final List<NostrEvent> events;
+  final RelayPublishOutcome publishOutcome;
+  NostrEvent? lastPublished;
+
+  @override
+  Future<List<NostrEvent>> query(
+    Set<String> relayUrls,
+    NostrFilter filter,
+  ) async => events;
+
+  @override
+  Future<Map<String, RelayPublishResult>> publish(
+    NostrEvent event,
+    Set<String> relayUrls,
+  ) async {
+    lastPublished = event;
+    return {
+      for (final url in relayUrls) url: RelayPublishResult(publishOutcome),
+    };
+  }
 }
 
 const _noReactions = RelayReactionsRepository(client: _RelayReturning([]));
@@ -223,6 +255,136 @@ void main() {
       );
 
       expect(await repository.fetchFollowers(victim, {'wss://r'}), isEmpty);
+    });
+  });
+
+  group('follow publishing', () {
+    // A fresh, throwaway keypair generated for this test run only -- never
+    // a real saved identity.
+    final me = generateNostrKeyPair();
+
+    test('fetchOwnContactTags keeps only "p" tags, verbatim', () async {
+      final client = _RelayReturningAndPublishing([
+        event(
+          pubkey: me.publicKeyHex,
+          kind: 3,
+          tags: [
+            ['p', other, 'wss://their-relay', 'petname'],
+            ['not-p', 'ignored'],
+          ],
+        ),
+      ]);
+      final repository = RelayContactsRepository(client: client);
+
+      final tags = await repository.fetchOwnContactTags(me.publicKeyHex, {
+        'wss://r',
+      });
+
+      expect(tags, [
+        ['p', other, 'wss://their-relay', 'petname'],
+      ]);
+    });
+
+    test(
+      'following someone adds them while preserving everyone else\'s tags',
+      () async {
+        final client = _RelayReturningAndPublishing([
+          event(
+            pubkey: me.publicKeyHex,
+            kind: 3,
+            tags: [
+              ['p', other, 'wss://their-relay', 'petname'],
+            ],
+          ),
+        ]);
+        final repository = RelayContactsRepository(client: client);
+
+        final results = await repository.setFollowing(
+          seckeyHex: me.privateKeyHex,
+          myPubkeyHex: me.publicKeyHex,
+          targetPubkeyHex: victim,
+          follow: true,
+          relayUrls: {'wss://r'},
+        );
+
+        expect(
+          results.values.every(
+            (r) => r.outcome == RelayPublishOutcome.accepted,
+          ),
+          isTrue,
+        );
+        final published = client.lastPublished!;
+        expect(published.kind, 3);
+        expect(published.content, '');
+        expect(published.tags, [
+          ['p', other, 'wss://their-relay', 'petname'],
+          ['p', victim],
+        ]);
+      },
+    );
+
+    test('unfollowing someone removes only their tag', () async {
+      final client = _RelayReturningAndPublishing([
+        event(
+          pubkey: me.publicKeyHex,
+          kind: 3,
+          tags: [
+            ['p', other, 'wss://their-relay', 'petname'],
+            ['p', victim],
+          ],
+        ),
+      ]);
+      final repository = RelayContactsRepository(client: client);
+
+      await repository.setFollowing(
+        seckeyHex: me.privateKeyHex,
+        myPubkeyHex: me.publicKeyHex,
+        targetPubkeyHex: victim,
+        follow: false,
+        relayUrls: {'wss://r'},
+      );
+
+      expect(client.lastPublished!.tags, [
+        ['p', other, 'wss://their-relay', 'petname'],
+      ]);
+    });
+
+    test('following with no prior contact list starts a fresh one', () async {
+      final client = _RelayReturningAndPublishing([]);
+      final repository = RelayContactsRepository(client: client);
+
+      await repository.setFollowing(
+        seckeyHex: me.privateKeyHex,
+        myPubkeyHex: me.publicKeyHex,
+        targetPubkeyHex: victim,
+        follow: true,
+        relayUrls: {'wss://r'},
+      );
+
+      expect(client.lastPublished!.tags, [
+        ['p', victim],
+      ]);
+    });
+
+    test('a rejected publish is reported, not silently swallowed', () async {
+      final client = _RelayReturningAndPublishing(
+        [],
+        publishOutcome: RelayPublishOutcome.rejected,
+      );
+      final repository = RelayContactsRepository(client: client);
+
+      final results = await repository.setFollowing(
+        seckeyHex: me.privateKeyHex,
+        myPubkeyHex: me.publicKeyHex,
+        targetPubkeyHex: victim,
+        follow: true,
+        relayUrls: {'wss://r'},
+      );
+
+      expect(
+        results.values.every((r) => r.outcome == RelayPublishOutcome.rejected),
+        isTrue,
+      );
     });
   });
 

@@ -3,6 +3,19 @@ import 'dart:convert';
 import 'dart:isolate';
 
 import 'models/nostr_event.dart';
+import 'models/text_sanitizer.dart';
+
+// OK messages are attacker-controlled, so sanitize/bound them like any
+// other untrusted relay text.
+const _maxOkMessageLength = 300;
+
+String? _sanitizedOkMessage(Object? raw) {
+  if (raw is! String) return null;
+  final truncated = raw.length > _maxOkMessageLength
+      ? raw.substring(0, _maxOkMessageLength)
+      : raw;
+  return sanitizeUtf16(truncated);
+}
 
 class ParsedRelayMessage {
   const ParsedRelayMessage({
@@ -53,9 +66,7 @@ ParsedRelayMessage? _parse(String raw) {
       event = NostrEvent.fromJson(message[2] as Map<String, dynamic>);
     } else if (type == 'OK') {
       accepted = message.length >= 3 && message[2] == true;
-      okMessage = message.length >= 4 && message[3] is String
-          ? message[3] as String
-          : null;
+      okMessage = _sanitizedOkMessage(message.length >= 4 ? message[3] : null);
     }
     return ParsedRelayMessage(
       subscriptionId: subscriptionId,

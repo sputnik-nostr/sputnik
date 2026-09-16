@@ -7,6 +7,7 @@ import '../main.dart';
 import '../models/identity.dart';
 import '../models/time_format.dart';
 import '../nostr/nostr.dart';
+import '../services/settings_store.dart';
 import '../widgets/placeholder_tab.dart';
 
 // How long a copied nsec is left on the clipboard before it's cleared.
@@ -28,12 +29,10 @@ void _scheduleClipboardClear(String copiedValue) {
   });
 }
 
-void _addIdentity(String pubkeyHex, String privkeyHex) {
-  final identity = Identity(
-    pubkeyHex: pubkeyHex,
-    privkeyHex: privkeyHex,
-    createdAt: DateTime.now(),
-  );
+Future<void> _addIdentity(String pubkeyHex, String privkeyHex) async {
+  // Save the secret first so an identity is never listed without one.
+  await SettingsStore.savePrivateKey(pubkeyHex, privkeyHex);
+  final identity = Identity(pubkeyHex: pubkeyHex, createdAt: DateTime.now());
   identitiesNotifier.value = [...identitiesNotifier.value, identity];
   activeIdentityPubkeyNotifier.value = identity.pubkeyHex;
 }
@@ -41,7 +40,7 @@ void _addIdentity(String pubkeyHex, String privkeyHex) {
 Future<void> _generateIdentity(BuildContext context) async {
   try {
     final keyPair = generateNostrKeyPair();
-    _addIdentity(keyPair.publicKeyHex, keyPair.privateKeyHex);
+    await _addIdentity(keyPair.publicKeyHex, keyPair.privateKeyHex);
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -85,9 +84,18 @@ class _ImportIdentityDialogState extends State<_ImportIdentityDialog> {
           validator: (value) {
             final seckeyHex = hexFromNsec((value ?? '').trim());
             if (seckeyHex == null) return 'Enter a valid nsec key';
-            if (identitiesNotifier.value.any(
-              (i) => i.privkeyHex == seckeyHex,
-            )) {
+
+            final String candidatePubkeyHex;
+            try {
+              candidatePubkeyHex = xonlyPubkeyHexFromSeckeyHex(seckeyHex);
+            } catch (_) {
+              return 'Enter a valid nsec key';
+            }
+            if (identityWithPubkey(
+                  identitiesNotifier.value,
+                  candidatePubkeyHex,
+                ) !=
+                null) {
               return 'This identity is already imported';
             }
             return null;
@@ -124,7 +132,7 @@ Future<void> _importIdentity(BuildContext context) async {
 
   try {
     final pubkeyHex = xonlyPubkeyHexFromSeckeyHex(seckeyHex);
-    _addIdentity(pubkeyHex, seckeyHex);
+    await _addIdentity(pubkeyHex, seckeyHex);
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(
@@ -171,6 +179,7 @@ Future<void> _confirmDeleteIdentity(
         ? null
         : remaining.first.pubkeyHex;
   }
+  await SettingsStore.deletePrivateKey(identity.pubkeyHex);
 }
 
 Future<void> _showNsec(BuildContext context, Identity identity) async {
@@ -196,7 +205,18 @@ Future<void> _showNsec(BuildContext context, Identity identity) async {
   );
   if (reveal != true || !context.mounted) return;
 
-  final nsec = nsecFromHex(identity.privkeyHex);
+  final privkeyHex = await SettingsStore.loadPrivateKey(identity.pubkeyHex);
+  if (!context.mounted) return;
+  if (privkeyHex == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Could not find this identity's private key"),
+      ),
+    );
+    return;
+  }
+
+  final nsec = nsecFromHex(privkeyHex);
   if (!context.mounted) return;
 
   await showDialog<void>(

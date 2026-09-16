@@ -41,6 +41,7 @@ void main() {
   final hostileName = 'A' * 5000;
 
   setUp(() {
+    loadMediaNotifier.value = true;
     notesNotifier.value = [
       Note(
         id: '1',

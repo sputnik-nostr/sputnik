@@ -16,6 +16,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('settingsCard')));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('relaysCard')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('relaysCard')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('addRelayButton')));

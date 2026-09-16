@@ -42,6 +42,42 @@ class RelayPublishResult {
   final String? message;
 }
 
+// More than one publish() can be in flight for the same event id (e.g. a
+// double-submit); resolve()/failAll() complete all of them rather than one
+// overwriting another's slot.
+class PublishWaiters {
+  final _byEventId = <String, List<Completer<RelayPublishResult>>>{};
+
+  Completer<RelayPublishResult> add(String eventId) {
+    final completer = Completer<RelayPublishResult>();
+    (_byEventId[eventId] ??= []).add(completer);
+    return completer;
+  }
+
+  void remove(String eventId, Completer<RelayPublishResult> completer) {
+    final waiters = _byEventId[eventId];
+    if (waiters == null) return;
+    waiters.remove(completer);
+    if (waiters.isEmpty) _byEventId.remove(eventId);
+  }
+
+  void resolve(String eventId, RelayPublishResult result) {
+    final waiters = _byEventId[eventId];
+    if (waiters == null) return;
+    for (final completer in waiters) {
+      if (!completer.isCompleted) completer.complete(result);
+    }
+  }
+
+  void failAll(RelayPublishResult result) {
+    for (final waiters in _byEventId.values) {
+      for (final completer in waiters) {
+        if (!completer.isCompleted) completer.complete(result);
+      }
+    }
+  }
+}
+
 class RelayConnectionPool {
   RelayConnectionPool._();
 
@@ -140,7 +176,7 @@ class _RelayConnection {
 
   final _handlers = <String, void Function(ParsedRelayMessage message)>{};
   final _completers = <String, Completer<void>>{};
-  final _publishCompleters = <String, Completer<RelayPublishResult>>{};
+  final _publishWaiters = PublishWaiters();
   bool _closed = false;
 
   Future<void> _dispatchQueue = Future.value();
@@ -154,17 +190,15 @@ class _RelayConnection {
       final parsed = await RelayMessageParser.instance.parse(raw);
       if (parsed == null) return;
       if (parsed.type == 'OK') {
-        final completer = _publishCompleters[parsed.subscriptionId];
-        if (completer != null && !completer.isCompleted) {
-          completer.complete(
-            RelayPublishResult(
-              parsed.accepted == true
-                  ? RelayPublishOutcome.accepted
-                  : RelayPublishOutcome.rejected,
-              message: parsed.message,
-            ),
-          );
-        }
+        _publishWaiters.resolve(
+          parsed.subscriptionId,
+          RelayPublishResult(
+            parsed.accepted == true
+                ? RelayPublishOutcome.accepted
+                : RelayPublishOutcome.rejected,
+            message: parsed.message,
+          ),
+        );
         return;
       }
       _handlers[parsed.subscriptionId]?.call(parsed);
@@ -177,13 +211,9 @@ class _RelayConnection {
     for (final completer in _completers.values) {
       if (!completer.isCompleted) completer.complete();
     }
-    for (final completer in _publishCompleters.values) {
-      if (!completer.isCompleted) {
-        completer.complete(
-          const RelayPublishResult(RelayPublishOutcome.connectionFailed),
-        );
-      }
-    }
+    _publishWaiters.failAll(
+      const RelayPublishResult(RelayPublishOutcome.connectionFailed),
+    );
   }
 
   Future<List<NostrEvent>> subscribe(
@@ -253,8 +283,7 @@ class _RelayConnection {
 
   Future<RelayPublishResult> publish(NostrEvent event, Duration timeout) async {
     await ready;
-    final completer = Completer<RelayPublishResult>();
-    _publishCompleters[event.id] = completer;
+    final completer = _publishWaiters.add(event.id);
 
     final timer = Timer(timeout, () {
       if (!completer.isCompleted) {
@@ -269,7 +298,7 @@ class _RelayConnection {
       return await completer.future;
     } finally {
       timer.cancel();
-      _publishCompleters.remove(event.id);
+      _publishWaiters.remove(event.id, completer);
     }
   }
 

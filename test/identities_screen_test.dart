@@ -2,6 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sputnik/main.dart';
+import 'package:sputnik/services/settings_store.dart';
+
+class _FakeSecretStore implements SecretStore {
+  final _values = <String, String>{};
+
+  @override
+  Future<String?> read(String key) async => _values[key];
+
+  @override
+  Future<void> write(String key, String value) async => _values[key] = value;
+
+  @override
+  Future<void> delete(String key) async => _values.remove(key);
+}
 
 void main() {
   setUp(() {
@@ -10,6 +24,7 @@ void main() {
     notesNotifier.value = const [];
     identitiesNotifier.value = const [];
     activeIdentityPubkeyNotifier.value = null;
+    SettingsStore.secretStore = _FakeSecretStore();
   });
 
   Future<void> openIdentitiesScreen(WidgetTester tester) async {
@@ -38,11 +53,10 @@ void main() {
       activeIdentityPubkeyNotifier.value,
       identitiesNotifier.value.single.pubkeyHex,
     );
-    expect(
-      RegExp(r'^[0-9a-f]{64}$')
-          .hasMatch(identitiesNotifier.value.single.privkeyHex),
-      isTrue,
+    final privkeyHex = await SettingsStore.loadPrivateKey(
+      identitiesNotifier.value.single.pubkeyHex,
     );
+    expect(RegExp(r'^[0-9a-f]{64}$').hasMatch(privkeyHex ?? ''), isTrue);
   });
 
   testWidgets('deleting the active identity clears the active pointer', (
@@ -53,6 +67,7 @@ void main() {
     await tester.tap(find.byKey(const Key('generateIdentityButton')));
     await tester.pumpAndSettle();
     expect(identitiesNotifier.value, hasLength(1));
+    final pubkeyHex = identitiesNotifier.value.single.pubkeyHex;
 
     await tester.tap(find.byType(PopupMenuButton<String>));
     await tester.pumpAndSettle();
@@ -64,6 +79,7 @@ void main() {
     expect(identitiesNotifier.value, isEmpty);
     expect(activeIdentityPubkeyNotifier.value, isNull);
     expect(find.text('No identities yet'), findsOneWidget);
+    expect(await SettingsStore.loadPrivateKey(pubkeyHex), isNull);
   });
 
   const seckeyHex =
@@ -83,7 +99,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(identitiesNotifier.value, hasLength(1));
-    expect(identitiesNotifier.value.single.privkeyHex, seckeyHex);
+    expect(
+      await SettingsStore.loadPrivateKey(
+        identitiesNotifier.value.single.pubkeyHex,
+      ),
+      seckeyHex,
+    );
     expect(
       activeIdentityPubkeyNotifier.value,
       identitiesNotifier.value.single.pubkeyHex,
