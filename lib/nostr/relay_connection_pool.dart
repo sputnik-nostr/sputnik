@@ -21,6 +21,27 @@ String _generateSubscriptionId() {
   return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 }
 
+enum RelayPublishOutcome {
+  /// The relay sent back `["OK", id, true, ...]`.
+  accepted,
+
+  /// The relay sent back `["OK", id, false, ...]` (see [message] for why).
+  rejected,
+
+  /// The relay never sent an OK for this event within the timeout.
+  noResponse,
+
+  /// Could not connect to, or stayed connected to, the relay at all.
+  connectionFailed,
+}
+
+class RelayPublishResult {
+  const RelayPublishResult(this.outcome, {this.message});
+
+  final RelayPublishOutcome outcome;
+  final String? message;
+}
+
 class RelayConnectionPool {
   RelayConnectionPool._();
 
@@ -74,6 +95,32 @@ class RelayConnectionPool {
     await connection.ready.timeout(connectTimeout);
     return connection;
   }
+
+  Future<Map<String, RelayPublishResult>> publishToAll(
+    NostrEvent event,
+    Set<String> relayUrls, {
+    required Duration timeout,
+  }) async {
+    final urls = relayUrls.toList();
+    final results = await Future.wait(
+      urls.map((relayUrl) => _publishToRelay(relayUrl, event, timeout)),
+    );
+    return {for (var i = 0; i < urls.length; i++) urls[i]: results[i]};
+  }
+
+  Future<RelayPublishResult> _publishToRelay(
+    String relayUrl,
+    NostrEvent event,
+    Duration timeout,
+  ) async {
+    try {
+      final connection = await _connectionFor(relayUrl, timeout);
+      return await connection.publish(event, timeout);
+    } catch (_) {
+      await _connections.remove(relayUrl)?.close();
+      return const RelayPublishResult(RelayPublishOutcome.connectionFailed);
+    }
+  }
 }
 
 class _RelayConnection {
@@ -93,6 +140,7 @@ class _RelayConnection {
 
   final _handlers = <String, void Function(ParsedRelayMessage message)>{};
   final _completers = <String, Completer<void>>{};
+  final _publishCompleters = <String, Completer<RelayPublishResult>>{};
   bool _closed = false;
 
   Future<void> _dispatchQueue = Future.value();
@@ -105,6 +153,20 @@ class _RelayConnection {
     final dispatched = _dispatchQueue.then((_) async {
       final parsed = await RelayMessageParser.instance.parse(raw);
       if (parsed == null) return;
+      if (parsed.type == 'OK') {
+        final completer = _publishCompleters[parsed.subscriptionId];
+        if (completer != null && !completer.isCompleted) {
+          completer.complete(
+            RelayPublishResult(
+              parsed.accepted == true
+                  ? RelayPublishOutcome.accepted
+                  : RelayPublishOutcome.rejected,
+              message: parsed.message,
+            ),
+          );
+        }
+        return;
+      }
       _handlers[parsed.subscriptionId]?.call(parsed);
     });
     _dispatchQueue = dispatched.catchError((Object _) {});
@@ -114,6 +176,13 @@ class _RelayConnection {
     _closed = true;
     for (final completer in _completers.values) {
       if (!completer.isCompleted) completer.complete();
+    }
+    for (final completer in _publishCompleters.values) {
+      if (!completer.isCompleted) {
+        completer.complete(
+          const RelayPublishResult(RelayPublishOutcome.connectionFailed),
+        );
+      }
     }
   }
 
@@ -180,6 +249,28 @@ class _RelayConnection {
     }
 
     return events;
+  }
+
+  Future<RelayPublishResult> publish(NostrEvent event, Duration timeout) async {
+    await ready;
+    final completer = Completer<RelayPublishResult>();
+    _publishCompleters[event.id] = completer;
+
+    final timer = Timer(timeout, () {
+      if (!completer.isCompleted) {
+        completer.complete(
+          const RelayPublishResult(RelayPublishOutcome.noResponse),
+        );
+      }
+    });
+
+    try {
+      _channel.sink.add(jsonEncode(['EVENT', event.toJson()]));
+      return await completer.future;
+    } finally {
+      timer.cancel();
+      _publishCompleters.remove(event.id);
+    }
   }
 
   Future<void> close() async {

@@ -46,21 +46,33 @@ List<List<String>> _tagsFromJson(Object? raw) {
   return tags;
 }
 
+String _hexFromBytes(List<int> bytes) =>
+    bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+
+// The NIP-01 id-hash input: [0, pubkey, created_at, kind, tags, content].
+// Shared by verification and signing so the two can't drift apart.
+Uint8List _canonicalSerialization({
+  required String pubkey,
+  required Object? createdAt,
+  required Object? kind,
+  required Object? tags,
+  required Object? content,
+}) {
+  return utf8.encode(jsonEncode([0, pubkey, createdAt, kind, tags, content]));
+}
+
 bool _isAuthentic(
   Map<String, dynamic> json,
   String id,
   String pubkey,
   String sig,
 ) {
-  final serialized = utf8.encode(
-    jsonEncode([
-      0,
-      pubkey,
-      json['created_at'],
-      json['kind'],
-      json['tags'],
-      json['content'],
-    ]),
+  final serialized = _canonicalSerialization(
+    pubkey: pubkey,
+    createdAt: json['created_at'],
+    kind: json['kind'],
+    tags: json['tags'],
+    content: json['content'],
   );
   final computedId = Uint8List.fromList(sha256.convert(serialized).bytes);
   if (!_bytesEqual(computedId, _bytesFromHex(id))) return false;
@@ -115,9 +127,60 @@ class NostrEvent {
   final List<List<String>> tags;
   final String content;
   final String sig;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'pubkey': pubkey,
+    'created_at': createdAt.millisecondsSinceEpoch ~/ 1000,
+    'kind': kind,
+    'tags': tags,
+    'content': content,
+    'sig': sig,
+  };
 }
 
 int compareNewestFirst(NostrEvent a, NostrEvent b) {
   final byTime = b.createdAt.compareTo(a.createdAt);
   return byTime != 0 ? byTime : a.id.compareTo(b.id);
+}
+
+/// Builds and signs a NostrEvent with [seckeyHex], per NIP-01.
+NostrEvent signEvent({
+  required String seckeyHex,
+  required String pubkeyHex,
+  required int kind,
+  List<List<String>> tags = const [],
+  required String content,
+  DateTime? createdAt,
+}) {
+  final createdAtSeconds =
+      (createdAt ?? DateTime.now()).millisecondsSinceEpoch ~/ 1000;
+
+  final serialized = _canonicalSerialization(
+    pubkey: pubkeyHex,
+    createdAt: createdAtSeconds,
+    kind: kind,
+    tags: tags,
+    content: content,
+  );
+  final idBytes = Uint8List.fromList(sha256.convert(serialized).bytes);
+  final sigBytes = signSchnorrSignature(seckeyHex: seckeyHex, msg32: idBytes);
+
+  final event = NostrEvent(
+    id: _hexFromBytes(idBytes),
+    pubkey: pubkeyHex,
+    createdAt: DateTime.fromMillisecondsSinceEpoch(createdAtSeconds * 1000),
+    kind: kind,
+    tags: tags,
+    content: content,
+    sig: _hexFromBytes(sigBytes),
+  );
+
+  // Defense in depth: a locally-signed event must verify through the same
+  // path a relay-received event does, or the native binding is broken.
+  if (!_isAuthentic(event.toJson(), event.id, event.pubkey, event.sig)) {
+    throw StateError('Locally signed event failed its own verification');
+  }
+
+  return event;
 }

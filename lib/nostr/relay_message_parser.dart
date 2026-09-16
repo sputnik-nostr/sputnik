@@ -9,11 +9,18 @@ class ParsedRelayMessage {
     required this.subscriptionId,
     required this.type,
     this.event,
+    this.accepted,
+    this.message,
   });
 
   final String subscriptionId;
   final String type;
   final NostrEvent? event;
+
+  // Only set for an "OK" message (a relay's response to a published event,
+  // where subscriptionId holds the event id instead of a subscription id).
+  final bool? accepted;
+  final String? message;
 }
 
 class _ParseRequest {
@@ -40,13 +47,22 @@ ParsedRelayMessage? _parse(String raw) {
     if (type is! String || subscriptionId is! String) return null;
 
     NostrEvent? event;
+    bool? accepted;
+    String? okMessage;
     if (type == 'EVENT' && message.length >= 3) {
       event = NostrEvent.fromJson(message[2] as Map<String, dynamic>);
+    } else if (type == 'OK') {
+      accepted = message.length >= 3 && message[2] == true;
+      okMessage = message.length >= 4 && message[3] is String
+          ? message[3] as String
+          : null;
     }
     return ParsedRelayMessage(
       subscriptionId: subscriptionId,
       type: type,
       event: event,
+      accepted: accepted,
+      message: okMessage,
     );
   } catch (_) {
     // Malformed or unexpected message from the relay; drop it rather than

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
-import '../models/current_user.dart';
+import '../models/identity.dart';
+import '../nostr/nostr.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/fade_in_avatar.dart';
 
 class ComposeScreen extends StatefulWidget {
-  const ComposeScreen({super.key});
+  const ComposeScreen({super.key, this.relayClient = const RelayClient()});
+
+  final RelayClient relayClient;
 
   @override
   State<ComposeScreen> createState() => _ComposeScreenState();
@@ -16,6 +19,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
   final _controller = TextEditingController();
 
   bool _hasText = false;
+  bool _posting = false;
 
   @override
   void initState() {
@@ -32,12 +36,86 @@ class _ComposeScreenState extends State<ComposeScreen> {
     super.dispose();
   }
 
-  void _post() {
-    // Publishing isn't wired up yet: no event signing or relay write path
-    // exists (RelayClient/RelayConnectionPool are read-only so far).
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Posting to relays is not implemented yet')),
+  Future<bool> _confirmPost(int relayCount) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Post to relays?'),
+        content: Text(
+          'This publishes your note to $relayCount relay(s). Notes on '
+          'Nostr are public and cannot be reliably deleted afterward.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            key: const Key('confirmPostButton'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Post'),
+          ),
+        ],
+      ),
     );
+    return confirmed ?? false;
+  }
+
+  Future<void> _post() async {
+    final pubkeyHex = activeIdentityPubkeyNotifier.value;
+    if (pubkeyHex == null) return;
+    final identity = identityWithPubkey(identitiesNotifier.value, pubkeyHex);
+    if (identity == null) return;
+
+    final relayUrls = selectedRelaysNotifier.value;
+    if (!await _confirmPost(relayUrls.length) || !mounted) return;
+
+    final NostrEvent event;
+    try {
+      event = signEvent(
+        seckeyHex: identity.privkeyHex,
+        pubkeyHex: identity.pubkeyHex,
+        kind: 1,
+        content: _controller.text.trim(),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not sign this note: $e')));
+      }
+      return;
+    }
+
+    setState(() => _posting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final results = await widget.relayClient.publish(event, relayUrls);
+    if (!mounted) return;
+    setState(() => _posting = false);
+
+    final accepted = results.values
+        .where((result) => result.outcome == RelayPublishOutcome.accepted)
+        .length;
+
+    if (accepted > 0) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Posted to $accepted/${results.length} relays')),
+      );
+      Navigator.pop(context);
+    } else {
+      String? reason;
+      for (final result in results.values) {
+        if (result.message != null && result.message!.isNotEmpty) {
+          reason = result.message;
+          break;
+        }
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(reason ?? 'Could not post this note to any relay'),
+        ),
+      );
+    }
   }
 
   @override
@@ -47,14 +125,12 @@ class _ComposeScreenState extends State<ComposeScreen> {
     final metadata = pubkeyHex == null
         ? null
         : profileCacheNotifier.value[pubkeyHex];
-    final isCurrentUser =
-        pubkeyHex == null || pubkeyHex == CurrentUser.pubkeyHex;
     final resolvedName = metadata?.resolvedName?.trim();
     final fallbackLabel = resolvedName?.isNotEmpty == true
         ? resolvedName![0].toUpperCase()
-        : isCurrentUser
-        ? currentUserProfileNotifier.value.displayName[0].toUpperCase()
-        : pubkeyHex[0].toUpperCase();
+        : pubkeyHex?.isNotEmpty == true
+        ? pubkeyHex![0].toUpperCase()
+        : '?';
 
     return Scaffold(
       appBar: AppBar(
@@ -67,11 +143,20 @@ class _ComposeScreenState extends State<ComposeScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: FilledButton(
-              key: const Key('composePostButton'),
-              onPressed: pubkeyHex != null && _hasText ? _post : null,
-              child: const Text('Post'),
-            ),
+            child: _posting
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : FilledButton(
+                    key: const Key('composePostButton'),
+                    onPressed: pubkeyHex != null && _hasText ? _post : null,
+                    child: const Text('Post'),
+                  ),
           ),
         ],
       ),

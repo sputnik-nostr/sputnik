@@ -1,10 +1,16 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../main.dart';
-import '../models/current_user.dart';
+import '../models/identity.dart';
+import '../nostr/nostr.dart';
+import '../services/cache_store.dart';
 
 class EditProfileScreen extends StatefulWidget {
-  const EditProfileScreen({super.key});
+  const EditProfileScreen({super.key, this.relayClient = const RelayClient()});
+
+  final RelayClient relayClient;
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -17,9 +23,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final profile = currentUserProfileNotifier.value;
-    _nameController = TextEditingController(text: profile.displayName);
-    _bioController = TextEditingController(text: profile.bio);
+    final pubkeyHex = activeIdentityPubkeyNotifier.value;
+    final metadata = pubkeyHex == null
+        ? null
+        : profileCacheNotifier.value[pubkeyHex];
+    _nameController = TextEditingController(
+      text: metadata?.displayName ?? metadata?.name ?? '',
+    );
+    _bioController = TextEditingController(text: metadata?.about ?? '');
   }
 
   @override
@@ -29,14 +40,93 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
-  void _save() {
-    final name = _nameController.text.trim();
-    currentUserProfileNotifier.value = currentUserProfileNotifier.value
-        .copyWith(
-          displayName: name.isEmpty ? CurrentUser.displayName : name,
-          bio: _bioController.text.trim(),
+  Future<bool> _confirmSave(int relayCount) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Update profile?'),
+        content: Text('This publishes your profile to $relayCount relay(s).'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            key: const Key('confirmSaveProfileButton'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
+  Future<void> _save() async {
+    final pubkeyHex = activeIdentityPubkeyNotifier.value;
+    if (pubkeyHex == null) return;
+    final identity = identityWithPubkey(identitiesNotifier.value, pubkeyHex);
+    if (identity == null) return;
+
+    final relayUrls = selectedRelaysNotifier.value;
+    if (!await _confirmSave(relayUrls.length) || !mounted) return;
+
+    // Apply the edited fields on top of whatever metadata is already known,
+    // so fields this form doesn't expose (picture/banner/nip05/website)
+    // survive the update rather than being wiped.
+    final existing =
+        profileCacheNotifier.value[pubkeyHex] ?? const NostrMetadata();
+    final updated = existing.copyWith(
+      displayName: _nameController.text.trim(),
+      about: _bioController.text.trim(),
+    );
+
+    final NostrEvent event;
+    try {
+      event = signEvent(
+        seckeyHex: identity.privkeyHex,
+        pubkeyHex: identity.pubkeyHex,
+        kind: 0,
+        content: jsonEncode(updated.toEventContent()),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not sign this profile update: $e')),
         );
-    Navigator.pop(context);
+      }
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final results = await widget.relayClient.publish(event, relayUrls);
+    if (!mounted) return;
+
+    final accepted = results.values
+        .where((result) => result.outcome == RelayPublishOutcome.accepted)
+        .length;
+
+    if (accepted > 0) {
+      profileCacheNotifier.value = {
+        ...profileCacheNotifier.value,
+        pubkeyHex: updated,
+      };
+      await CacheStore.putProfiles({pubkeyHex: updated});
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Updated profile on $accepted/${results.length} relays',
+          ),
+        ),
+      );
+      if (mounted) Navigator.pop(context);
+    } else {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not publish this profile update to any relay'),
+        ),
+      );
+    }
   }
 
   @override

@@ -23,3 +23,9 @@ int nostr_secp256k1_verify_schnorr(
     const uint8_t msg32[32],
     const uint8_t sig64[64],
     const uint8_t pubkey32[32]);
+
+int nostr_secp256k1_sign_schnorr(
+    nostr_secp256k1* wrapper,
+    const uint8_t seckey32[32],
+    const uint8_t msg32[32],
+    uint8_t sig64_out[64]);

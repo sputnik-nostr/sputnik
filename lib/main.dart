@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'models/app_seed_color.dart';
-import 'models/current_user.dart';
 import 'models/identity.dart';
 import 'models/note.dart';
 import 'models/relay.dart';
@@ -41,9 +40,6 @@ final ValueNotifier<List<Identity>> identitiesNotifier = ValueNotifier(
 
 final ValueNotifier<String?> activeIdentityPubkeyNotifier = ValueNotifier(null);
 
-final ValueNotifier<CurrentUserProfile> currentUserProfileNotifier =
-    ValueNotifier(CurrentUserProfile.fallback);
-
 final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
@@ -81,11 +77,6 @@ Future<void> main() async {
     SettingsStore.loadActiveIdentityPubkey,
     SettingsStore.saveActiveIdentityPubkey,
   );
-  final currentUserProfileBound = bindPersisted(
-    currentUserProfileNotifier,
-    SettingsStore.loadCurrentUserProfile,
-    SettingsStore.saveCurrentUserProfile,
-  );
 
   await cacheInit;
   await themeModeBound;
@@ -94,7 +85,6 @@ Future<void> main() async {
   await customRelaysBound;
   await identitiesBound;
   await activeIdentityPubkeyBound;
-  await currentUserProfileBound;
 
   await bindPersisted(
     selectedRelaysNotifier,

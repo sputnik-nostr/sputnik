@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../main.dart';
-import '../models/current_user.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../models/time_format.dart';
@@ -17,6 +16,7 @@ import '../widgets/note_tile.dart';
 import '../widgets/payment_target_chip.dart';
 import '../widgets/placeholder_tab.dart';
 import 'edit_profile_screen.dart';
+import 'identities_screen.dart';
 import 'image_viewer_screen.dart';
 import 'users_list_screen.dart';
 
@@ -37,15 +37,19 @@ void openProfile(BuildContext context, String pubkeyHex) {
 }
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key, this.pubkeyHex = CurrentUser.pubkeyHex});
+  /// [pubkeyHex] null means "my profile" -- whichever identity is active.
+  const ProfileScreen({super.key, this.pubkeyHex});
 
-  final String pubkeyHex;
+  final String? pubkeyHex;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  late final String? _resolvedPubkeyHex =
+      widget.pubkeyHex ?? activeIdentityPubkeyNotifier.value;
+
   List<Note>? _fetchedNotes;
   bool _loadingNotes = true;
   List<String>? _following;
@@ -55,18 +59,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _checkedNip05Identifier;
   Nip05Status? _nip05Status;
 
-  bool get _isCurrentUser => widget.pubkeyHex == CurrentUser.pubkeyHex;
+  bool get _isCurrentUser =>
+      _resolvedPubkeyHex != null &&
+      _resolvedPubkeyHex == activeIdentityPubkeyNotifier.value;
 
-  void _maybeVerifyNip05(String? identifier) {
+  void _maybeVerifyNip05(String? identifier, String pubkeyHex) {
     final trimmed = identifier?.trim();
     if (trimmed == null || trimmed.isEmpty) return;
     if (trimmed == _checkedNip05Identifier) return;
 
     _checkedNip05Identifier = trimmed;
     _nip05Status = null;
-    verifyNip05(identifier: trimmed, pubkeyHex: widget.pubkeyHex).then((
-      status,
-    ) {
+    verifyNip05(identifier: trimmed, pubkeyHex: pubkeyHex).then((status) {
       if (!mounted || _checkedNip05Identifier != trimmed) return;
       setState(() => _nip05Status = status);
     });
@@ -91,34 +95,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // The current user's pubkey is a local placeholder, not a real key any
-    // relay has metadata for, so there's nothing to fetch. Otherwise, the
-    // cached metadata (if any) renders instantly below while this refreshes
-    // it in the background.
-    if (_isCurrentUser) {
+    final pubkeyHex = _resolvedPubkeyHex;
+    if (pubkeyHex == null) {
+      // No identity to show a profile for at all.
       _loadingNotes = false;
-    } else {
-      const RelayProfileRepository().fetchProfile(
-        widget.pubkeyHex,
-        selectedRelaysNotifier.value,
-      );
-      _loadAuthorPosts();
-      _loadContacts();
-      _loadPaymentTargets();
+      return;
     }
+
+    const RelayProfileRepository().fetchProfile(
+      pubkeyHex,
+      selectedRelaysNotifier.value,
+    );
+    _loadAuthorPosts(pubkeyHex);
+    _loadContacts(pubkeyHex);
+    _loadPaymentTargets(pubkeyHex);
   }
 
-  Future<void> _loadAuthorPosts() async {
+  Future<void> _loadAuthorPosts(String pubkeyHex) async {
     final relayUrls = selectedRelaysNotifier.value;
     final posts = await RelayPostRepository(relayUrls: relayUrls)
-        .fetchPostsByAuthor(widget.pubkeyHex);
+        .fetchPostsByAuthor(pubkeyHex);
     if (!mounted) return;
 
-    final metadata = profileCacheNotifier.value[widget.pubkeyHex];
+    final metadata = profileCacheNotifier.value[pubkeyHex];
     final notes = await hydratePosts(
       posts,
       relayUrls,
-      knownMetadata: metadata == null ? const {} : {widget.pubkeyHex: metadata},
+      knownMetadata: metadata == null ? const {} : {pubkeyHex: metadata},
     );
     if (!mounted) return;
 
@@ -128,17 +131,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  Future<void> _loadContacts() async {
+  Future<void> _loadContacts(String pubkeyHex) async {
     final relayUrls = selectedRelaysNotifier.value;
     const repository = RelayContactsRepository();
-    final followingFuture = repository.fetchFollowing(
-      widget.pubkeyHex,
-      relayUrls,
-    );
-    final followersFuture = repository.fetchFollowers(
-      widget.pubkeyHex,
-      relayUrls,
-    );
+    final followingFuture = repository.fetchFollowing(pubkeyHex, relayUrls);
+    final followersFuture = repository.fetchFollowers(pubkeyHex, relayUrls);
 
     final following = await followingFuture;
     if (mounted) setState(() => _following = following);
@@ -147,16 +144,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) setState(() => _followers = followers);
   }
 
-  Future<void> _loadPaymentTargets() async {
+  Future<void> _loadPaymentTargets(String pubkeyHex) async {
     final targets = await const RelayPaymentTargetsRepository()
-        .fetchPaymentTargets(widget.pubkeyHex, selectedRelaysNotifier.value);
+        .fetchPaymentTargets(pubkeyHex, selectedRelaysNotifier.value);
     if (mounted) setState(() => _paymentTargets = targets);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final pubkeyHex = widget.pubkeyHex;
+    final pubkeyHex = _resolvedPubkeyHex;
+
+    if (pubkeyHex == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const PlaceholderTab(
+                icon: Icons.person_outline,
+                label: 'No identity yet',
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                key: const Key('createIdentityFromProfileButton'),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const IdentitiesScreen()),
+                ),
+                child: const Text('Create or import an identity'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final npub = npubFromHex(pubkeyHex);
 
     return Scaffold(
@@ -164,12 +188,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         animation: Listenable.merge([
           profileCacheNotifier,
           notesNotifier,
-          currentUserProfileNotifier,
+          activeIdentityPubkeyNotifier,
         ]),
         builder: (context, child) {
-          final metadata = _isCurrentUser
-              ? null
-              : profileCacheNotifier.value[pubkeyHex];
+          final metadata = profileCacheNotifier.value[pubkeyHex];
           final notes = notesNotifier.value;
           final ownNotesById = <String, Note>{
             for (final note in (notes ?? const []))
@@ -192,20 +214,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   )
                   .toList()
                 ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          final displayName = _isCurrentUser
-              ? currentUserProfileNotifier.value.displayName
-              : (metadata?.resolvedName ??
-                    (ownNotes.isNotEmpty
-                        ? ownNotes.first.displayName
-                        : _shortPubkey(pubkeyHex)));
+          final displayName =
+              metadata?.resolvedName ??
+              (ownNotes.isNotEmpty
+                  ? ownNotes.first.displayName
+                  : _shortPubkey(pubkeyHex));
           final pictureUrl = metadata?.picture;
           final bannerUrl = metadata?.banner;
-          final bio = _isCurrentUser
-              ? currentUserProfileNotifier.value.bio
-              : metadata?.about;
+          final bio = metadata?.about;
           final hasBio = bio != null && bio.trim().isNotEmpty;
-          final nip05 = _isCurrentUser ? null : metadata?.nip05;
-          if (!_isCurrentUser) _maybeVerifyNip05(nip05);
+          final nip05 = metadata?.nip05;
+          _maybeVerifyNip05(nip05, pubkeyHex);
 
           return ListView(
             padding: EdgeInsets.zero,
@@ -411,13 +430,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         status: _nip05Status,
                       ),
                     ],
-                    if (_isCurrentUser) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        formatLastActive(CurrentUser.lastActiveAt),
-                        style: theme.metadata,
-                      ),
-                    ] else if (ownNotes.isNotEmpty) ...[
+                    if (ownNotes.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
                         formatLastActiveFromPostedAt(ownNotes.first.postedAt),
@@ -428,55 +441,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const SizedBox(height: 8),
                       LinkifiedText(bio, style: theme.textTheme.bodyMedium),
                     ],
-                    if (!_isCurrentUser) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          CountLabel(
-                            count: _following?.length,
-                            label: 'following',
-                            onTap: _following == null
-                                ? null
-                                : () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => UsersListScreen(
-                                        title: 'Following',
-                                        pubkeys: _following!,
-                                      ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        CountLabel(
+                          count: _following?.length,
+                          label: 'following',
+                          onTap: _following == null
+                              ? null
+                              : () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => UsersListScreen(
+                                      title: 'Following',
+                                      pubkeys: _following!,
                                     ),
                                   ),
-                          ),
-                          const SizedBox(width: 16),
-                          CountLabel(
-                            count: _followers?.length,
-                            label: 'followers',
-                            onTap: _followers == null
-                                ? null
-                                : () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => UsersListScreen(
-                                        title: 'Followers',
-                                        pubkeys: _followers!,
-                                      ),
+                                ),
+                        ),
+                        const SizedBox(width: 16),
+                        CountLabel(
+                          count: _followers?.length,
+                          label: 'followers',
+                          onTap: _followers == null
+                              ? null
+                              : () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => UsersListScreen(
+                                      title: 'Followers',
+                                      pubkeys: _followers!,
                                     ),
                                   ),
-                          ),
-                        ],
-                      ),
-                      if (_paymentTargets != null &&
-                          _paymentTargets!.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (final target in _paymentTargets!)
-                              PaymentTargetChip(target: target),
-                          ],
+                                ),
                         ),
                       ],
+                    ),
+                    if (_paymentTargets != null &&
+                        _paymentTargets!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final target in _paymentTargets!)
+                            PaymentTargetChip(target: target),
+                        ],
+                      ),
                     ],
                   ],
                 ),

@@ -139,3 +139,28 @@ int nostr_secp256k1_verify_schnorr(
 
     return secp256k1_schnorrsig_verify(wrapper->ctx, sig64, msg32, 32, &xonly_pubkey);
 }
+
+int nostr_secp256k1_sign_schnorr(
+    nostr_secp256k1* wrapper,
+    const uint8_t seckey32[32],
+    const uint8_t msg32[32],
+    uint8_t sig64_out[64])
+{
+    if (wrapper == NULL || seckey32 == NULL || msg32 == NULL || sig64_out == NULL) return 0;
+
+    secp256k1_keypair keypair;
+    if (!secp256k1_ec_seckey_verify(wrapper->ctx, seckey32) || !secp256k1_keypair_create(wrapper->ctx, &keypair, seckey32))
+    {
+        nostr_secure_cleanse(&keypair, sizeof(keypair));
+        return 0;
+    }
+
+    uint8_t aux_rand[32];
+    int have_aux_rand = nostr_secure_random(aux_rand, sizeof(aux_rand));
+
+    int ok = have_aux_rand && secp256k1_schnorrsig_sign32(wrapper->ctx, sig64_out, msg32, &keypair, aux_rand);
+
+    nostr_secure_cleanse(&keypair, sizeof(keypair));
+    nostr_secure_cleanse(aux_rand, sizeof(aux_rand));
+    return ok;
+}

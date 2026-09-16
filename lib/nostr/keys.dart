@@ -80,6 +80,34 @@ NostrKeyPair generateNostrKeyPair() {
   }
 }
 
+Uint8List signSchnorrSignature({
+  required String seckeyHex,
+  required Uint8List msg32,
+}) {
+  final bindings = NostrSecp256k1Bindings.instance;
+  final wrapper = _sharedWrapper;
+
+  final seckey = calloc<Uint8>(32);
+  final msg = calloc<Uint8>(32);
+  final sigOut = calloc<Uint8>(64);
+
+  try {
+    _bytesFromHexInto(seckey, seckeyHex);
+    msg.asTypedList(32).setAll(0, msg32);
+
+    if (bindings.signSchnorr(wrapper, seckey, msg, sigOut) != 1) {
+      throw ArgumentError('invalid secp256k1 secret key');
+    }
+
+    return Uint8List.fromList(sigOut.asTypedList(64));
+  } finally {
+    _wipe(seckey, 32);
+    calloc.free(seckey);
+    calloc.free(msg);
+    calloc.free(sigOut);
+  }
+}
+
 bool verifySchnorrSignature({
   required Uint8List msg32,
   required Uint8List sig64,

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
-import '../models/current_user.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/app_drawer.dart';
 import 'bookmarks_screen.dart';
@@ -9,6 +8,17 @@ import 'compose_screen.dart';
 import 'home_screen.dart';
 import 'notifications_screen.dart';
 import 'search_screen.dart';
+
+// A single letter (or icon) to stand in for an avatar image, based on
+// whichever identity is active - "?" when none is.
+String _activeIdentityInitial() {
+  final pubkeyHex = activeIdentityPubkeyNotifier.value;
+  if (pubkeyHex == null) return '?';
+  final resolvedName = profileCacheNotifier.value[pubkeyHex]?.resolvedName
+      ?.trim();
+  return (resolvedName?.isNotEmpty == true ? resolvedName! : pubkeyHex)[0]
+      .toUpperCase();
+}
 
 class RootScreen extends StatefulWidget {
   const RootScreen({super.key});
@@ -39,13 +49,16 @@ class _RootScreenState extends State<RootScreen> {
           child: GestureDetector(
             key: const Key('profileAvatarButton'),
             onTap: () => _scaffoldKey.currentState?.openDrawer(),
-            child: ValueListenableBuilder<CurrentUserProfile>(
-              valueListenable: currentUserProfileNotifier,
-              builder: (context, profile, _) => CircleAvatar(
+            child: AnimatedBuilder(
+              animation: Listenable.merge([
+                activeIdentityPubkeyNotifier,
+                profileCacheNotifier,
+              ]),
+              builder: (context, _) => CircleAvatar(
                 radius: 14,
                 backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                 child: Text(
-                  profile.displayName[0].toUpperCase(),
+                  _activeIdentityInitial(),
                   style: Theme.of(context).avatarFallback,
                 ),
               ),

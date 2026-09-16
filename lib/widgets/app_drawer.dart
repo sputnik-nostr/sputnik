@@ -1,10 +1,21 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
-import '../models/current_user.dart';
 import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
 import '../theme/app_text_styles.dart';
+
+// A short label for whichever identity is active - a resolved profile name,
+// a short pubkey if none is cached yet, or a prompt when there's no
+// identity at all.
+String _activeIdentityLabel() {
+  final pubkeyHex = activeIdentityPubkeyNotifier.value;
+  if (pubkeyHex == null) return 'No identity yet';
+  final resolvedName = profileCacheNotifier.value[pubkeyHex]?.resolvedName
+      ?.trim();
+  if (resolvedName != null && resolvedName.isNotEmpty) return resolvedName;
+  return pubkeyHex.substring(0, 8);
+}
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -29,22 +40,28 @@ class AppDrawer extends StatelessWidget {
               },
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                child: ValueListenableBuilder<CurrentUserProfile>(
-                  valueListenable: currentUserProfileNotifier,
-                  builder: (context, profile, _) => Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: theme.colorScheme.primaryContainer,
-                        child: Text(
-                          profile.displayName[0].toUpperCase(),
-                          style: theme.avatarFallback,
+                child: AnimatedBuilder(
+                  animation: Listenable.merge([
+                    activeIdentityPubkeyNotifier,
+                    profileCacheNotifier,
+                  ]),
+                  builder: (context, _) {
+                    final label = _activeIdentityLabel();
+                    return Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: theme.colorScheme.primaryContainer,
+                          child: Text(
+                            label[0].toUpperCase(),
+                            style: theme.avatarFallback,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(profile.displayName, style: theme.avatarName),
-                    ],
-                  ),
+                        const SizedBox(width: 12),
+                        Text(label, style: theme.avatarName),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),

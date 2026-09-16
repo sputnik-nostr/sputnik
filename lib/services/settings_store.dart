@@ -5,7 +5,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_seed_color.dart';
-import '../models/current_user.dart';
 import '../models/identity.dart';
 import '../models/note.dart';
 import '../models/relay.dart';
@@ -58,7 +57,6 @@ class SettingsStore {
   static const _customRelaysKey = 'custom_relays';
   static const _identitiesKey = 'identities';
   static const _activeIdentityPubkeyKey = 'active_identity_pubkey';
-  static const _currentUserProfileKey = 'current_user_profile';
 
   // Identities are kept in the platform keystore/keychain for secure storage.
   static const _secureStorage = FlutterSecureStorage();
@@ -188,25 +186,5 @@ class SettingsStore {
     } else {
       await prefs.setString(_activeIdentityPubkeyKey, pubkeyHex);
     }
-  }
-
-  static Future<CurrentUserProfile> loadCurrentUserProfile() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_currentUserProfileKey);
-    if (raw == null) return CurrentUserProfile.fallback;
-
-    try {
-      return CurrentUserProfile.fromJson(
-        jsonDecode(raw) as Map<String, dynamic>,
-      );
-    } catch (_) {
-      // Cached profile data is malformed; fall back to the sample defaults.
-      return CurrentUserProfile.fallback;
-    }
-  }
-
-  static Future<void> saveCurrentUserProfile(CurrentUserProfile profile) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_currentUserProfileKey, jsonEncode(profile.toJson()));
   }
 }

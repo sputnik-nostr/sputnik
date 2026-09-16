@@ -21,3 +21,10 @@ class Identity {
     'createdAt': createdAt.millisecondsSinceEpoch,
   };
 }
+
+Identity? identityWithPubkey(List<Identity> identities, String pubkeyHex) {
+  for (final identity in identities) {
+    if (identity.pubkeyHex == pubkeyHex) return identity;
+  }
+  return null;
+}

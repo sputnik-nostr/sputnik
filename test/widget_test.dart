@@ -29,7 +29,7 @@ void main() {
     await tester.tap(profileButton);
     await tester.pumpAndSettle();
 
-    expect(find.text('Anon'), findsOneWidget);
+    expect(find.text('No identity yet'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('settingsCard')));
