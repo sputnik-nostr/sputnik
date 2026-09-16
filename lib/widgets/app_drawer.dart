@@ -32,6 +32,7 @@ class AppDrawer extends StatelessWidget {
             InkWell(
               key: const Key('profileCard'),
               onTap: () {
+                FocusScope.of(context).unfocus();
                 Navigator.pop(context);
                 Navigator.push(
                   context,

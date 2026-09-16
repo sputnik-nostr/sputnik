@@ -32,6 +32,9 @@ String _shortPubkey(String pubkey) {
 }
 
 void openProfile(BuildContext context, String pubkeyHex) {
+  // Otherwise a text field left focused offstage (e.g. search) can pop the
+  // keyboard back up when this route is popped.
+  FocusScope.of(context).unfocus();
   Navigator.push(
     context,
     MaterialPageRoute(builder: (_) => ProfileScreen(pubkeyHex: pubkeyHex)),

@@ -99,6 +99,14 @@ class PaymentTargetChip extends StatelessWidget {
         key: Key('paymentTarget_${target.type}_${target.address}'),
         borderRadius: const BorderRadius.all(Radius.circular(8)),
         onTap: () => _open(context),
+        onLongPress: () {
+          Clipboard.setData(ClipboardData(text: target.address));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Copied ${target.type} address to clipboard'),
+            ),
+          );
+        },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: Row(

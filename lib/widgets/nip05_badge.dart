@@ -49,6 +49,7 @@ class Nip05Badge extends StatelessWidget {
         const SizedBox(width: 4),
         Tooltip(
           message: tooltip,
+          triggerMode: TooltipTriggerMode.tap,
           child: Icon(icon, size: 14, color: color),
         ),
       ],
