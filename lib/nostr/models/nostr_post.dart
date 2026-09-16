@@ -1,13 +1,14 @@
+import '../nip19.dart';
 import 'nostr_event.dart';
 
 NostrPost nostrPostFromEvent(NostrEvent event) {
-  final shortPubkey = event.pubkey.substring(0, 8);
+  final handle = shortPubkey(event.pubkey);
   return NostrPost(
     id: event.id,
     author: NostrAuthor(
       pubkey: event.pubkey,
-      displayName: shortPubkey,
-      handle: shortPubkey,
+      displayName: handle,
+      handle: handle,
     ),
     content: event.content,
     createdAt: event.createdAt,

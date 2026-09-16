@@ -1,12 +1,5 @@
 import 'bech32.dart';
-
-String _hexFromBytes(List<int> bytes) =>
-    bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-
-List<int> _bytesFromHex(String hex) => [
-  for (var i = 0; i < hex.length; i += 2)
-    int.parse(hex.substring(i, i + 2), radix: 16),
-];
+import 'hex.dart';
 
 String? _hexFromBareEntity(
   String input,
@@ -17,7 +10,7 @@ String? _hexFromBareEntity(
   if (decoded == null || decoded.hrp != expectedHrp) return null;
   final bytes = convertBits(decoded.data, 5, 8, pad: false);
   if (bytes.length != expectedByteLength) return null;
-  return _hexFromBytes(bytes);
+  return hexEncode(bytes);
 }
 
 const _tlvSpecialByteLength = 32;
@@ -35,7 +28,7 @@ String? _hexFromTlvSpecial(String input, String expectedHrp) {
     if (valueEnd > bytes.length) return null;
     if (type == 0) {
       if (length != _tlvSpecialByteLength) return null;
-      return _hexFromBytes(bytes.sublist(i + 2, valueEnd));
+      return hexEncode(bytes.sublist(i + 2, valueEnd));
     }
     i = valueEnd;
   }
@@ -46,7 +39,7 @@ String? _hexFromTlvSpecial(String input, String expectedHrp) {
 String npubFromHex(String pubkeyHex) {
   return bech32Encode(
     'npub',
-    convertBits(_bytesFromHex(pubkeyHex), 8, 5, pad: true),
+    convertBits(hexDecode(pubkeyHex), 8, 5, pad: true),
   );
 }
 
@@ -60,14 +53,14 @@ String? hexFromNsec(String nsec) => _hexFromBareEntity(nsec, 'nsec', 32);
 String nsecFromHex(String seckeyHex) {
   return bech32Encode(
     'nsec',
-    convertBits(_bytesFromHex(seckeyHex), 8, 5, pad: true),
+    convertBits(hexDecode(seckeyHex), 8, 5, pad: true),
   );
 }
 
 String noteFromHex(String eventIdHex) {
   return bech32Encode(
     'note',
-    convertBits(_bytesFromHex(eventIdHex), 8, 5, pad: true),
+    convertBits(hexDecode(eventIdHex), 8, 5, pad: true),
   );
 }
 
@@ -78,15 +71,23 @@ String? hexFromNprofile(String nprofile) =>
 
 String? hexFromNevent(String nevent) => _hexFromTlvSpecial(nevent, 'nevent');
 
-String truncateNpub(String npub) {
-  const totalLength = 20;
-  const suffixLength = 5;
-  if (npub.length <= totalLength) return npub;
+String truncateMiddle(
+  String value, {
+  required int totalLength,
+  required int suffixLength,
+}) {
+  if (value.length <= totalLength) return value;
   final prefixLength = totalLength - suffixLength - 3;
-  final prefix = npub.substring(0, prefixLength);
-  final suffix = npub.substring(npub.length - suffixLength);
+  final prefix = value.substring(0, prefixLength);
+  final suffix = value.substring(value.length - suffixLength);
   return '$prefix...$suffix';
 }
+
+String truncateNpub(String npub) =>
+    truncateMiddle(npub, totalLength: 20, suffixLength: 5);
+
+String shortPubkey(String pubkeyHex, [int length = 8]) =>
+    pubkeyHex.length <= length ? pubkeyHex : pubkeyHex.substring(0, length);
 
 typedef NostrUriTarget = ({String? pubkeyHex, String? eventIdHex});
 

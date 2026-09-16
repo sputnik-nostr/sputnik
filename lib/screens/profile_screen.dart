@@ -27,10 +27,6 @@ const _avatarRadius = 40.0;
 const _avatarOverlap = _avatarRadius * 2 * 0.25;
 const _avatarInitialFontSize = _avatarRadius * 0.7;
 
-String _shortPubkey(String pubkey) {
-  return pubkey.length <= 8 ? pubkey : pubkey.substring(0, 8);
-}
-
 void openProfile(BuildContext context, String pubkeyHex) {
   // Otherwise a text field left focused offstage (e.g. search) can pop the
   // keyboard back up when this route is popped.
@@ -293,7 +289,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               metadata?.resolvedName ??
               (ownNotes.isNotEmpty
                   ? ownNotes.first.displayName
-                  : _shortPubkey(pubkeyHex));
+                  : shortPubkey(pubkeyHex));
           final pictureUrl = metadata?.picture;
           final bannerUrl = metadata?.banner;
           final bio = metadata?.about;

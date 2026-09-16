@@ -58,5 +58,5 @@ class ProfileResultTile extends StatelessWidget {
 String _truncateBio(String bio) {
   const maxLength = 80;
   if (bio.length <= maxLength) return bio;
-  return '${bio.substring(0, maxLength).trimRight()}…';
+  return '${bio.substring(0, maxLength).trimRight()}...';
 }

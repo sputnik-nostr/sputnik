@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
+import '../nostr/nip19.dart';
 import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
 import '../theme/app_text_styles.dart';
@@ -14,7 +15,7 @@ String _activeIdentityLabel() {
   final resolvedName = profileCacheNotifier.value[pubkeyHex]?.resolvedName
       ?.trim();
   if (resolvedName != null && resolvedName.isNotEmpty) return resolvedName;
-  return pubkeyHex.substring(0, 8);
+  return shortPubkey(pubkeyHex);
 }
 
 class AppDrawer extends StatelessWidget {

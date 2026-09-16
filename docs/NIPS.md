@@ -12,6 +12,7 @@ A list of Nostr NIPs, detailing which ones we plan to implement (or not).
 | `21` | `nostr:` URI scheme                                  | Implemented                 |
 | `27` | Text Note References                                 | Implemented                 |
 | `65` | Relay List Metadata                                  | Support planned             |
+| `A3` | Payment addresses via `payto` tags                   | Implemented                 |
 
 ## Longer-term:
 

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
+import '../hex.dart';
 import '../keys.dart';
 import 'text_sanitizer.dart';
 
@@ -10,14 +11,6 @@ final _hexPattern = RegExp(r'^[0-9a-fA-F]+$');
 
 bool _isHex(String value, int byteLength) =>
     value.length == byteLength * 2 && _hexPattern.hasMatch(value);
-
-Uint8List _bytesFromHex(String hex) {
-  final bytes = Uint8List(hex.length ~/ 2);
-  for (var i = 0; i < bytes.length; i++) {
-    bytes[i] = int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16);
-  }
-  return bytes;
-}
 
 bool _bytesEqual(List<int> a, List<int> b) {
   if (a.length != b.length) return false;
@@ -46,9 +39,6 @@ List<List<String>> _tagsFromJson(Object? raw) {
   return tags;
 }
 
-String _hexFromBytes(List<int> bytes) =>
-    bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-
 // The NIP-01 id-hash input: [0, pubkey, created_at, kind, tags, content].
 // Shared by verification and signing so the two can't drift apart.
 Uint8List _canonicalSerialization({
@@ -75,12 +65,12 @@ bool _isAuthentic(
     content: json['content'],
   );
   final computedId = Uint8List.fromList(sha256.convert(serialized).bytes);
-  if (!_bytesEqual(computedId, _bytesFromHex(id))) return false;
+  if (!_bytesEqual(computedId, hexDecode(id))) return false;
 
   return verifySchnorrSignature(
     msg32: computedId,
-    sig64: _bytesFromHex(sig),
-    pubkey32: _bytesFromHex(pubkey),
+    sig64: hexDecode(sig),
+    pubkey32: hexDecode(pubkey),
   );
 }
 
@@ -167,13 +157,13 @@ NostrEvent signEvent({
   final sigBytes = signSchnorrSignature(seckeyHex: seckeyHex, msg32: idBytes);
 
   final event = NostrEvent(
-    id: _hexFromBytes(idBytes),
+    id: hexEncode(idBytes),
     pubkey: pubkeyHex,
     createdAt: DateTime.fromMillisecondsSinceEpoch(createdAtSeconds * 1000),
     kind: kind,
     tags: tags,
     content: content,
-    sig: _hexFromBytes(sigBytes),
+    sig: hexEncode(sigBytes),
   );
 
   // Defense in depth: a locally-signed event must verify through the same

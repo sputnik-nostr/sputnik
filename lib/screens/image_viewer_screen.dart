@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:photo_view/photo_view.dart';
 
 // Full-screen pinch-to-zoom view of a network image.
 class ImageViewerScreen extends StatelessWidget {
@@ -10,15 +9,17 @@ class ImageViewerScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
       ),
-      body: PhotoView(
-        imageProvider: NetworkImage(imageUrl),
-        backgroundDecoration: const BoxDecoration(color: Colors.black),
-        minScale: PhotoViewComputedScale.contained,
-        maxScale: PhotoViewComputedScale.covered * 4,
+      body: InteractiveViewer(
+        minScale: 1,
+        maxScale: 4,
+        child: SizedBox.expand(
+          child: Image.network(imageUrl, fit: BoxFit.contain),
+        ),
       ),
     );
   }

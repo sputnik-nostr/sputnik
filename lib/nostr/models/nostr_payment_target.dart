@@ -2,6 +2,7 @@ import 'nostr_event.dart';
 
 const _directUriSchemes = {
   'bitcoin',
+  'bitcoincash',
   'ethereum',
   'lightning',
   'litecoin',

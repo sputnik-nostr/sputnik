@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../nostr/models/nostr_payment_target.dart';
+import '../nostr/nip19.dart';
 import '../theme/app_text_styles.dart';
 
 const _tickers = <String, String>{
@@ -10,12 +11,14 @@ const _tickers = <String, String>{
   'lightning': 'LN',
   'bip352': 'BTC',
   'bip353': 'BTC',
+  'bitcoincash': 'BCH',
   'litecoin': 'LTC',
   'monero': 'XMR',
   'ethereum': 'ETH',
   'zcash': 'ZEC',
   'nano': 'NANO',
   'solana': 'SOL',
+  'tron': 'TRX',
 };
 
 const _brandColors = <String, Color>{
@@ -23,12 +26,14 @@ const _brandColors = <String, Color>{
   'lightning': Color(0xFFF7931A),
   'bip352': Color(0xFFF7931A),
   'bip353': Color(0xFFF7931A),
+  'bitcoincash': Color(0xFF0AC18E),
   'litecoin': Color(0xFF345D9D),
   'monero': Color(0xFFFF6600),
   'ethereum': Color(0xFF627EEA),
   'zcash': Color(0xFFF4B728),
   'nano': Color(0xFF209CE9),
   'solana': Color(0xFF9945FF),
+  'tron': Color(0xFFFF060A),
   'paypal': Color(0xFF0070BA),
   'venmo': Color(0xFF3D95CE),
   'revolut': Color(0xFF191C1F),
@@ -36,16 +41,6 @@ const _brandColors = <String, Color>{
 };
 
 String _ticker(String type) => _tickers[type] ?? type.toUpperCase();
-
-String _truncateAddress(String address) {
-  const totalLength = 16;
-  const suffixLength = 4;
-  if (address.length <= totalLength) return address;
-  final prefixLength = totalLength - suffixLength - 3;
-  final prefix = address.substring(0, prefixLength);
-  final suffix = address.substring(address.length - suffixLength);
-  return '$prefix...$suffix';
-}
 
 class PaymentTargetChip extends StatelessWidget {
   const PaymentTargetChip({super.key, required this.target});
@@ -126,7 +121,14 @@ class PaymentTargetChip extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              Text(_truncateAddress(target.address), style: theme.metadata),
+              Text(
+                truncateMiddle(
+                  target.address,
+                  totalLength: 16,
+                  suffixLength: 4,
+                ),
+                style: theme.metadata,
+              ),
             ],
           ),
         ),

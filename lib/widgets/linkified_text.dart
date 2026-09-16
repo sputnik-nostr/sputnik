@@ -102,7 +102,11 @@ class _LinkifiedTextState extends State<LinkifiedText> {
       if (!live.contains(key)) _recognizers.remove(key)?.dispose();
     }
 
-    return Text.rich(TextSpan(style: widget.style, children: spans));
+    // SelectionArea lets the text be selected/copied while still passing
+    // plain taps through to each span's TapGestureRecognizer for links.
+    return SelectionArea(
+      child: Text.rich(TextSpan(style: widget.style, children: spans)),
+    );
   }
 
   Future<void> _openHttpUrl(BuildContext context, String url) async {

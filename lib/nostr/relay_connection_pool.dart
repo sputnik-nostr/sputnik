@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import 'hex.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'relay_message_parser.dart';
@@ -16,10 +17,8 @@ const _maxSubscriptionDuration = Duration(seconds: 30);
 
 const _maxEventsPerSubscription = 2000;
 
-String _generateSubscriptionId() {
-  final bytes = List<int>.generate(8, (_) => _random.nextInt(256));
-  return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-}
+String _generateSubscriptionId() =>
+    hexEncode(List<int>.generate(8, (_) => _random.nextInt(256)));
 
 enum RelayPublishOutcome {
   /// The relay sent back `["OK", id, true, ...]`.
