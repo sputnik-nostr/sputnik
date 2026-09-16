@@ -22,14 +22,33 @@ class ThreadData {
 
 const _replyLimit = 200;
 
-bool _referencesPost(NostrEvent event, String postId) {
-  final wanted = postId.toLowerCase();
-  for (final tag in event.tags) {
-    if (tag.length > 1 && tag[0] == 'e' && tag[1].toLowerCase() == wanted) {
-      return true;
+const _nip10Markers = {'root', 'reply', 'mention'};
+
+bool _hasNip10Marker(List<String> tag) =>
+    tag.length >= 4 && _nip10Markers.contains(tag[3]);
+
+// Per NIP-10: prefer a marked "reply" tag, falling back to "root" for
+// top-level replies. Without markers (the deprecated positional scheme),
+// the last "e" tag is the parent; earlier ones are just citations.
+String? _directReplyParent(NostrEvent event) {
+  final eTags = [
+    for (final tag in event.tags)
+      if (tag.length > 1 && tag[0] == 'e') tag,
+  ];
+  if (eTags.isEmpty) return null;
+
+  final marked = eTags.where(_hasNip10Marker).toList();
+  if (marked.isNotEmpty) {
+    for (final tag in marked) {
+      if (tag[3] == 'reply') return tag[1].toLowerCase();
     }
+    for (final tag in marked) {
+      if (tag[3] == 'root') return tag[1].toLowerCase();
+    }
+    return null;
   }
-  return false;
+
+  return eTags.last[1].toLowerCase();
 }
 
 class RelayThreadRepository {
@@ -56,9 +75,10 @@ class RelayThreadRepository {
       postId,
     ], relayUrls);
 
+    final wantedId = postId.toLowerCase();
     final matchingReplies = [
       for (final event in await repliesFuture)
-        if (event.kind == 1 && _referencesPost(event, postId)) event,
+        if (event.kind == 1 && _directReplyParent(event) == wantedId) event,
     ]..sort(compareNewestFirst);
     final replyEvents = matchingReplies.take(_replyLimit).toList();
     final reactions = (await reactionsFuture)[postId] ?? const PostReactions();

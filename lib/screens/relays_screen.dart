@@ -3,6 +3,21 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import '../models/relay.dart';
 
+bool _isPlaintext(String relay) => Uri.tryParse(relay)?.scheme == 'ws';
+
+Widget _plaintextWarningIcon(BuildContext context) {
+  return Tooltip(
+    message:
+        'Unencrypted relay (ws://). Traffic to and from it can be read '
+        'or tampered with on the network. Prefer a wss:// relay.',
+    child: Icon(
+      Icons.no_encryption_outlined,
+      size: 20,
+      color: Theme.of(context).colorScheme.error,
+    ),
+  );
+}
+
 void _setSelected(String relay, bool selected) {
   final updated = Set<String>.from(selectedRelaysNotifier.value);
   if (selected) {
@@ -127,6 +142,9 @@ class RelaysScreen extends StatelessWidget {
                   title: Text(relay),
                   value: selected.contains(relay),
                   onChanged: (checked) => _setSelected(relay, checked ?? false),
+                  secondary: _isPlaintext(relay)
+                      ? _plaintextWarningIcon(context)
+                      : null,
                 ),
               if (customRelays.isNotEmpty) ...[
                 const Divider(height: 1),
@@ -145,10 +163,19 @@ class RelaysScreen extends StatelessWidget {
                     value: selected.contains(relay),
                     onChanged: (checked) =>
                         _setSelected(relay, checked ?? false),
-                    secondary: IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      tooltip: 'Remove relay',
-                      onPressed: () => _removeCustomRelay(relay),
+                    secondary: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_isPlaintext(relay)) ...[
+                          _plaintextWarningIcon(context),
+                          const SizedBox(width: 4),
+                        ],
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          tooltip: 'Remove relay',
+                          onPressed: () => _removeCustomRelay(relay),
+                        ),
+                      ],
                     ),
                   ),
               ],

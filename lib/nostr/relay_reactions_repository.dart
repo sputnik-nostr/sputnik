@@ -7,6 +7,20 @@ import 'relay_client.dart';
 // one of the given post ids, grouped by which post id they tagged.
 const _reactionLimit = 500;
 
+// Per NIP-25/NIP-18: with more than one "e" tag, the last one is the
+// actual target; earlier ones are just citations.
+String? _lastTaggedEventId(NostrEvent event) {
+  String? found;
+  for (final tag in event.tags) {
+    if (tag.length > 1 && tag[0] == 'e') found = tag[1].toLowerCase();
+  }
+  return found;
+}
+
+// Per NIP-25: "+" or empty content means like, "-" means dislike, and
+// anything else (emoji, custom-emoji shortcode) is neither.
+bool _isLikeReaction(String content) => content.isEmpty || content == '+';
+
 Map<String, List<String>> _authorsByTaggedPost(
   List<NostrEvent> events,
   Set<String> postIds,
@@ -15,12 +29,11 @@ Map<String, List<String>> _authorsByTaggedPost(
   final seenByPost = <String, Set<String>>{};
   for (final event in events) {
     if (event.kind != kind) continue;
-    for (final tag in event.tags) {
-      if (tag.length < 2 || tag[0] != 'e') continue;
-      final postId = tag[1].toLowerCase();
-      if (!postIds.contains(postId)) continue;
-      seenByPost.putIfAbsent(postId, () => {}).add(event.pubkey);
-    }
+    if (kind == 7 && !_isLikeReaction(event.content)) continue;
+
+    final postId = _lastTaggedEventId(event);
+    if (postId == null || !postIds.contains(postId)) continue;
+    seenByPost.putIfAbsent(postId, () => {}).add(event.pubkey);
   }
   return {
     for (final entry in seenByPost.entries) entry.key: entry.value.toList(),

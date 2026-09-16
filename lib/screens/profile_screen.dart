@@ -6,11 +6,13 @@ import '../models/current_user.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../models/time_format.dart';
+import '../nostr/nip05.dart';
 import '../nostr/nostr.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/count_label.dart';
 import '../widgets/fade_in_avatar.dart';
 import '../widgets/linkified_text.dart';
+import '../widgets/nip05_badge.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/payment_target_chip.dart';
 import '../widgets/placeholder_tab.dart';
@@ -50,8 +52,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<String>? _followers;
   List<NostrPaymentTarget>? _paymentTargets;
   bool _followingLocally = false;
+  String? _checkedNip05Identifier;
+  Nip05Status? _nip05Status;
 
   bool get _isCurrentUser => widget.pubkeyHex == CurrentUser.pubkeyHex;
+
+  void _maybeVerifyNip05(String? identifier) {
+    final trimmed = identifier?.trim();
+    if (trimmed == null || trimmed.isEmpty) return;
+    if (trimmed == _checkedNip05Identifier) return;
+
+    _checkedNip05Identifier = trimmed;
+    _nip05Status = null;
+    verifyNip05(identifier: trimmed, pubkeyHex: widget.pubkeyHex).then((
+      status,
+    ) {
+      if (!mounted || _checkedNip05Identifier != trimmed) return;
+      setState(() => _nip05Status = status);
+    });
+  }
 
   void _openImage(BuildContext context, String imageUrl) {
     Navigator.push(
@@ -185,6 +204,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ? currentUserProfileNotifier.value.bio
               : metadata?.about;
           final hasBio = bio != null && bio.trim().isNotEmpty;
+          final nip05 = _isCurrentUser ? null : metadata?.nip05;
+          if (!_isCurrentUser) _maybeVerifyNip05(nip05);
 
           return ListView(
             padding: EdgeInsets.zero,
@@ -383,6 +404,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ],
                     ),
+                    if (nip05 != null && nip05.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Nip05Badge(
+                        identifier: nip05.trim(),
+                        status: _nip05Status,
+                      ),
+                    ],
                     if (_isCurrentUser) ...[
                       const SizedBox(height: 4),
                       Text(

@@ -286,6 +286,70 @@ void main() {
       expect(thread.replies, hasLength(1));
       expect(thread.replies.single.content, 'a real reply');
     });
+
+    test('a marked "mention" tag does not make a note a reply', () async {
+      final repository = RelayThreadRepository(
+        reactionsRepository: _noReactions,
+        client: _RelayReturning([
+          event(
+            pubkey: attacker,
+            kind: 1,
+            id: otherId,
+            content: 'just citing it',
+            tags: [
+              ['e', wantedId, '', 'mention'],
+              ['e', otherId, '', 'root'],
+            ],
+          ),
+        ]),
+      );
+
+      final thread = await repository.fetchThread(wantedId, {'wss://r'});
+      expect(thread.replies, isEmpty);
+    });
+
+    test('a marked "reply" tag takes priority over "root"', () async {
+      final repository = RelayThreadRepository(
+        reactionsRepository: _noReactions,
+        client: _RelayReturning([
+          event(
+            pubkey: attacker,
+            kind: 1,
+            id: otherId,
+            content: 'a reply deep in the thread',
+            tags: [
+              ['e', otherId, '', 'root'],
+              ['e', wantedId, '', 'reply'],
+            ],
+          ),
+        ]),
+      );
+
+      final thread = await repository.fetchThread(wantedId, {'wss://r'});
+      expect(thread.replies, hasLength(1));
+    });
+
+    test('in the deprecated positional scheme, only the last e tag is the '
+        'direct parent, not an earlier citation', () async {
+      final repository = RelayThreadRepository(
+        reactionsRepository: _noReactions,
+        client: _RelayReturning([
+          event(
+            pubkey: attacker,
+            kind: 1,
+            id: otherId,
+            content: 'root is wanted, but replying to something else',
+            tags: [
+              ['e', wantedId],
+              ['e', otherId],
+            ],
+          ),
+        ]),
+      );
+
+      final thread = await repository.fetchThread(wantedId, {'wss://r'});
+      expect(thread.replies, isEmpty);
+    });
   });
 
   group('followers', () {
@@ -365,6 +429,70 @@ void main() {
       );
       expect(reactions[wantedId]!.likerPubkeys, [attacker]);
       expect(reactions[wantedId]!.reposterPubkeys, isEmpty);
+    });
+
+    test('a dislike ("-") is not counted as a like', () async {
+      final repository = RelayReactionsRepository(
+        client: _RelayReturning([
+          event(
+            pubkey: attacker,
+            kind: 7,
+            content: '-',
+            tags: [
+              ['e', wantedId],
+            ],
+          ),
+        ]),
+      );
+
+      final reactions = await repository.fetchReactions(
+        [wantedId],
+        {'wss://r'},
+      );
+      expect(reactions[wantedId]!.likerPubkeys, isEmpty);
+    });
+
+    test('a custom emoji reaction is not counted as a like', () async {
+      final repository = RelayReactionsRepository(
+        client: _RelayReturning([
+          event(
+            pubkey: attacker,
+            kind: 7,
+            content: ':shortcode:',
+            tags: [
+              ['e', wantedId],
+            ],
+          ),
+        ]),
+      );
+
+      final reactions = await repository.fetchReactions(
+        [wantedId],
+        {'wss://r'},
+      );
+      expect(reactions[wantedId]!.likerPubkeys, isEmpty);
+    });
+
+    test('only the last e tag is treated as the reaction target', () async {
+      final repository = RelayReactionsRepository(
+        client: _RelayReturning([
+          event(
+            pubkey: attacker,
+            kind: 7,
+            tags: [
+              ['e', otherId],
+              ['e', wantedId],
+            ],
+          ),
+        ]),
+      );
+
+      final reactions = await repository.fetchReactions(
+        [wantedId, otherId],
+        {'wss://r'},
+      );
+      expect(reactions[wantedId]!.likerPubkeys, [attacker]);
+      expect(reactions[otherId]!.likerPubkeys, isEmpty);
     });
   });
 }

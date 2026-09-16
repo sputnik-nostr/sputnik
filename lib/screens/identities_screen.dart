@@ -9,6 +9,25 @@ import '../models/time_format.dart';
 import '../nostr/nostr.dart';
 import '../widgets/placeholder_tab.dart';
 
+// How long a copied nsec is left on the clipboard before it's cleared.
+const nsecClipboardClearDelay = Duration(seconds: 30);
+
+// Clears the clipboard after [nsecClipboardClearDelay], but only if it
+// still holds the value we copied. If the user copied something else in
+// the meantime, that is left alone.
+void _scheduleClipboardClear(String copiedValue) {
+  Future.delayed(nsecClipboardClearDelay, () async {
+    try {
+      final current = await Clipboard.getData(Clipboard.kTextPlain);
+      if (current?.text == copiedValue) {
+        await Clipboard.setData(const ClipboardData(text: ''));
+      }
+    } catch (_) {
+      // Best-effort: if the clipboard can't be read or cleared, leave it.
+    }
+  });
+}
+
 void _addIdentity(String pubkeyHex, String privkeyHex) {
   final identity = Identity(
     pubkeyHex: pubkeyHex,
@@ -197,11 +216,12 @@ Future<void> _showNsec(BuildContext context, Identity identity) async {
               );
               return;
             }
+            _scheduleClipboardClear(nsec);
             messenger.showSnackBar(
-              const SnackBar(
+              SnackBar(
                 content: Text(
-                  'Copied private key. Clear your clipboard once you have '
-                  'stored it somewhere safe.',
+                  'Copied private key. It will be cleared from the '
+                  'clipboard in ${nsecClipboardClearDelay.inSeconds}s.',
                 ),
               ),
             );

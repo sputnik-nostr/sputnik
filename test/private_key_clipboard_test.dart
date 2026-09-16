@@ -3,14 +3,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sputnik/main.dart';
+import 'package:sputnik/screens/identities_screen.dart';
 
 void main() {
   late List<String> copied;
   late bool failCopy;
+  late String? clipboardText;
 
   setUp(() {
     copied = [];
     failCopy = false;
+    clipboardText = null;
     notesNotifier.value = const [];
     identitiesNotifier.value = const [];
     activeIdentityPubkeyNotifier.value = null;
@@ -21,7 +24,13 @@ void main() {
             if (failCopy) {
               throw PlatformException(code: 'clipboard-unavailable');
             }
-            copied.add((call.arguments as Map)['text'] as String);
+            final text = (call.arguments as Map)['text'] as String;
+            copied.add(text);
+            clipboardText = text;
+            return null;
+          }
+          if (call.method == 'Clipboard.getData') {
+            return {'text': clipboardText};
           }
           return null;
         });
@@ -61,6 +70,10 @@ void main() {
     expect(copied, hasLength(1));
     expect(copied.single, startsWith('nsec1'));
     expect(find.textContaining('Copied private key'), findsOneWidget);
+
+    // Let the pending clear timer run out within the test's fake clock.
+    await tester.pump(nsecClipboardClearDelay);
+    await tester.pumpAndSettle();
   });
 
   testWidgets('a failed copy is reported instead of claimed as success', (
@@ -77,7 +90,7 @@ void main() {
     expect(find.textContaining('Copied private key'), findsNothing);
   });
 
-  testWidgets('the app does not promise to clear the clipboard', (
+  testWidgets('the clipboard is cleared automatically after copying', (
     tester,
   ) async {
     await revealPrivateKey(tester);
@@ -85,6 +98,28 @@ void main() {
     await tester.tap(find.text('Copy'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('clears in'), findsNothing);
+    expect(find.textContaining('cleared from the'), findsOneWidget);
+    expect(clipboardText, startsWith('nsec1'));
+
+    await tester.pump(nsecClipboardClearDelay);
+    await tester.pumpAndSettle();
+
+    expect(clipboardText, isEmpty);
+  });
+
+  testWidgets('a clipboard overwritten by something else is left alone', (
+    tester,
+  ) async {
+    await revealPrivateKey(tester);
+
+    await tester.tap(find.text('Copy'));
+    await tester.pumpAndSettle();
+
+    clipboardText = 'something else the user copied';
+
+    await tester.pump(nsecClipboardClearDelay);
+    await tester.pumpAndSettle();
+
+    expect(clipboardText, 'something else the user copied');
   });
 }
