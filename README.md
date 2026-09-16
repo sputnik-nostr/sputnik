@@ -1,12 +1,13 @@
 # sputnik
 
-A minimal, cross-platform Nostr client. Highly WIP.
+A minimal, cross-platform Nostr client. WIP.
 
 ## Features
 
+- Privacy-focused
 - Not bloated (compared to other clients)
-- Reasonably good performance
-- Support for [payment targets](https://github.com/nostr-protocol/nips/blob/master/A3.md)
+- Very good performance
+- Support for [a reasonable number of NIPs](./docs/NIPS.md)
 - Licensed under MIT
 
 ## Screenshots
