@@ -35,6 +35,18 @@ void main() {
     ]);
   });
 
+  test('normalizes ticker aliases to their NIP-A3 canonical type', () {
+    final event = _eventWithTags([
+      ['payto', 'xmr', 'monero-address'],
+      ['payto', 'BTC', 'bitcoin-address'],
+    ]);
+
+    expect(paymentTargetsFromEvent(event), [
+      const NostrPaymentTarget(type: 'monero', address: 'monero-address'),
+      const NostrPaymentTarget(type: 'bitcoin', address: 'bitcoin-address'),
+    ]);
+  });
+
   test('builds a direct URI for widely deployed schemes', () {
     const target = NostrPaymentTarget(
       type: 'bitcoin',

@@ -3,24 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../nostr/models/nostr_payment_target.dart';
+import '../nostr/models/payment_target_types.dart';
 import '../nostr/nip19.dart';
 import '../theme/app_text_styles.dart';
 
-const _tickers = <String, String>{
-  'bitcoin': 'BTC',
-  'lightning': 'LN',
-  'bip352': 'BTC',
-  'bip353': 'BTC',
-  'bitcoincash': 'BCH',
-  'litecoin': 'LTC',
-  'monero': 'XMR',
-  'ethereum': 'ETH',
-  'zcash': 'ZEC',
-  'nano': 'NANO',
-  'solana': 'SOL',
-  'tron': 'TRX',
-};
-
+// Kept separate from PaymentTargetTypeInfo since Color is a UI concern and
+// the model layer stays Flutter-free.
 const _brandColors = <String, Color>{
   'bitcoin': Color(0xFFF7931A),
   'lightning': Color(0xFFF7931A),
@@ -40,47 +28,24 @@ const _brandColors = <String, Color>{
   'cashme': Color(0xFF00D632),
 };
 
-const _displayNames = <String, String>{
-  'bitcoin': 'Bitcoin',
-  'lightning': 'Lightning',
-  'bip352': 'BIP-352',
-  'bip353': 'BIP-353',
-  'bitcoincash': 'Bitcoin Cash',
-  'litecoin': 'Litecoin',
-  'monero': 'Monero',
-  'ethereum': 'Ethereum',
-  'zcash': 'Zcash',
-  'nano': 'Nano',
-  'solana': 'Solana',
-  'tron': 'Tron',
-  'paypal': 'PayPal',
-  'venmo': 'Venmo',
-  'revolut': 'Revolut',
-  'cashme': 'CashMe',
-};
-
-const _typeDescriptions = <String, String>{
-  'bip352': 'Silent payments',
-  'bip353': 'DNS addresses',
-  'cashme': 'Cash App cashtag',
-};
-
-String _ticker(String type) => _tickers[type] ?? type.toUpperCase();
+String _ticker(String type) =>
+    paymentTargetTypes[type]?.ticker ?? type.toUpperCase();
 
 // Proper-noun currency names stay capitalized even mid-sentence.
 String _displayName(String type) =>
-    _displayNames[type] ??
+    paymentTargetTypes[type]?.displayName ??
     (type.isEmpty ? type : type[0].toUpperCase() + type.substring(1));
 
 // All types the app recognizes, for the "hide address types" setting.
-final knownPaymentTargetTypes = _displayNames.keys.toList();
+final knownPaymentTargetTypes = paymentTargetTypes.keys.toList();
 
 String paymentTargetTypeDisplayName(String type) => _displayName(type);
 
 // A hint under a type's display name: its ticker, or a short description.
 String? paymentTargetTypeSubtitle(String type) {
-  final description = _typeDescriptions[type];
-  final ticker = _tickers[type];
+  final info = paymentTargetTypes[type];
+  final description = info?.description;
+  final ticker = info?.ticker;
   if (description == null) return ticker;
   return ticker == null ? description : '$description ($ticker)';
 }
