@@ -30,15 +30,17 @@
 
 ## Other things:
 
-- [ ] Make sure crypto logic is secure
 - [x] Fix build on Android with crypto libraries
-- [ ] Add desktop support for macOS
-- [ ] Rewrite doc comments
 - [x] Rewrite unit tests, improve coverage
 - [x] Show follow buttons directly in a followers/following/reactions list
-- [ ] Let editing a profile cover more fields than name/bio (picture, banner, NIP-05, website)
 - [x] Add an option to hide specific crypto address types from being shown on a profile
+- [ ] Make sure crypto logic is secure
+- [ ] Add desktop support for macOS
+- [ ] Rewrite doc comments
+- [ ] Let editing a profile cover more fields than name/bio (picture, banner, NIP-05, website)
 - [ ] Add an option to hide/show client ID string
+- [ ] Add payment targets support for Zano and Firo
+- [ ] Have some visual indication that there are more payment target chips to scroll to
 
 # Ideas to improve performance
 
