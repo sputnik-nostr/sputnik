@@ -273,24 +273,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               if (bannerUrl != null && loadMediaNotifier.value)
                                 Image(
-                                  image: ResizeImage(
-                                    NetworkImage(bannerUrl),
-                                    width:
-                                        (MediaQuery.sizeOf(context).width *
-                                                MediaQuery.devicePixelRatioOf(
-                                                  context,
-                                                ))
-                                            .round()
-                                            .clamp(1, 4096),
-                                    height:
-                                        (_bannerHeight *
-                                                MediaQuery.devicePixelRatioOf(
-                                                  context,
-                                                ))
-                                            .round()
-                                            .clamp(1, 4096),
-                                    policy: ResizeImagePolicy.fit,
-                                  ),
+                                  image: NetworkImage(bannerUrl),
                                   fit: BoxFit.cover,
                                   frameBuilder:
                                       (
@@ -375,6 +358,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               : null,
                           child: FadeInAvatar(
                             radius: _avatarRadius,
+                            highQuality: true,
                             imageUrl: pictureUrl,
                             backgroundColor: theme.colorScheme.primaryContainer,
                             fallback: Text(
