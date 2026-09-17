@@ -11,9 +11,10 @@ class RelayPaymentTargetsRepository {
 
   Future<List<NostrPaymentTarget>> fetchPaymentTargets(
     String pubkeyHex,
-    Set<String> relayUrls,
-  ) async {
-    if (CacheStore.isPaymentTargetsFresh(pubkeyHex)) {
+    Set<String> relayUrls, {
+    bool force = false,
+  }) async {
+    if (!force && CacheStore.isPaymentTargetsFresh(pubkeyHex)) {
       final cached = CacheStore.getPaymentTargets(pubkeyHex);
       if (cached != null) return cached;
     }

@@ -100,13 +100,20 @@ class SettingsScreen extends StatelessWidget {
                   inputDecorationTheme: InputDecorationTheme(
                     filled: true,
                     fillColor: WidgetStateColor.resolveWith((states) {
+                      final colorScheme = Theme.of(context).colorScheme;
+                      final base = colorScheme.surfaceContainerHighest;
                       if (states.contains(WidgetState.hovered)) {
-                        return Theme.of(context).colorScheme.onSurface
-                            .withValues(alpha: 0.08);
+                        return Color.alphaBlend(
+                          colorScheme.onSurface.withValues(alpha: 0.08),
+                          base,
+                        );
                       }
-                      return Colors.transparent;
+                      return base;
                     }),
-                    border: const OutlineInputBorder(),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   ),

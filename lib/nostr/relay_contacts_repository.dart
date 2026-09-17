@@ -26,9 +26,10 @@ class RelayContactsRepository {
   // The pubkeys a person follows, read from their own kind:3 contact list.
   Future<List<String>> fetchFollowing(
     String pubkeyHex,
-    Set<String> relayUrls,
-  ) async {
-    if (CacheStore.isFollowingFresh(pubkeyHex)) {
+    Set<String> relayUrls, {
+    bool force = false,
+  }) async {
+    if (!force && CacheStore.isFollowingFresh(pubkeyHex)) {
       final cached = CacheStore.getFollowing(pubkeyHex);
       if (cached != null) return cached;
     }
@@ -56,14 +57,15 @@ class RelayContactsRepository {
   // pubkey.
   Future<List<String>> fetchFollowers(
     String pubkeyHex,
-    Set<String> relayUrls,
-  ) async {
-    if (CacheStore.isFollowersFresh(pubkeyHex)) {
+    Set<String> relayUrls, {
+    bool force = false,
+  }) async {
+    if (!force && CacheStore.isFollowersFresh(pubkeyHex)) {
       final cached = CacheStore.getFollowers(pubkeyHex);
       if (cached != null) return cached;
     }
 
-    final events = await client.query(
+    final tagged = await client.query(
       relayUrls,
       NostrFilter(
         kinds: const [3],
@@ -73,15 +75,30 @@ class RelayContactsRepository {
         limit: 500,
       ),
     );
-    if (events.isEmpty) return const <String>[];
-    events.sort(compareNewestFirst);
+    if (tagged.isEmpty) return const <String>[];
+
+    final candidates = {
+      for (final event in tagged)
+        if (event.kind == 3) event.pubkey,
+    };
+    if (candidates.isEmpty) return const <String>[];
+
+    final latestEventsByChunk = await Future.wait(
+      chunkedAuthors(candidates.toList()).map(
+        (chunk) => client.query(
+          relayUrls,
+          NostrFilter(kinds: const [3], authors: chunk),
+        ),
+      ),
+    );
+    final latestEvents = latestEventsByChunk.expand((events) => events).toList()
+      ..sort(compareNewestFirst);
 
     final latestByAuthor = <String, NostrEvent>{};
-    for (final event in events) {
+    for (final event in latestEvents) {
       if (event.kind != 3) continue;
       latestByAuthor.putIfAbsent(event.pubkey, () => event);
     }
-    if (latestByAuthor.isEmpty) return const <String>[];
 
     final subject = pubkeyHex.toLowerCase();
     final followers = [
@@ -89,9 +106,7 @@ class RelayContactsRepository {
         if (_followedPubkeys(event).contains(subject)) event.pubkey,
     ];
 
-    if (followers.isNotEmpty) {
-      await CacheStore.putFollowers(pubkeyHex, followers);
-    }
+    await CacheStore.putFollowers(pubkeyHex, followers);
     return followers;
   }
 
