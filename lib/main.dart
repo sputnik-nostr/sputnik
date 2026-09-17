@@ -45,6 +45,10 @@ final ValueNotifier<String?> activeIdentityPubkeyNotifier = ValueNotifier(null);
 
 final ValueNotifier<bool> loadMediaNotifier = ValueNotifier(true);
 
+// Payment target types (e.g. "monero") to hide on every profile.
+final ValueNotifier<Set<String>> hiddenPaymentTargetTypesNotifier =
+    ValueNotifier(const {});
+
 // The active identity's own following list, shared across every screen.
 final ValueNotifier<Set<String>?> myFollowingNotifier = ValueNotifier(null);
 
@@ -93,6 +97,11 @@ Future<void> main() async {
     SettingsStore.loadLoadMedia,
     SettingsStore.saveLoadMedia,
   );
+  final hiddenPaymentTargetTypesBound = bindPersisted(
+    hiddenPaymentTargetTypesNotifier,
+    SettingsStore.loadHiddenPaymentTargetTypes,
+    SettingsStore.saveHiddenPaymentTargetTypes,
+  );
 
   await cacheInit;
   await themeModeBound;
@@ -102,6 +111,7 @@ Future<void> main() async {
   await identitiesBound;
   await activeIdentityPubkeyBound;
   await loadMediaBound;
+  await hiddenPaymentTargetTypesBound;
 
   await bindPersisted(
     selectedRelaysNotifier,

@@ -56,4 +56,23 @@ void main() {
     expect(copied, target.address);
     expect(find.text('Copied Bitcoin address to clipboard'), findsOneWidget);
   });
+
+  group('paymentTargetTypeSubtitle', () {
+    test('a plain currency type just shows its ticker', () {
+      expect(paymentTargetTypeSubtitle('monero'), 'XMR');
+    });
+
+    test('a name that hides the underlying currency adds a description', () {
+      expect(paymentTargetTypeSubtitle('bip352'), 'Silent payments (BTC)');
+      expect(paymentTargetTypeSubtitle('bip353'), 'DNS addresses (BTC)');
+    });
+
+    test('a fiat service with no ticker shows only its description', () {
+      expect(paymentTargetTypeSubtitle('cashme'), 'Cash App cashtag');
+    });
+
+    test('a type with neither a ticker nor a description has no subtitle', () {
+      expect(paymentTargetTypeSubtitle('paypal'), isNull);
+    });
+  });
 }

@@ -81,6 +81,7 @@ class SettingsStore {
   static const _activeIdentityPubkeyKey = 'active_identity_pubkey';
   static const _identitySecretPrefix = 'identity_secret_';
   static const _loadMediaKey = 'load_media';
+  static const _hiddenPaymentTargetTypesKey = 'hidden_payment_target_types';
 
   // Backs the identity index and each identity's private key.
   @visibleForTesting
@@ -251,5 +252,15 @@ class SettingsStore {
   static Future<void> saveLoadMedia(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_loadMediaKey, value);
+  }
+
+  static Future<Set<String>> loadHiddenPaymentTargetTypes() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (prefs.getStringList(_hiddenPaymentTargetTypesKey) ?? []).toSet();
+  }
+
+  static Future<void> saveHiddenPaymentTargetTypes(Set<String> types) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_hiddenPaymentTargetTypesKey, types.toList());
   }
 }

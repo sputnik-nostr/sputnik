@@ -11,6 +11,7 @@ class NostrMetadata {
     this.banner,
     this.nip05,
     this.website,
+    this.legacyMoneroAddress,
   });
 
   factory NostrMetadata.fromContent(String content) {
@@ -25,6 +26,15 @@ class NostrMetadata {
       return value == null ? null : sanitizeUtf16(value);
     }
 
+    // Non-standard fields some clients use instead of a NIP-A3 payto tag.
+    String? legacyMoneroAddress() {
+      final direct = text('xmr') ?? text('monero_address');
+      if (direct != null) return direct;
+      final addresses = json['cryptocurrency_addresses'];
+      final nested = addresses is Map ? addresses['monero'] : null;
+      return nested is String ? sanitizeUtf16(nested) : null;
+    }
+
     return NostrMetadata(
       name: text('name'),
       displayName: text('display_name') ?? text('displayName'),
@@ -33,6 +43,7 @@ class NostrMetadata {
       banner: string('banner'),
       nip05: string('nip05'),
       website: string('website'),
+      legacyMoneroAddress: legacyMoneroAddress(),
     );
   }
 
@@ -50,6 +61,7 @@ class NostrMetadata {
       banner: string('banner'),
       nip05: string('nip05'),
       website: string('website'),
+      legacyMoneroAddress: string('legacyMoneroAddress'),
     );
   }
 
@@ -60,6 +72,7 @@ class NostrMetadata {
   final String? banner;
   final String? nip05;
   final String? website;
+  final String? legacyMoneroAddress;
 
   String? get resolvedName {
     final trimmedDisplayName = displayName?.trim();
@@ -80,6 +93,8 @@ class NostrMetadata {
       if (banner != null) 'banner': banner,
       if (nip05 != null) 'nip05': nip05,
       if (website != null) 'website': website,
+      if (legacyMoneroAddress != null)
+        'legacyMoneroAddress': legacyMoneroAddress,
     };
   }
 
@@ -114,6 +129,7 @@ class NostrMetadata {
       banner: banner ?? this.banner,
       nip05: nip05 ?? this.nip05,
       website: website ?? this.website,
+      legacyMoneroAddress: legacyMoneroAddress,
     );
   }
 }

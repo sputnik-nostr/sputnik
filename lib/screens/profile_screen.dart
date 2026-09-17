@@ -188,10 +188,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
           notesNotifier,
           activeIdentityPubkeyNotifier,
           loadMediaNotifier,
+          hiddenPaymentTargetTypesNotifier,
         ]),
         builder: (context, child) {
           final metadata = profileCacheNotifier.value[pubkeyHex];
           final notes = notesNotifier.value;
+          final legacyMonero = metadata?.legacyMoneroAddress;
+          final paymentTargets = [
+            ...?_paymentTargets,
+            if (legacyMonero != null &&
+                (_paymentTargets ?? const []).every((t) => t.type != 'monero'))
+              NostrPaymentTarget(type: 'monero', address: legacyMonero),
+          ];
+          final visiblePaymentTargets = paymentTargets
+              .where(
+                (target) => !hiddenPaymentTargetTypesNotifier.value.contains(
+                  target.type,
+                ),
+              )
+              .toList();
           final ownNotesById = <String, Note>{
             for (final note in (notes ?? const []))
               if (note.pubkey == pubkeyHex) note.id: note,
@@ -471,14 +486,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ],
                     ),
-                    if (_paymentTargets != null &&
-                        _paymentTargets!.isNotEmpty) ...[
+                    if (visiblePaymentTargets.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          for (final target in _paymentTargets!)
+                          for (final target in visiblePaymentTargets)
                             PaymentTargetChip(target: target),
                         ],
                       ),

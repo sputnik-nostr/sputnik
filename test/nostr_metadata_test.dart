@@ -34,4 +34,53 @@ void main() {
     expect(metadata.nip05, isNull);
     expect(metadata.about, isNull);
   });
+
+  group('legacyMoneroAddress (non-standard, not part of any NIP)', () {
+    test('reads a bare "xmr" field', () {
+      final metadata = NostrMetadata.fromContent('{"xmr": "4Aaddress"}');
+      expect(metadata.legacyMoneroAddress, '4Aaddress');
+    });
+
+    test('falls back to "monero_address" when "xmr" is absent', () {
+      final metadata = NostrMetadata.fromContent(
+        '{"monero_address": "4Baddress"}',
+      );
+      expect(metadata.legacyMoneroAddress, '4Baddress');
+    });
+
+    test('falls back to cryptocurrency_addresses.monero last', () {
+      final metadata = NostrMetadata.fromContent(
+        '{"cryptocurrency_addresses": {"monero": "4Caddress"}}',
+      );
+      expect(metadata.legacyMoneroAddress, '4Caddress');
+    });
+
+    test('prefers "xmr" over the other two when several are present', () {
+      final metadata = NostrMetadata.fromContent(
+        '{"xmr": "4Aaddress", "monero_address": "4Baddress", '
+        '"cryptocurrency_addresses": {"monero": "4Caddress"}}',
+      );
+      expect(metadata.legacyMoneroAddress, '4Aaddress');
+    });
+
+    test('is null when none of the fields are present', () {
+      final metadata = NostrMetadata.fromContent('{"name": "alice"}');
+      expect(metadata.legacyMoneroAddress, isNull);
+    });
+
+    test('is never included in the published event content', () {
+      final metadata = NostrMetadata.fromContent('{"xmr": "4Aaddress"}');
+      expect(metadata.toEventContent().containsKey('xmr'), isFalse);
+      expect(
+        metadata.toEventContent().containsKey('legacyMoneroAddress'),
+        isFalse,
+      );
+    });
+
+    test('round-trips through the local cache format', () {
+      final metadata = NostrMetadata.fromContent('{"xmr": "4Aaddress"}');
+      final restored = NostrMetadata.fromJson(metadata.toJson());
+      expect(restored.legacyMoneroAddress, '4Aaddress');
+    });
+  });
 }

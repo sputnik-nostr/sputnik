@@ -6,6 +6,7 @@ import '../models/identity.dart';
 import '../models/relay.dart';
 import '../services/cache_store.dart';
 import 'identities_screen.dart';
+import 'payment_target_types_screen.dart';
 import 'relays_screen.dart';
 
 Future<void> _confirmClearCache(BuildContext context) async {
@@ -46,8 +47,9 @@ Future<void> _confirmResetPreferences(BuildContext context) async {
     builder: (context) => AlertDialog(
       title: const Text('Reset preferences?'),
       content: const Text(
-        'This resets the theme, theme color, and relay selection back to '
-        'their defaults. Identities and bookmarks are not affected.',
+        'This resets the theme, theme color, relay selection, media '
+        'loading, and payment target visibility back to their defaults. '
+        'Identities and bookmarks are not affected.',
       ),
       actions: [
         TextButton(
@@ -66,6 +68,8 @@ Future<void> _confirmResetPreferences(BuildContext context) async {
   themeModeNotifier.value = ThemeMode.system;
   seedColorNotifier.value = AppSeedColor.blue;
   selectedRelaysNotifier.value = defaultRelays.toSet();
+  loadMediaNotifier.value = true;
+  hiddenPaymentTargetTypesNotifier.value = const {};
 
   if (context.mounted) {
     ScaffoldMessenger.of(context)
@@ -172,6 +176,30 @@ class SettingsScreen extends StatelessWidget {
                     ),
                     value: loadMedia,
                     onChanged: (value) => loadMediaNotifier.value = value,
+                  );
+                },
+              ),
+              ValueListenableBuilder<Set<String>>(
+                valueListenable: hiddenPaymentTargetTypesNotifier,
+                builder: (context, hidden, _) {
+                  return ListTile(
+                    key: const Key('paymentTargetTypesCard'),
+                    leading: const Icon(Icons.account_balance_wallet_outlined),
+                    title: const Text('Payment targets'),
+                    subtitle: Text(
+                      hidden.isEmpty
+                          ? 'All types shown'
+                          : '${hidden.length} type'
+                                '${hidden.length == 1 ? '' : 's'} hidden',
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PaymentTargetTypesScreen(),
+                        ),
+                      );
+                    },
                   );
                 },
               ),

@@ -22,16 +22,35 @@ class _FakeSecretStore implements SecretStore {
 }
 
 class _FakeRelayClient extends RelayClient {
-  _FakeRelayClient({this.publishOutcome = RelayPublishOutcome.accepted});
+  _FakeRelayClient({
+    this.publishOutcome = RelayPublishOutcome.accepted,
+    this.paymentTargetTags = const [],
+  });
 
   final RelayPublishOutcome publishOutcome;
+  final List<List<String>> paymentTargetTags;
   NostrEvent? lastPublished;
 
   @override
   Future<List<NostrEvent>> query(
     Set<String> relayUrls,
     NostrFilter filter,
-  ) async => const [];
+  ) async {
+    if (filter.kinds?.contains(10133) != true) return const [];
+    final author = filter.authors?.first;
+    if (author == null || paymentTargetTags.isEmpty) return const [];
+    return [
+      NostrEvent(
+        id: 'id',
+        pubkey: author,
+        createdAt: DateTime.now(),
+        kind: 10133,
+        tags: paymentTargetTags,
+        content: '',
+        sig: 'sig',
+      ),
+    ];
+  }
 
   @override
   Future<Map<String, RelayPublishResult>> publish(
@@ -57,6 +76,8 @@ void main() {
     activeIdentityPubkeyNotifier.value = null;
     selectedRelaysNotifier.value = {'wss://relay.example'};
     myFollowingNotifier.value = null;
+    hiddenPaymentTargetTypesNotifier.value = const {};
+    profileCacheNotifier.value = const {};
   });
 
   testWidgets('with no active identity, shows a prompt instead of a profile', (
@@ -96,6 +117,108 @@ void main() {
 
     expect(find.byKey(const Key('followButton')), findsNothing);
   });
+
+  testWidgets('a hidden payment target type is not shown on a profile', (
+    tester,
+  ) async {
+    hiddenPaymentTargetTypesNotifier.value = {'monero'};
+    final fakeClient = _FakeRelayClient(
+      paymentTargetTags: [
+        ['payto', 'bitcoin', 'bc1qexample'],
+        ['payto', 'monero', '4Aexample'],
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ProfileScreen(pubkeyHex: 'b' * 64, relayClient: fakeClient),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(Key('paymentTarget_bitcoin_bc1qexample')),
+      findsOneWidget,
+    );
+    expect(find.byKey(Key('paymentTarget_monero_4Aexample')), findsNothing);
+  });
+
+  testWidgets(
+    'a legacy monero field in profile metadata fills in when no payto tag '
+    'covers it',
+    (tester) async {
+      final pubkeyHex = 'b' * 64;
+      profileCacheNotifier.value = {
+        pubkeyHex: const NostrMetadata(legacyMoneroAddress: '4Alegacy'),
+      };
+      final fakeClient = _FakeRelayClient(
+        paymentTargetTags: [
+          ['payto', 'bitcoin', 'bc1qexample'],
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProfileScreen(pubkeyHex: pubkeyHex, relayClient: fakeClient),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(Key('paymentTarget_bitcoin_bc1qexample')),
+        findsOneWidget,
+      );
+      expect(find.byKey(Key('paymentTarget_monero_4Alegacy')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a real payto monero tag takes priority over the legacy metadata field',
+    (tester) async {
+      final pubkeyHex = 'b' * 64;
+      profileCacheNotifier.value = {
+        pubkeyHex: const NostrMetadata(legacyMoneroAddress: '4Alegacy'),
+      };
+      final fakeClient = _FakeRelayClient(
+        paymentTargetTags: [
+          ['payto', 'monero', '4Areal'],
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProfileScreen(pubkeyHex: pubkeyHex, relayClient: fakeClient),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(Key('paymentTarget_monero_4Areal')), findsOneWidget);
+      expect(find.byKey(Key('paymentTarget_monero_4Alegacy')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'hiding the monero type also hides the legacy metadata fallback',
+    (tester) async {
+      hiddenPaymentTargetTypesNotifier.value = {'monero'};
+      final pubkeyHex = 'b' * 64;
+      profileCacheNotifier.value = {
+        pubkeyHex: const NostrMetadata(legacyMoneroAddress: '4Alegacy'),
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProfileScreen(
+            pubkeyHex: pubkeyHex,
+            relayClient: _FakeRelayClient(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(Key('paymentTarget_monero_4Alegacy')), findsNothing);
+    },
+  );
 
   group('follow button', () {
     late Identity identity;

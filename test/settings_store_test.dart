@@ -133,4 +133,21 @@ void main() {
 
     expect(await SettingsStore.loadLoadMedia(), isFalse);
   });
+
+  test('hidden payment target types default to none hidden', () async {
+    SharedPreferences.setMockInitialValues({});
+
+    expect(await SettingsStore.loadHiddenPaymentTargetTypes(), isEmpty);
+  });
+
+  test('hidden payment target types persist once saved', () async {
+    SharedPreferences.setMockInitialValues({});
+
+    await SettingsStore.saveHiddenPaymentTargetTypes({'monero', 'paypal'});
+
+    expect(await SettingsStore.loadHiddenPaymentTargetTypes(), {
+      'monero',
+      'paypal',
+    });
+  });
 }

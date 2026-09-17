@@ -59,12 +59,31 @@ const _displayNames = <String, String>{
   'cashme': 'CashMe',
 };
 
+const _typeDescriptions = <String, String>{
+  'bip352': 'Silent payments',
+  'bip353': 'DNS addresses',
+  'cashme': 'Cash App cashtag',
+};
+
 String _ticker(String type) => _tickers[type] ?? type.toUpperCase();
 
 // Proper-noun currency names stay capitalized even mid-sentence.
 String _displayName(String type) =>
     _displayNames[type] ??
     (type.isEmpty ? type : type[0].toUpperCase() + type.substring(1));
+
+// All types the app recognizes, for the "hide address types" setting.
+final knownPaymentTargetTypes = _displayNames.keys.toList();
+
+String paymentTargetTypeDisplayName(String type) => _displayName(type);
+
+// A hint under a type's display name: its ticker, or a short description.
+String? paymentTargetTypeSubtitle(String type) {
+  final description = _typeDescriptions[type];
+  final ticker = _tickers[type];
+  if (description == null) return ticker;
+  return ticker == null ? description : '$description ($ticker)';
+}
 
 class PaymentTargetChip extends StatelessWidget {
   const PaymentTargetChip({super.key, required this.target});
