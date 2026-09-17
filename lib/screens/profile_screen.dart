@@ -22,6 +22,8 @@ import 'image_viewer_screen.dart';
 import 'users_list_screen.dart';
 
 const _bannerHeight = 140.0 * 0.8;
+const _bannerMaxDecodeExtent = 1600;
+const _avatarMinDecodeExtent = 400;
 const _avatarRadius = 40.0;
 const _avatarOverlap = _avatarRadius * 2 * 0.25;
 const _avatarInitialFontSize = _avatarRadius * 0.7;
@@ -273,7 +275,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               if (bannerUrl != null && loadMediaNotifier.value)
                                 Image(
-                                  image: NetworkImage(bannerUrl),
+                                  image: ResizeImage(
+                                    NetworkImage(bannerUrl),
+                                    width: _bannerMaxDecodeExtent,
+                                    height: _bannerMaxDecodeExtent,
+                                    policy: ResizeImagePolicy.fit,
+                                  ),
                                   fit: BoxFit.cover,
                                   frameBuilder:
                                       (
@@ -358,7 +365,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               : null,
                           child: FadeInAvatar(
                             radius: _avatarRadius,
-                            highQuality: true,
+                            minDecodeExtent: _avatarMinDecodeExtent,
                             imageUrl: pictureUrl,
                             backgroundColor: theme.colorScheme.primaryContainer,
                             fallback: Text(

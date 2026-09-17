@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../main.dart';
@@ -15,7 +17,7 @@ class FadeInAvatar extends StatefulWidget {
     required this.backgroundColor,
     required this.fallback,
     this.radius = 20,
-    this.highQuality = false,
+    this.minDecodeExtent,
   });
 
   final String? imageUrl;
@@ -23,7 +25,11 @@ class FadeInAvatar extends StatefulWidget {
   final Widget fallback;
   final double radius;
 
-  final bool highQuality;
+  // Raises the decode resolution above what the widget's own on-screen size
+  // would need, for placements (e.g. the profile page) that want a sharper
+  // result than a low-DPI display's native pixels, short of full source
+  // resolution.
+  final int? minDecodeExtent;
 
   @override
   State<FadeInAvatar> createState() => _FadeInAvatarState();
@@ -54,8 +60,11 @@ class _FadeInAvatarState extends State<FadeInAvatar> {
   @override
   Widget build(BuildContext context) {
     final diameter = widget.radius * 2;
-    final decodeExtent = (diameter * MediaQuery.devicePixelRatioOf(context))
-        .round();
+    final sizeMatchedExtent =
+        (diameter * MediaQuery.devicePixelRatioOf(context)).round();
+    final decodeExtent = widget.minDecodeExtent == null
+        ? sizeMatchedExtent
+        : math.max(sizeMatchedExtent, widget.minDecodeExtent!);
 
     return ClipOval(
       child: SizedBox(
@@ -82,14 +91,12 @@ class _FadeInAvatarState extends State<FadeInAvatar> {
                   return const SizedBox.shrink();
                 }
                 return Image(
-                  image: widget.highQuality
-                      ? NetworkImage(url)
-                      : ResizeImage(
-                          NetworkImage(url),
-                          width: decodeExtent,
-                          height: decodeExtent,
-                          policy: ResizeImagePolicy.fit,
-                        ),
+                  image: ResizeImage(
+                    NetworkImage(url),
+                    width: decodeExtent,
+                    height: decodeExtent,
+                    policy: ResizeImagePolicy.fit,
+                  ),
                   fit: BoxFit.cover,
                   frameBuilder:
                       (context, child, frame, wasSynchronouslyLoaded) {
