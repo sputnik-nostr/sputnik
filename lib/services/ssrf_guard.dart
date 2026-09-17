@@ -18,6 +18,9 @@ bool isBlockedAddress(InternetAddress address) {
   return false;
 }
 
+int effectivePort(Uri url) =>
+    url.port != 0 ? url.port : (url.scheme == 'https' ? 443 : 80);
+
 Future<ConnectionTask<Socket>> guardedConnectionFactory(
   Uri url,
   String? proxyHost,
@@ -35,7 +38,7 @@ Future<ConnectionTask<Socket>> guardedConnectionFactory(
     throw SocketException('No public address found for ${url.host}');
   }
 
-  final rawTask = await Socket.startConnect(address, url.port);
+  final rawTask = await Socket.startConnect(address, effectivePort(url));
   if (url.scheme != 'https') return rawTask;
 
   // connectionFactory doesn't wrap https in TLS itself.

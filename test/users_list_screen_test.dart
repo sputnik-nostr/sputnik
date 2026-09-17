@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -6,6 +8,7 @@ import 'package:sputnik/models/identity.dart';
 import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/screens/users_list_screen.dart';
 import 'package:sputnik/services/settings_store.dart';
+import 'package:sputnik/widgets/follow_button.dart';
 
 class _FakeSecretStore implements SecretStore {
   final _values = <String, String>{};
@@ -25,6 +28,7 @@ class _FakeRelayClient extends RelayClient {
     required this.seckeyHex,
     this.followingTags = const [],
     this.publishOutcome = RelayPublishOutcome.accepted,
+    this.followingQueryGate,
   });
 
   // Used to self-sign the active identity's own kind:3 event returned from
@@ -36,6 +40,9 @@ class _FakeRelayClient extends RelayClient {
   final RelayPublishOutcome publishOutcome;
   NostrEvent? lastPublished;
 
+  // When set, delays the kind:3 query until this completes.
+  final Completer<void>? followingQueryGate;
+
   @override
   Future<List<NostrEvent>> query(
     Set<String> relayUrls,
@@ -44,6 +51,7 @@ class _FakeRelayClient extends RelayClient {
     if (filter.kinds?.contains(3) != true) return const [];
     final author = filter.authors?.first;
     if (author == null) return const [];
+    if (followingQueryGate != null) await followingQueryGate!.future;
     return [
       signEvent(
         seckeyHex: seckeyHex,
@@ -67,6 +75,12 @@ class _FakeRelayClient extends RelayClient {
   }
 }
 
+// The follow-sync background loop debounces before publishing.
+Future<void> _settleFollowSync(WidgetTester tester) async {
+  await tester.pump(const Duration(milliseconds: 600));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   late Identity identity;
   late String seckeyHex;
@@ -84,6 +98,7 @@ void main() {
     activeIdentityPubkeyNotifier.value = identity.pubkeyHex;
     selectedRelaysNotifier.value = {'wss://relay.example'};
     profileCacheNotifier.value = const {};
+    myFollowingNotifier.value = null;
 
     SettingsStore.secretStore = _FakeSecretStore();
     await SettingsStore.savePrivateKey(
@@ -141,7 +156,13 @@ void main() {
     expect(find.text('Follow'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('followButton')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+
+    // Flips instantly, before the debounced publish even fires.
+    expect(find.text('Following'), findsOneWidget);
+    expect(fakeClient.lastPublished, isNull);
+
+    await _settleFollowSync(tester);
 
     expect(fakeClient.lastPublished, isNotNull);
     expect(fakeClient.lastPublished!.tags, [
@@ -150,13 +171,11 @@ void main() {
     expect(find.text('Following'), findsOneWidget);
   });
 
-  testWidgets('a rejected follow reverts the button back to Follow', (
+  testWidgets('a follow made in a list is immediately visible to a fresh '
+      'FollowButton for the same person elsewhere, with no extra fetch', (
     tester,
   ) async {
-    final fakeClient = _FakeRelayClient(
-      seckeyHex: seckeyHex,
-      publishOutcome: RelayPublishOutcome.rejected,
-    );
+    final fakeClient = _FakeRelayClient(seckeyHex: seckeyHex);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -170,12 +189,81 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('followButton')));
-    await tester.pumpAndSettle();
+    await _settleFollowSync(tester);
+    expect(find.text('Following'), findsOneWidget);
 
-    expect(fakeClient.lastPublished, isNotNull);
-    expect(find.text('Follow'), findsOneWidget);
-    expect(find.text('Could not update your follow list'), findsOneWidget);
+    // A fresh FollowButton for the same person, as on a new profile page.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FollowButton(
+            targetPubkeyHex: notFollowedPubkeyHex,
+            relayClient: fakeClient,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Following'), findsOneWidget);
   });
+
+  testWidgets('follow buttons show as Follow immediately, before the '
+      'my-following fetch resolves', (tester) async {
+    final gate = Completer<void>();
+    final fakeClient = _FakeRelayClient(
+      seckeyHex: seckeyHex,
+      followingQueryGate: gate,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: UsersListScreen(
+          title: 'Followers',
+          pubkeys: [followedPubkeyHex, notFollowedPubkeyHex],
+          relayClient: fakeClient,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // Visible immediately, defaulting to Follow, not hidden.
+    expect(find.byKey(const Key('followButton')), findsNWidgets(2));
+    expect(find.text('Follow'), findsNWidgets(2));
+
+    gate.complete();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets(
+    'a rejected follow shows an error but does not revert the button',
+    (tester) async {
+      final fakeClient = _FakeRelayClient(
+        seckeyHex: seckeyHex,
+        publishOutcome: RelayPublishOutcome.rejected,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigatorKey,
+          home: UsersListScreen(
+            title: 'Followers',
+            pubkeys: [notFollowedPubkeyHex],
+            relayClient: fakeClient,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('followButton')));
+      await _settleFollowSync(tester);
+
+      expect(fakeClient.lastPublished, isNotNull);
+      // Not reverted, even though the background publish failed.
+      expect(find.text('Following'), findsOneWidget);
+      expect(find.text('Could not update your follow list'), findsOneWidget);
+    },
+  );
 
   testWidgets('with no active identity, no follow buttons are shown', (
     tester,

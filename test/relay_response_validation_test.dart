@@ -388,6 +388,69 @@ void main() {
     });
   });
 
+  group('follow-list sync (background sync from myFollowingNotifier)', () {
+    final me = generateNostrKeyPair();
+
+    test('publishes exactly the desired set, preserving kept tags and adding '
+        'bare tags for new ones', () async {
+      final client = _RelayReturningAndPublishing([
+        event(
+          pubkey: me.publicKeyHex,
+          kind: 3,
+          tags: [
+            ['p', other, 'wss://their-relay', 'petname'],
+            ['p', victim],
+          ],
+        ),
+      ]);
+      final repository = RelayContactsRepository(client: client);
+
+      // Drop victim, keep other, add attacker.
+      final results = await repository.syncFollowingTo(
+        seckeyHex: me.privateKeyHex,
+        myPubkeyHex: me.publicKeyHex,
+        desiredFollowing: {other, attacker},
+        relayUrls: {'wss://r'},
+      );
+
+      expect(
+        results.values.every((r) => r.outcome == RelayPublishOutcome.accepted),
+        isTrue,
+      );
+      expect(client.lastPublished!.tags, [
+        ['p', other, 'wss://their-relay', 'petname'],
+        ['p', attacker],
+      ]);
+    });
+
+    test(
+      'collapses to a no-op publish when the desired set is unchanged',
+      () async {
+        final client = _RelayReturningAndPublishing([
+          event(
+            pubkey: me.publicKeyHex,
+            kind: 3,
+            tags: [
+              ['p', other],
+            ],
+          ),
+        ]);
+        final repository = RelayContactsRepository(client: client);
+
+        await repository.syncFollowingTo(
+          seckeyHex: me.privateKeyHex,
+          myPubkeyHex: me.publicKeyHex,
+          desiredFollowing: {other},
+          relayUrls: {'wss://r'},
+        );
+
+        expect(client.lastPublished!.tags, [
+          ['p', other],
+        ]);
+      },
+    );
+  });
+
   group('thread replies', () {
     test('drops events that do not reference the post', () async {
       final repository = RelayThreadRepository(

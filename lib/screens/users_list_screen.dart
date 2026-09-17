@@ -34,19 +34,11 @@ class _UsersListScreenState extends State<UsersListScreen> {
   final _pending = <String>{};
   Timer? _debounce;
 
-  // Fetched once for the screen, checked per row.
-  Set<String>? _myFollowing;
-
   @override
   void initState() {
     super.initState();
-    final myPubkeyHex = activeIdentityPubkeyNotifier.value;
-    if (myPubkeyHex == null) return;
     RelayContactsRepository(client: widget.relayClient)
-        .fetchFollowing(myPubkeyHex, selectedRelaysNotifier.value)
-        .then((following) {
-          if (mounted) setState(() => _myFollowing = following.toSet());
-        });
+        .ensureMyFollowingLoaded(selectedRelaysNotifier.value);
   }
 
   void _ensureProfileRequested(String pubkeyHex) {
@@ -95,9 +87,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
                     return ProfileResultTile(
                       pubkeyHex: pubkeyHex,
                       metadata: profileCache[pubkeyHex],
-                      isFollowing: isSelf
-                          ? null
-                          : _myFollowing?.contains(pubkeyHex.toLowerCase()),
+                      showFollowButton: !isSelf && myPubkeyHex != null,
                       relayClient: widget.relayClient,
                     );
                   },

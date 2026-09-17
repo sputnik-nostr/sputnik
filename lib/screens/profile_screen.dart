@@ -60,7 +60,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<String>? _following;
   List<String>? _followers;
   List<NostrPaymentTarget>? _paymentTargets;
-  bool _isFollowing = false;
   String? _checkedNip05Identifier;
   Nip05Status? _nip05Status;
 
@@ -103,7 +102,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadAuthorPosts(pubkeyHex);
     _loadContacts(pubkeyHex);
     _loadPaymentTargets(pubkeyHex);
-    _loadFollowState(pubkeyHex);
+    RelayContactsRepository(client: widget.relayClient)
+        .ensureMyFollowingLoaded(selectedRelaysNotifier.value);
   }
 
   Future<void> _loadAuthorPosts(String pubkeyHex) async {
@@ -146,20 +146,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       client: widget.relayClient,
     ).fetchPaymentTargets(pubkeyHex, selectedRelaysNotifier.value);
     if (mounted) setState(() => _paymentTargets = targets);
-  }
-
-  // Whether the active identity (not the viewed profile) follows them.
-  Future<void> _loadFollowState(String pubkeyHex) async {
-    final myPubkeyHex = activeIdentityPubkeyNotifier.value;
-    if (myPubkeyHex == null || myPubkeyHex == pubkeyHex) return;
-    final myFollowing = await RelayContactsRepository(
-      client: widget.relayClient,
-    ).fetchFollowing(myPubkeyHex, selectedRelaysNotifier.value);
-    if (mounted) {
-      setState(
-        () => _isFollowing = myFollowing.contains(pubkeyHex.toLowerCase()),
-      );
-    }
   }
 
   @override
@@ -352,9 +338,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 padding: EdgeInsets.zero,
                               ),
                             )
+                          : activeIdentityPubkeyNotifier.value == null
+                          ? const SizedBox.shrink()
                           : FollowButton(
                               targetPubkeyHex: pubkeyHex,
-                              initialIsFollowing: _isFollowing,
                               relayClient: widget.relayClient,
                             ),
                     ),

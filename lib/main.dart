@@ -45,6 +45,9 @@ final ValueNotifier<String?> activeIdentityPubkeyNotifier = ValueNotifier(null);
 
 final ValueNotifier<bool> loadMediaNotifier = ValueNotifier(true);
 
+// The active identity's own following list, shared across every screen.
+final ValueNotifier<Set<String>?> myFollowingNotifier = ValueNotifier(null);
+
 final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {

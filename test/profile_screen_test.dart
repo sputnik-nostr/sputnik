@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -24,16 +22,9 @@ class _FakeSecretStore implements SecretStore {
 }
 
 class _FakeRelayClient extends RelayClient {
-  _FakeRelayClient({
-    this.publishOutcome = RelayPublishOutcome.accepted,
-    this.gate,
-  });
+  _FakeRelayClient({this.publishOutcome = RelayPublishOutcome.accepted});
 
   final RelayPublishOutcome publishOutcome;
-  // When set, publish() waits on this before resolving -- lets a test
-  // observe UI state that should already be settled before the network
-  // call completes (i.e. an optimistic update).
-  final Completer<void>? gate;
   NostrEvent? lastPublished;
 
   @override
@@ -47,7 +38,6 @@ class _FakeRelayClient extends RelayClient {
     NostrEvent event,
     Set<String> relayUrls,
   ) async {
-    if (gate != null) await gate!.future;
     lastPublished = event;
     return {
       for (final url in relayUrls) url: RelayPublishResult(publishOutcome),
@@ -55,11 +45,18 @@ class _FakeRelayClient extends RelayClient {
   }
 }
 
+// The follow-sync background loop debounces before publishing.
+Future<void> _settleFollowSync(WidgetTester tester) async {
+  await tester.pump(const Duration(milliseconds: 600));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUp(() {
     identitiesNotifier.value = const [];
     activeIdentityPubkeyNotifier.value = null;
     selectedRelaysNotifier.value = {'wss://relay.example'};
+    myFollowingNotifier.value = null;
   });
 
   testWidgets('with no active identity, shows a prompt instead of a profile', (
@@ -85,6 +82,21 @@ void main() {
     expect(find.byType(IdentitiesScreen), findsOneWidget);
   });
 
+  testWidgets("viewing someone else's profile with no active identity shows no "
+      'follow button', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ProfileScreen(
+          pubkeyHex: 'b' * 64,
+          relayClient: _FakeRelayClient(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('followButton')), findsNothing);
+  });
+
   group('follow button', () {
     late Identity identity;
     final targetPubkeyHex = 'b' * 64;
@@ -108,38 +120,8 @@ void main() {
     });
 
     testWidgets(
-      'the button flips to Following instantly, before the publish resolves',
-      (tester) async {
-        final gate = Completer<void>();
-        final fakeClient = _FakeRelayClient(gate: gate);
-        await tester.pumpWidget(
-          MaterialApp(
-            home: ProfileScreen(
-              pubkeyHex: targetPubkeyHex,
-              relayClient: fakeClient,
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        await tester.tap(find.byKey(const Key('followButton')));
-        await tester.pump();
-
-        // The publish hasn't resolved yet (the gate is still closed), but
-        // the button should already reflect the new state.
-        expect(find.text('Following'), findsOneWidget);
-        expect(fakeClient.lastPublished, isNull);
-
-        gate.complete();
-        await tester.pumpAndSettle();
-
-        expect(find.text('Following'), findsOneWidget);
-        expect(fakeClient.lastPublished, isNotNull);
-      },
-    );
-
-    testWidgets(
-      'tapping Follow publishes immediately, with no confirm dialog',
+      'the button flips instantly and stays clickable through a rapid '
+      'double-tap, with no confirm dialog',
       (tester) async {
         final fakeClient = _FakeRelayClient();
         await tester.pumpWidget(
@@ -157,30 +139,28 @@ void main() {
         await tester.tap(find.byKey(const Key('followButton')));
         await tester.pump();
 
-        // No confirm dialog -- unlike posting/editing a profile, following
-        // is reversible and carries no content.
+        // Flips instantly, no network call yet, no confirm dialog.
+        expect(find.text('Following'), findsOneWidget);
+        expect(fakeClient.lastPublished, isNull);
         expect(find.byType(AlertDialog), findsNothing);
 
-        await tester.pumpAndSettle();
+        // Immediately tappable again -- no disabled/pending state.
+        await tester.tap(find.byKey(const Key('followButton')));
+        await tester.pump();
+        expect(find.text('Follow'), findsOneWidget);
+        expect(fakeClient.lastPublished, isNull);
 
-        final published = fakeClient.lastPublished;
-        expect(published, isNotNull);
-        expect(published!.pubkey, identity.pubkeyHex);
-        expect(published.kind, 3);
-        expect(published.content, '');
-        expect(published.tags, [
-          ['p', targetPubkeyHex],
-        ]);
-        expect(find.text('Following'), findsOneWidget);
+        // The two taps collapse into a single publish of the final state.
+        await _settleFollowSync(tester);
+        expect(fakeClient.lastPublished, isNotNull);
+        expect(find.text('Follow'), findsOneWidget);
       },
     );
 
-    testWidgets('a rejected follow leaves the button as Follow', (
+    testWidgets('tapping Follow publishes the new state after a short delay', (
       tester,
     ) async {
-      final fakeClient = _FakeRelayClient(
-        publishOutcome: RelayPublishOutcome.rejected,
-      );
+      final fakeClient = _FakeRelayClient();
       await tester.pumpWidget(
         MaterialApp(
           home: ProfileScreen(
@@ -192,11 +172,44 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('followButton')));
-      await tester.pumpAndSettle();
+      await _settleFollowSync(tester);
 
-      expect(fakeClient.lastPublished, isNotNull);
-      expect(find.text('Follow'), findsOneWidget);
-      expect(find.text('Could not update your follow list'), findsOneWidget);
+      final published = fakeClient.lastPublished;
+      expect(published, isNotNull);
+      expect(published!.pubkey, identity.pubkeyHex);
+      expect(published.kind, 3);
+      expect(published.content, '');
+      expect(published.tags, [
+        ['p', targetPubkeyHex],
+      ]);
+      expect(find.text('Following'), findsOneWidget);
     });
+
+    testWidgets(
+      'a rejected follow shows an error but does not revert the button',
+      (tester) async {
+        final fakeClient = _FakeRelayClient(
+          publishOutcome: RelayPublishOutcome.rejected,
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            navigatorKey: navigatorKey,
+            home: ProfileScreen(
+              pubkeyHex: targetPubkeyHex,
+              relayClient: fakeClient,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('followButton')));
+        await _settleFollowSync(tester);
+
+        expect(fakeClient.lastPublished, isNotNull);
+        // Not reverted, even though the background publish failed.
+        expect(find.text('Following'), findsOneWidget);
+        expect(find.text('Could not update your follow list'), findsOneWidget);
+      },
+    );
   });
 }

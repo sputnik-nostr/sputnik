@@ -1,9 +1,14 @@
+import '../main.dart';
 import '../services/cache_store.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'relay_client.dart';
 
 final _pubkeyPattern = RegExp(r'^[0-9a-fA-F]{64}$');
+
+// Which identity myFollowingNotifier holds data for, and its load future.
+String? _myFollowingLoadedForPubkeyHex;
+Future<void>? _myFollowingLoadingFuture;
 
 List<String> _followedPubkeys(NostrEvent event) {
   return [
@@ -90,6 +95,26 @@ class RelayContactsRepository {
     return followers;
   }
 
+  // Populates myFollowingNotifier for the active identity, once per identity.
+  Future<void> ensureMyFollowingLoaded(Set<String> relayUrls) {
+    final myPubkeyHex = activeIdentityPubkeyNotifier.value;
+    if (myPubkeyHex == null) {
+      myFollowingNotifier.value = null;
+      _myFollowingLoadedForPubkeyHex = null;
+      return Future.value();
+    }
+    if (_myFollowingLoadedForPubkeyHex == myPubkeyHex &&
+        myFollowingNotifier.value != null) {
+      return Future.value();
+    }
+    return _myFollowingLoadingFuture ??= fetchFollowing(myPubkeyHex, relayUrls)
+        .then((following) {
+          myFollowingNotifier.value = following.toSet();
+          _myFollowingLoadedForPubkeyHex = myPubkeyHex;
+        })
+        .whenComplete(() => _myFollowingLoadingFuture = null);
+  }
+
   // Raw "p" tags, kept verbatim (unlike fetchFollowing) so a republish
   // doesn't drop others' relay/petname fields. Always fresh, not cached.
   Future<List<List<String>>> fetchOwnContactTags(
@@ -124,16 +149,58 @@ class RelayContactsRepository {
   }) async {
     final currentTags = await fetchOwnContactTags(myPubkeyHex, relayUrls);
     final target = targetPubkeyHex.toLowerCase();
-    final withoutTarget = [
+    final currentPubkeys = {
       for (final tag in currentTags)
-        if (tag.length < 2 || tag[1].toLowerCase() != target) tag,
+        if (tag.length > 1) tag[1].toLowerCase(),
+    };
+    final desired = follow
+        ? ({...currentPubkeys, target})
+        : ({...currentPubkeys}..remove(target));
+
+    return _publishFollowing(
+      seckeyHex: seckeyHex,
+      myPubkeyHex: myPubkeyHex,
+      currentTags: currentTags,
+      desiredFollowing: desired,
+      relayUrls: relayUrls,
+    );
+  }
+
+  // Publishes desiredFollowing as the full contact list, keeping tags.
+  Future<Map<String, RelayPublishResult>> syncFollowingTo({
+    required String seckeyHex,
+    required String myPubkeyHex,
+    required Set<String> desiredFollowing,
+    required Set<String> relayUrls,
+  }) async {
+    final currentTags = await fetchOwnContactTags(myPubkeyHex, relayUrls);
+    return _publishFollowing(
+      seckeyHex: seckeyHex,
+      myPubkeyHex: myPubkeyHex,
+      currentTags: currentTags,
+      desiredFollowing: desiredFollowing,
+      relayUrls: relayUrls,
+    );
+  }
+
+  Future<Map<String, RelayPublishResult>> _publishFollowing({
+    required String seckeyHex,
+    required String myPubkeyHex,
+    required List<List<String>> currentTags,
+    required Set<String> desiredFollowing,
+    required Set<String> relayUrls,
+  }) async {
+    final kept = [
+      for (final tag in currentTags)
+        if (tag.length > 1 && desiredFollowing.contains(tag[1].toLowerCase()))
+          tag,
     ];
-    final newTags = follow
-        ? [
-            ...withoutTarget,
-            ['p', targetPubkeyHex],
-          ]
-        : withoutTarget;
+    final keptPubkeys = {for (final tag in kept) tag[1].toLowerCase()};
+    final newTags = [
+      ...kept,
+      for (final pubkey in desiredFollowing)
+        if (!keptPubkeys.contains(pubkey)) ['p', pubkey],
+    ];
 
     final event = signEvent(
       seckeyHex: seckeyHex,
@@ -148,11 +215,7 @@ class RelayContactsRepository {
       (result) => result.outcome == RelayPublishOutcome.accepted,
     );
     if (accepted) {
-      final pubkeys = [
-        for (final tag in newTags)
-          if (tag.length > 1) tag[1].toLowerCase(),
-      ];
-      await CacheStore.putFollowing(myPubkeyHex, pubkeys);
+      await CacheStore.putFollowing(myPubkeyHex, desiredFollowing.toList());
     }
     return results;
   }

@@ -11,15 +11,15 @@ class ProfileResultTile extends StatelessWidget {
     super.key,
     required this.pubkeyHex,
     required this.metadata,
-    this.isFollowing,
+    this.showFollowButton = false,
     this.relayClient = const RelayClient(),
   });
 
   final String pubkeyHex;
   final NostrMetadata? metadata;
 
-  // Null hides the follow button (no active identity, or this is you).
-  final bool? isFollowing;
+  // False hides the follow button (no active identity, or this is you).
+  final bool showFollowButton;
   final RelayClient relayClient;
 
   @override
@@ -57,11 +57,10 @@ class ProfileResultTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: theme.textTheme.bodySmall,
       ),
-      trailing: isFollowing == null
+      trailing: !showFollowButton
           ? null
           : FollowButton(
               targetPubkeyHex: pubkeyHex,
-              initialIsFollowing: isFollowing!,
               relayClient: relayClient,
               dense: true,
             ),
