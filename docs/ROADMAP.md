@@ -12,7 +12,7 @@
 - [x] Publish notes to relays (signed, with a confirm step)
 - [x] Publish profile edits to relays (name/bio only so far)
 - [x] Publish follow/unfollow to relays (was previously a stub)
-- [ ] Allow copying text
+- [x] Allow copying text
 - [ ] Separate posts and replies on profiles
 - [ ] Add support for profile URLs
 - [ ] Add support for Blossom and other media types
@@ -31,11 +31,11 @@
 ## Other things:
 
 - [ ] Make sure crypto logic is secure
-- [ ] Fix build on Android with crypto libraries
+- [x] Fix build on Android with crypto libraries
 - [ ] Add desktop support for macOS
 - [ ] Rewrite doc comments
-- [ ] Rewrite unit tests, improve coverage
-- [ ] Show follow buttons directly in a followers/following/reactions list
+- [x] Rewrite unit tests, improve coverage
+- [x] Show follow buttons directly in a followers/following/reactions list
 - [ ] Let editing a profile cover more fields than name/bio (picture, banner, NIP-05, website)
 - [ ] Add an option to hide specific crypto address types from being shown on a profile
 - [ ] Add an option to hide/show client ID string

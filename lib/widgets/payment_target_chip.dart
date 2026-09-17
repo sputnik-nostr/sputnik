@@ -40,7 +40,31 @@ const _brandColors = <String, Color>{
   'cashme': Color(0xFF00D632),
 };
 
+const _displayNames = <String, String>{
+  'bitcoin': 'Bitcoin',
+  'lightning': 'Lightning',
+  'bip352': 'BIP-352',
+  'bip353': 'BIP-353',
+  'bitcoincash': 'Bitcoin Cash',
+  'litecoin': 'Litecoin',
+  'monero': 'Monero',
+  'ethereum': 'Ethereum',
+  'zcash': 'Zcash',
+  'nano': 'Nano',
+  'solana': 'Solana',
+  'tron': 'Tron',
+  'paypal': 'PayPal',
+  'venmo': 'Venmo',
+  'revolut': 'Revolut',
+  'cashme': 'CashMe',
+};
+
 String _ticker(String type) => _tickers[type] ?? type.toUpperCase();
+
+// Proper-noun currency names stay capitalized even mid-sentence.
+String _displayName(String type) =>
+    _displayNames[type] ??
+    (type.isEmpty ? type : type[0].toUpperCase() + type.substring(1));
 
 class PaymentTargetChip extends StatelessWidget {
   const PaymentTargetChip({super.key, required this.target});
@@ -63,7 +87,9 @@ class PaymentTargetChip extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('This ${target.type} address looks malformed'),
+            content: Text(
+              'This ${_displayName(target.type)} address looks malformed',
+            ),
           ),
         );
       }
@@ -72,7 +98,9 @@ class PaymentTargetChip extends StatelessWidget {
     if (!opened && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No app found to open ${target.type} addresses'),
+          content: Text(
+            'No app found to open ${_displayName(target.type)} addresses',
+          ),
         ),
       );
     }
@@ -98,7 +126,9 @@ class PaymentTargetChip extends StatelessWidget {
           Clipboard.setData(ClipboardData(text: target.address));
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Copied ${target.type} address to clipboard'),
+              content: Text(
+                'Copied ${_displayName(target.type)} address to clipboard',
+              ),
             ),
           );
         },

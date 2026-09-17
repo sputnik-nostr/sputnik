@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -10,6 +12,7 @@ import 'screens/root_screen.dart';
 import 'services/cache_store.dart';
 import 'services/feed_loader.dart';
 import 'services/settings_store.dart';
+import 'services/ssrf_guard.dart';
 
 final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier(
   ThemeMode.system,
@@ -46,6 +49,9 @@ final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Blocks SSRF via attacker-controlled URLs (e.g. profile pictures).
+  HttpOverrides.global = SsrfGuardedHttpOverrides();
 
   // Initialize cache store, load persistent settings
   final cacheInit = CacheStore.init();

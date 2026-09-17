@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../services/ssrf_guard.dart';
+
 /// Result of checking a NIP-05 identifier against a pubkey.
 enum Nip05Status {
   /// The domain confirmed this identifier maps to the pubkey.
@@ -38,54 +40,6 @@ Nip05Identifier? parseNip05(String identifier) {
   return (local: local, domain: domain);
 }
 
-// nip05 comes from another user's profile metadata, so the domain is
-// attacker-controlled. Block loopback/private/link-local targets so it
-// can't be used to probe the device's own network (e.g. cloud metadata
-// endpoints like 169.254.169.254).
-bool _isBlockedAddress(InternetAddress address) {
-  if (address.isLoopback || address.isLinkLocal || address.isMulticast) {
-    return true;
-  }
-  final bytes = address.rawAddress;
-  if (address.type == InternetAddressType.IPv4) {
-    if (bytes[0] == 0) return true; // 0.0.0.0/8
-    if (bytes[0] == 10) return true; // 10.0.0.0/8
-    if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) return true;
-    if (bytes[0] == 192 && bytes[1] == 168) return true; // 192.168.0.0/16
-    if (bytes[0] == 169 && bytes[1] == 254) return true; // link-local/meta
-  } else if (address.type == InternetAddressType.IPv6) {
-    if ((bytes[0] & 0xfe) == 0xfc) return true; // fc00::/7 unique local
-  }
-  return false;
-}
-
-Future<ConnectionTask<Socket>> _guardedConnect(
-  Uri url,
-  String? proxyHost,
-  int? proxyPort,
-) async {
-  final addresses = await InternetAddress.lookup(url.host);
-  InternetAddress? address;
-  for (final candidate in addresses) {
-    if (!_isBlockedAddress(candidate)) {
-      address = candidate;
-      break;
-    }
-  }
-  if (address == null) {
-    throw SocketException('No public address found for ${url.host}');
-  }
-
-  final rawTask = await Socket.startConnect(address, url.port);
-  if (url.scheme != 'https') return rawTask;
-
-  // connectionFactory doesn't wrap https in TLS itself; do it here, pinned
-  // to the vetted address but validated against the hostname, not the IP.
-  final rawSocket = await rawTask.socket;
-  final secureSocket = SecureSocket.secure(rawSocket, host: url.host);
-  return ConnectionTask.fromSocket(secureSocket, rawTask.cancel);
-}
-
 Future<List<int>?> _readBounded(HttpClientResponse response) async {
   final bytes = <int>[];
   await for (final chunk in response) {
@@ -108,7 +62,7 @@ Future<Nip05Status> _fetchAndVerify(
     return Nip05Status.unreachable;
   }
 
-  final client = HttpClient()..connectionFactory = _guardedConnect;
+  final client = HttpClient()..connectionFactory = guardedConnectionFactory;
   try {
     final request = await client.getUrl(uri);
     // Per NIP-05, clients must not follow a redirect here.

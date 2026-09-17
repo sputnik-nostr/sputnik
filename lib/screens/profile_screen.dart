@@ -2,16 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../main.dart';
-import '../models/identity.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../models/time_format.dart';
 import '../nostr/nip05.dart';
 import '../nostr/nostr.dart';
-import '../services/settings_store.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/count_label.dart';
 import '../widgets/fade_in_avatar.dart';
+import '../widgets/follow_button.dart';
 import '../widgets/linkified_text.dart';
 import '../widgets/nip05_badge.dart';
 import '../widgets/note_tile.dart';
@@ -62,7 +61,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<String>? _followers;
   List<NostrPaymentTarget>? _paymentTargets;
   bool _isFollowing = false;
-  bool _followPending = false;
   String? _checkedNip05Identifier;
   Nip05Status? _nip05Status;
 
@@ -88,62 +86,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context,
       MaterialPageRoute(builder: (_) => ImageViewerScreen(imageUrl: imageUrl)),
     );
-  }
-
-  Future<void> _toggleFollow() async {
-    final myPubkeyHex = activeIdentityPubkeyNotifier.value;
-    final targetPubkeyHex = _resolvedPubkeyHex;
-    if (myPubkeyHex == null || targetPubkeyHex == null || _followPending) {
-      return;
-    }
-    final identity = identityWithPubkey(identitiesNotifier.value, myPubkeyHex);
-    if (identity == null) return;
-
-    // Flip immediately; publish in the background, revert on failure.
-    final wantsFollow = !_isFollowing;
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() {
-      _isFollowing = wantsFollow;
-      _followPending = true;
-    });
-
-    final privkeyHex = await SettingsStore.loadPrivateKey(myPubkeyHex);
-    if (!mounted) return;
-    if (privkeyHex == null) {
-      setState(() {
-        _isFollowing = !wantsFollow;
-        _followPending = false;
-      });
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text("Could not find this identity's private key"),
-        ),
-      );
-      return;
-    }
-
-    final results = await RelayContactsRepository(client: widget.relayClient)
-        .setFollowing(
-          seckeyHex: privkeyHex,
-          myPubkeyHex: myPubkeyHex,
-          targetPubkeyHex: targetPubkeyHex,
-          follow: wantsFollow,
-          relayUrls: selectedRelaysNotifier.value,
-        );
-    if (!mounted) return;
-
-    final accepted = results.values.any(
-      (result) => result.outcome == RelayPublishOutcome.accepted,
-    );
-    setState(() {
-      _followPending = false;
-      if (!accepted) _isFollowing = !wantsFollow;
-    });
-    if (!accepted) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Could not update your follow list')),
-      );
-    }
   }
 
   @override
@@ -410,20 +352,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 padding: EdgeInsets.zero,
                               ),
                             )
-                          : _isFollowing
-                          ? OutlinedButton(
-                              key: const Key('followButton'),
-                              onPressed: _followPending
-                                  ? null
-                                  : () => _toggleFollow(),
-                              child: const Text('Following'),
-                            )
-                          : FilledButton(
-                              key: const Key('followButton'),
-                              onPressed: _followPending
-                                  ? null
-                                  : () => _toggleFollow(),
-                              child: const Text('Follow'),
+                          : FollowButton(
+                              targetPubkeyHex: pubkeyHex,
+                              initialIsFollowing: _isFollowing,
+                              relayClient: widget.relayClient,
                             ),
                     ),
                     Positioned(

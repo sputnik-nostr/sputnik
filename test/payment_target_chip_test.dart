@@ -54,6 +54,6 @@ void main() {
     await tester.pump();
 
     expect(copied, target.address);
-    expect(find.text('Copied bitcoin address to clipboard'), findsOneWidget);
+    expect(find.text('Copied Bitcoin address to clipboard'), findsOneWidget);
   });
 }

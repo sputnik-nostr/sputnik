@@ -14,10 +14,12 @@ class UsersListScreen extends StatefulWidget {
     super.key,
     required this.title,
     required this.pubkeys,
+    this.relayClient = const RelayClient(),
   });
 
   final String title;
   final List<String> pubkeys;
+  final RelayClient relayClient;
 
   @override
   State<UsersListScreen> createState() => _UsersListScreenState();
@@ -32,6 +34,21 @@ class _UsersListScreenState extends State<UsersListScreen> {
   final _pending = <String>{};
   Timer? _debounce;
 
+  // Fetched once for the screen, checked per row.
+  Set<String>? _myFollowing;
+
+  @override
+  void initState() {
+    super.initState();
+    final myPubkeyHex = activeIdentityPubkeyNotifier.value;
+    if (myPubkeyHex == null) return;
+    RelayContactsRepository(client: widget.relayClient)
+        .fetchFollowing(myPubkeyHex, selectedRelaysNotifier.value)
+        .then((following) {
+          if (mounted) setState(() => _myFollowing = following.toSet());
+        });
+  }
+
   void _ensureProfileRequested(String pubkeyHex) {
     if (!_requested.add(pubkeyHex)) return;
     _pending.add(pubkeyHex);
@@ -43,10 +60,8 @@ class _UsersListScreenState extends State<UsersListScreen> {
     if (_pending.isEmpty) return;
     final toFetch = Set<String>.of(_pending);
     _pending.clear();
-    const RelayProfileRepository().fetchProfiles(
-      toFetch,
-      selectedRelaysNotifier.value,
-    );
+    RelayProfileRepository(client: widget.relayClient)
+        .fetchProfiles(toFetch, selectedRelaysNotifier.value);
   }
 
   @override
@@ -73,9 +88,17 @@ class _UsersListScreenState extends State<UsersListScreen> {
                   itemBuilder: (context, index) {
                     final pubkeyHex = widget.pubkeys[index];
                     _ensureProfileRequested(pubkeyHex);
+                    final myPubkeyHex = activeIdentityPubkeyNotifier.value;
+                    final isSelf =
+                        myPubkeyHex != null &&
+                        pubkeyHex.toLowerCase() == myPubkeyHex.toLowerCase();
                     return ProfileResultTile(
                       pubkeyHex: pubkeyHex,
                       metadata: profileCache[pubkeyHex],
+                      isFollowing: isSelf
+                          ? null
+                          : _myFollowing?.contains(pubkeyHex.toLowerCase()),
+                      relayClient: widget.relayClient,
                     );
                   },
                 );

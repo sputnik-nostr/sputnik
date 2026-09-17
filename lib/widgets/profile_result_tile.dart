@@ -4,16 +4,23 @@ import '../nostr/nostr.dart';
 import '../screens/profile_screen.dart';
 import '../theme/app_text_styles.dart';
 import 'fade_in_avatar.dart';
+import 'follow_button.dart';
 
 class ProfileResultTile extends StatelessWidget {
   const ProfileResultTile({
     super.key,
     required this.pubkeyHex,
     required this.metadata,
+    this.isFollowing,
+    this.relayClient = const RelayClient(),
   });
 
   final String pubkeyHex;
   final NostrMetadata? metadata;
+
+  // Null hides the follow button (no active identity, or this is you).
+  final bool? isFollowing;
+  final RelayClient relayClient;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +57,14 @@ class ProfileResultTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: theme.textTheme.bodySmall,
       ),
+      trailing: isFollowing == null
+          ? null
+          : FollowButton(
+              targetPubkeyHex: pubkeyHex,
+              initialIsFollowing: isFollowing!,
+              relayClient: relayClient,
+              dense: true,
+            ),
       onTap: () => openProfile(context, pubkeyHex),
     );
   }

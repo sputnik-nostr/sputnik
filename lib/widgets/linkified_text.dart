@@ -29,6 +29,16 @@ class LinkifiedText extends StatefulWidget {
 class _LinkifiedTextState extends State<LinkifiedText> {
   final _recognizers = <String, TapGestureRecognizer>{};
 
+  // Avoids re-scanning unchanged text on every rebuild.
+  String? _matchedText;
+  List<RegExpMatch>? _matches;
+
+  List<RegExpMatch> _matchesFor(String text) {
+    if (_matchedText == text) return _matches!;
+    _matchedText = text;
+    return _matches = _linkPattern.allMatches(text).toList();
+  }
+
   @override
   void dispose() {
     for (final recognizer in _recognizers.values) {
@@ -52,7 +62,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     final spans = <InlineSpan>[];
     var start = 0;
 
-    for (final match in _linkPattern.allMatches(widget.text)) {
+    for (final match in _matchesFor(widget.text)) {
       if (match.start > start) {
         spans.add(TextSpan(text: widget.text.substring(start, match.start)));
       }
