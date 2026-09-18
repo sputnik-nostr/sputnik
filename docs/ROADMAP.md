@@ -16,6 +16,9 @@
 - [x] Separate posts and replies on profiles
 - [x] Separate following and global feeds on the home page
 - [x] Keep replies out of the home feeds (they stay on profiles and in threads)
+- [x] Show a cited npub or nprofile as the person's name, linking to their profile
+- [x] Show a cited note or nevent as a short link that opens the post
+- [x] Infinite scroll on the home feeds and profiles (up to 1000 posts loaded per list)
 - [ ] Add support for profile URLs
 - [ ] Add support for Blossom and other media types
 - [x] Show relay lists on profiles

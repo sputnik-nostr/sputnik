@@ -12,7 +12,9 @@ import '../widgets/compact_tab_bar.dart';
 import '../widgets/count_label.dart';
 import '../widgets/fade_in_avatar.dart';
 import '../widgets/follow_button.dart';
+import '../services/post_cursor.dart';
 import '../widgets/linkified_text.dart';
+import '../widgets/load_more_footer.dart';
 import '../widgets/nip05_badge.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/payment_target_chip.dart';
@@ -30,7 +32,7 @@ const _avatarRadius = 40.0;
 const _avatarOverlap = _avatarRadius * 2 * 0.25;
 const _avatarInitialFontSize = _avatarRadius * 0.7;
 
-// Replies are fetched alongside posts, so this needs headroom for both.
+// Replies are fetched alongside posts, so a page needs headroom for both.
 const _profileEventLimit = 100;
 
 void openProfile(BuildContext context, String pubkeyHex) {
@@ -70,6 +72,13 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   List<Note>? _fetchedNotes;
   bool _loadingNotes = true;
+  late final PostCursor _cursor = PostCursor(
+    (until) => RelayPostRepository(
+      relayUrls: selectedRelaysNotifier.value,
+      client: widget.relayClient,
+      limit: _profileEventLimit,
+    ).fetchPage(authors: [_resolvedPubkeyHex!], until: until),
+  );
   List<String>? _following;
   List<String>? _followers;
   List<NostrPaymentTarget>? _paymentTargets;
@@ -127,25 +136,42 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Future<void> _loadAuthorPosts(String pubkeyHex) async {
     final relayUrls = selectedRelaysNotifier.value;
-    final posts = await RelayPostRepository(
-      relayUrls: relayUrls,
-      client: widget.relayClient,
-      limit: _profileEventLimit,
-    ).fetchPostsByAuthor(pubkeyHex);
+    final posts = await _cursor.first();
     if (!mounted) return;
 
-    final metadata = profileCacheNotifier.value[pubkeyHex];
-    final notes = await hydratePosts(
-      posts,
-      relayUrls,
-      knownMetadata: metadata == null ? const {} : {pubkeyHex: metadata},
-    );
+    final notes = await _hydrate(posts, pubkeyHex, relayUrls);
     if (!mounted) return;
 
     setState(() {
       _fetchedNotes = notes;
       _loadingNotes = false;
     });
+  }
+
+  Future<void> _loadMorePosts() async {
+    final pubkeyHex = _resolvedPubkeyHex;
+    if (pubkeyHex == null) return;
+    final relayUrls = selectedRelaysNotifier.value;
+    final posts = await _cursor.more();
+    if (!mounted || posts.isEmpty) return;
+
+    final notes = await _hydrate(posts, pubkeyHex, relayUrls);
+    if (!mounted) return;
+
+    setState(() => _fetchedNotes = [...?_fetchedNotes, ...notes]);
+  }
+
+  Future<List<Note>> _hydrate(
+    List<NostrPost> posts,
+    String pubkeyHex,
+    Set<String> relayUrls,
+  ) {
+    final metadata = profileCacheNotifier.value[pubkeyHex];
+    return hydratePosts(
+      posts,
+      relayUrls,
+      knownMetadata: metadata == null ? const {} : {pubkeyHex: metadata},
+    );
   }
 
   Future<void> _loadContacts(String pubkeyHex, {bool force = false}) async {
@@ -657,30 +683,39 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _notesTab(String storageKey, List<Note> notes, String emptyLabel) {
-    return ListView(
-      key: PageStorageKey(storageKey),
-      padding: EdgeInsets.zero,
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [
-        if (notes.isEmpty && _loadingNotes)
-          const Padding(
-            padding: EdgeInsets.only(top: 48),
-            child: Center(child: CircularProgressIndicator()),
-          )
-        else if (notes.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 48),
-            child: PlaceholderTab(
-              icon: Icons.notes_outlined,
-              label: emptyLabel,
+    return ValueListenableBuilder<bool>(
+      valueListenable: _cursor.hasMore,
+      builder: (context, hasMore, _) => ListView(
+        key: PageStorageKey(storageKey),
+        padding: EdgeInsets.zero,
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          if (notes.isEmpty && _loadingNotes)
+            const Padding(
+              padding: EdgeInsets.only(top: 48),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (notes.isEmpty && !hasMore)
+            Padding(
+              padding: const EdgeInsets.only(top: 48),
+              child: PlaceholderTab(
+                icon: Icons.notes_outlined,
+                label: emptyLabel,
+              ),
+            )
+          else
+            for (final note in notes) ...[
+              NoteTile(note: note),
+              const Divider(height: 1),
+            ],
+          // A new key per page, so the next one is asked for if still in view.
+          if (hasMore && !_loadingNotes)
+            LoadMoreFooter(
+              key: ValueKey(_fetchedNotes?.length),
+              onLoadMore: _loadMorePosts,
             ),
-          )
-        else
-          for (final note in notes) ...[
-            NoteTile(note: note),
-            const Divider(height: 1),
-          ],
-      ],
+        ],
+      ),
     );
   }
 }

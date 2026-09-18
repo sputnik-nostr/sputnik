@@ -8,6 +8,9 @@ import 'relay_client.dart';
 // Replies are dropped after the query, so ask for more to still fill a page.
 const _replyOverfetch = 3;
 
+// Bounds the queries one page can cost when most results are dropped.
+const _maxPageRounds = 4;
+
 class RelayPostRepository implements PostRepository {
   const RelayPostRepository({
     required this.relayUrls,
@@ -52,30 +55,97 @@ class RelayPostRepository implements PostRepository {
     List<String>? authors,
     bool includeReplies = true,
   }) async {
+    final page = await fetchPage(
+      authors: authors,
+      includeReplies: includeReplies,
+    );
+    return page.posts;
+  }
+
+  // Pass the previous page's [PostPage.next] as [until] to get the next page.
+  Future<PostPage> fetchPage({
+    List<String>? authors,
+    bool includeReplies = true,
+    DateTime? until,
+  }) async {
     final wanted = authors?.map((a) => a.toLowerCase()).toSet();
     final queryLimit = includeReplies ? limit : limit * _replyOverfetch;
-    final filters = [
-      if (wanted == null)
-        NostrFilter(kinds: const [1], limit: queryLimit)
-      else
-        for (final chunk in chunkedAuthors(wanted.toList()))
-          NostrFilter(kinds: const [1], authors: chunk, limit: queryLimit),
-    ];
+    final found = <String, NostrEvent>{};
+    var cursor = until;
+    var exhausted = false;
 
-    final eventsByFilter = await Future.wait(
-      filters.map((filter) => client.query(relayUrls, filter)),
-    );
+    for (
+      var round = 0;
+      round < _maxPageRounds && found.length < limit;
+      round++
+    ) {
+      final filters = [
+        if (wanted == null)
+          NostrFilter(kinds: const [1], until: cursor, limit: queryLimit)
+        else
+          for (final chunk in chunkedAuthors(wanted.toList()))
+            NostrFilter(
+              kinds: const [1],
+              authors: chunk,
+              until: cursor,
+              limit: queryLimit,
+            ),
+      ];
+      final eventsByFilter = await Future.wait(
+        filters.map((filter) => client.query(relayUrls, filter)),
+      );
 
-    final eventsById = {
-      for (final events in eventsByFilter)
-        for (final event in events)
-          if (event.kind == 1 &&
-              (wanted == null || wanted.contains(event.pubkey)) &&
-              (includeReplies || replyParentId(event) == null))
-            event.id: event,
-    };
-    final matching = eventsById.values.toList()..sort(compareNewestFirst);
+      final valid = [
+        for (final events in eventsByFilter)
+          [
+            for (final event in events)
+              if (event.kind == 1 &&
+                  (wanted == null || wanted.contains(event.pubkey)))
+                event,
+          ],
+      ];
+      // Only a chunk that hit the limit can have older posts left to fetch.
+      DateTime? horizon;
+      for (var i = 0; i < valid.length; i++) {
+        if (eventsByFilter[i].length < queryLimit || valid[i].isEmpty) continue;
+        final oldest = valid[i].map((e) => e.createdAt).reduce(_older);
+        if (horizon == null || oldest.isAfter(horizon)) horizon = oldest;
+      }
 
-    return matching.take(limit).map(nostrPostFromEvent).toList();
+      for (final event in valid.expand((events) => events)) {
+        final inRange = horizon == null || !event.createdAt.isBefore(horizon);
+        if (inRange && (includeReplies || replyParentId(event) == null)) {
+          found[event.id] = event;
+        }
+      }
+      if (horizon == null) {
+        exhausted = true;
+        break;
+      }
+      // A page that is all one second would otherwise never move on.
+      cursor = cursor != null && !horizon.isBefore(cursor)
+          ? cursor.subtract(const Duration(seconds: 1))
+          : horizon;
+    }
+
+    final sorted = found.values.toList()..sort(compareNewestFirst);
+    final kept = sorted.take(limit).toList();
+    final truncated = sorted.length > limit;
+    var next = truncated ? kept.last.createdAt : (exhausted ? null : cursor);
+    if (next != null && until != null && !next.isBefore(until)) {
+      next = until.subtract(const Duration(seconds: 1));
+    }
+    return PostPage(kept.map(nostrPostFromEvent).toList(), next);
   }
+}
+
+DateTime _older(DateTime a, DateTime b) => a.isBefore(b) ? a : b;
+
+class PostPage {
+  const PostPage(this.posts, this.next);
+
+  final List<NostrPost> posts;
+
+  // Null once nothing older is left to fetch.
+  final DateTime? next;
 }

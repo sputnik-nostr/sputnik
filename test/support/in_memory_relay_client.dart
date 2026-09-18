@@ -72,6 +72,15 @@ class InMemoryRelayClient extends RelayClient with AnsweringRelayClient {
     if (filter.kinds != null && !filter.kinds!.contains(event.kind)) {
       return false;
     }
+    final seconds = event.createdAt.millisecondsSinceEpoch ~/ 1000;
+    if (filter.until != null &&
+        seconds > filter.until!.millisecondsSinceEpoch ~/ 1000) {
+      return false;
+    }
+    if (filter.since != null &&
+        seconds < filter.since!.millisecondsSinceEpoch ~/ 1000) {
+      return false;
+    }
     for (final entry in (filter.tags ?? const {}).entries) {
       final hit = event.tags.any(
         (tag) =>
