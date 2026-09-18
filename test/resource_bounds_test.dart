@@ -42,7 +42,9 @@ void main() {
 
   setUp(() {
     loadMediaNotifier.value = true;
-    notesNotifier.value = [
+    // Home opens on the following feed, which needs an identity.
+    activeIdentityPubkeyNotifier.value = 'a' * 64;
+    followingNotesNotifier.value = [
       Note(
         id: '1',
         pubkey: 'a' * 64,

@@ -13,6 +13,7 @@ class Note {
     this.replyCount = 0,
     this.repostCount = 0,
     this.likeCount = 0,
+    this.isReply = false,
   });
 
   factory Note.fromJson(Map<String, dynamic> json) {
@@ -31,6 +32,7 @@ class Note {
       replyCount: json['replyCount'] as int? ?? 0,
       repostCount: json['repostCount'] as int? ?? 0,
       likeCount: json['likeCount'] as int? ?? 0,
+      isReply: json['isReply'] as bool? ?? false,
     );
   }
 
@@ -45,6 +47,7 @@ class Note {
   final int replyCount;
   final int repostCount;
   final int likeCount;
+  final bool isReply;
 
   Note copyWith({
     String? displayName,
@@ -65,6 +68,7 @@ class Note {
       replyCount: replyCount ?? this.replyCount,
       repostCount: repostCount ?? this.repostCount,
       likeCount: likeCount ?? this.likeCount,
+      isReply: isReply,
     );
   }
 
@@ -80,6 +84,7 @@ class Note {
       'replyCount': replyCount,
       'repostCount': repostCount,
       'likeCount': likeCount,
+      if (isReply) 'isReply': true,
     };
   }
 }

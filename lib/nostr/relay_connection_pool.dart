@@ -77,6 +77,24 @@ class PublishWaiters {
   }
 }
 
+class RelayQueryResult {
+  const RelayQueryResult({
+    required this.events,
+    required this.answeredRelays,
+    required this.queriedRelays,
+  });
+
+  final List<NostrEvent> events;
+
+  // Relays that finished with EOSE, not ones that failed or timed out.
+  final int answeredRelays;
+  final int queriedRelays;
+
+  // An empty [events] only proves absence if no relay could be hiding it.
+  bool get allRelaysAnswered =>
+      queriedRelays > 0 && answeredRelays == queriedRelays;
+}
+
 class RelayConnectionPool {
   RelayConnectionPool._();
 
@@ -88,21 +106,32 @@ class RelayConnectionPool {
     Set<String> relayUrls,
     NostrFilter filter, {
     required Duration timeout,
+  }) async =>
+      (await queryWithStatus(relayUrls, filter, timeout: timeout)).events;
+
+  Future<RelayQueryResult> queryWithStatus(
+    Set<String> relayUrls,
+    NostrFilter filter, {
+    required Duration timeout,
   }) async {
-    final eventsByRelay = await Future.wait(
+    final answers = await Future.wait(
       relayUrls.map((relayUrl) => _queryRelay(relayUrl, filter, timeout)),
     );
 
     final eventsById = <String, NostrEvent>{};
-    for (final events in eventsByRelay) {
-      for (final event in events) {
+    for (final answer in answers) {
+      for (final event in answer.events) {
         eventsById[event.id] = event;
       }
     }
-    return eventsById.values.toList();
+    return RelayQueryResult(
+      events: eventsById.values.toList(),
+      answeredRelays: answers.where((answer) => answer.eose).length,
+      queriedRelays: answers.length,
+    );
   }
 
-  Future<List<NostrEvent>> _queryRelay(
+  Future<({List<NostrEvent> events, bool eose})> _queryRelay(
     String relayUrl,
     NostrFilter filter,
     Duration timeout,
@@ -114,7 +143,7 @@ class RelayConnectionPool {
       // Relay is unreachable, or the persistent connection just failed;
       // drop it so the next query reconnects fresh.
       await _connections.remove(relayUrl)?.close();
-      return const [];
+      return (events: const <NostrEvent>[], eose: false);
     }
   }
 
@@ -215,13 +244,14 @@ class _RelayConnection {
     );
   }
 
-  Future<List<NostrEvent>> subscribe(
+  Future<({List<NostrEvent> events, bool eose})> subscribe(
     NostrFilter filter,
     Duration timeout,
   ) async {
     await ready;
     final subscriptionId = _generateSubscriptionId();
     final events = <NostrEvent>[];
+    var eose = false;
     final completer = Completer<void>();
     Timer? idleTimer;
     var receivedAny = false;
@@ -248,6 +278,8 @@ class _RelayConnection {
             completer.complete();
           }
         case 'EOSE':
+          eose = true;
+          if (!completer.isCompleted) completer.complete();
         case 'CLOSED':
           if (!completer.isCompleted) completer.complete();
       }
@@ -277,7 +309,7 @@ class _RelayConnection {
       _channel.sink.add(jsonEncode(['CLOSE', subscriptionId]));
     }
 
-    return events;
+    return (events: events, eose: eose);
   }
 
   Future<RelayPublishResult> publish(NostrEvent event, Duration timeout) async {

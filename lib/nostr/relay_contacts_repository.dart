@@ -28,25 +28,35 @@ class RelayContactsRepository {
     String pubkeyHex,
     Set<String> relayUrls, {
     bool force = false,
+  }) async =>
+      await _fetchFollowingOrNull(pubkeyHex, relayUrls, force: force) ??
+      const <String>[];
+
+  // Null when nothing was found and some relay may still hold a list.
+  Future<List<String>?> _fetchFollowingOrNull(
+    String pubkeyHex,
+    Set<String> relayUrls, {
+    bool force = false,
   }) async {
     if (!force && CacheStore.isFollowingFresh(pubkeyHex)) {
       final cached = CacheStore.getFollowing(pubkeyHex);
       if (cached != null) return cached;
     }
 
-    final events = await client.query(
+    final result = await client.queryWithStatus(
       relayUrls,
       NostrFilter(kinds: const [3], authors: [pubkeyHex], limit: 1),
     );
-    if (events.isEmpty) return const <String>[];
 
     final author = pubkeyHex.toLowerCase();
     final own = [
-      for (final event in events)
+      for (final event in result.events)
         if (event.kind == 3 && event.pubkey == author) event,
     ]..sort(compareNewestFirst);
 
-    if (own.isEmpty) return const <String>[];
+    if (own.isEmpty) {
+      return result.allRelaysAnswered ? const <String>[] : null;
+    }
 
     final following = _followedPubkeys(own.first);
     await CacheStore.putFollowing(pubkeyHex, following);
@@ -122,30 +132,34 @@ class RelayContactsRepository {
         myFollowingNotifier.value != null) {
       return Future.value();
     }
-    return _myFollowingLoadingFuture ??= fetchFollowing(myPubkeyHex, relayUrls)
-        .then((following) {
-          myFollowingNotifier.value = following.toSet();
-          _myFollowingLoadedForPubkeyHex = myPubkeyHex;
-        })
-        .whenComplete(() => _myFollowingLoadingFuture = null);
+    return _myFollowingLoadingFuture ??=
+        _fetchFollowingOrNull(myPubkeyHex, relayUrls)
+            .then((following) {
+              // Left unloaded on failure so the next call retries.
+              if (following == null) return;
+              myFollowingNotifier.value = following.toSet();
+              _myFollowingLoadedForPubkeyHex = myPubkeyHex;
+            })
+            .whenComplete(() => _myFollowingLoadingFuture = null);
   }
 
   // Raw "p" tags, kept verbatim (unlike fetchFollowing) so a republish
   // doesn't drop others' relay/petname fields. Always fresh, not cached.
-  Future<List<List<String>>> fetchOwnContactTags(
+  // Null when nothing was found and some relay may still hold a list.
+  Future<List<List<String>>?> fetchOwnContactTags(
     String pubkeyHex,
     Set<String> relayUrls,
   ) async {
-    final events = await client.query(
+    final result = await client.queryWithStatus(
       relayUrls,
       NostrFilter(kinds: const [3], authors: [pubkeyHex], limit: 1),
     );
     final author = pubkeyHex.toLowerCase();
     final own = [
-      for (final event in events)
+      for (final event in result.events)
         if (event.kind == 3 && event.pubkey == author) event,
     ]..sort(compareNewestFirst);
-    if (own.isEmpty) return const [];
+    if (own.isEmpty) return result.allRelaysAnswered ? const [] : null;
 
     return [
       for (final tag in own.first.tags)
@@ -162,40 +176,53 @@ class RelayContactsRepository {
     required bool follow,
     required Set<String> relayUrls,
   }) async {
+    final outcome = await applyFollowChanges(
+      seckeyHex: seckeyHex,
+      myPubkeyHex: myPubkeyHex,
+      changes: {targetPubkeyHex: follow},
+      relayUrls: relayUrls,
+    );
+    return outcome.results;
+  }
+
+  // Applies follow (true) / unfollow (false) changes to the relays' list.
+  Future<({Map<String, RelayPublishResult> results, Set<String> following})>
+  applyFollowChanges({
+    required String seckeyHex,
+    required String myPubkeyHex,
+    required Map<String, bool> changes,
+    required Set<String> relayUrls,
+  }) async {
     final currentTags = await fetchOwnContactTags(myPubkeyHex, relayUrls);
-    final target = targetPubkeyHex.toLowerCase();
-    final currentPubkeys = {
+    // Publishing blind would replace the real list with just these changes.
+    if (currentTags == null) {
+      return (
+        results: const <String, RelayPublishResult>{},
+        following: const <String>{},
+      );
+    }
+
+    final desired = {
       for (final tag in currentTags)
         if (tag.length > 1) tag[1].toLowerCase(),
     };
-    final desired = follow
-        ? ({...currentPubkeys, target})
-        : ({...currentPubkeys}..remove(target));
+    for (final change in changes.entries) {
+      final target = change.key.toLowerCase();
+      if (change.value) {
+        desired.add(target);
+      } else {
+        desired.remove(target);
+      }
+    }
 
-    return _publishFollowing(
+    final results = await _publishFollowing(
       seckeyHex: seckeyHex,
       myPubkeyHex: myPubkeyHex,
       currentTags: currentTags,
       desiredFollowing: desired,
       relayUrls: relayUrls,
     );
-  }
-
-  // Publishes desiredFollowing as the full contact list, keeping tags.
-  Future<Map<String, RelayPublishResult>> syncFollowingTo({
-    required String seckeyHex,
-    required String myPubkeyHex,
-    required Set<String> desiredFollowing,
-    required Set<String> relayUrls,
-  }) async {
-    final currentTags = await fetchOwnContactTags(myPubkeyHex, relayUrls);
-    return _publishFollowing(
-      seckeyHex: seckeyHex,
-      myPubkeyHex: myPubkeyHex,
-      currentTags: currentTags,
-      desiredFollowing: desiredFollowing,
-      relayUrls: relayUrls,
-    );
+    return (results: results, following: desired);
   }
 
   Future<Map<String, RelayPublishResult>> _publishFollowing({

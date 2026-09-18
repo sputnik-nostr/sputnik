@@ -3,7 +3,7 @@ import 'models/nostr_filter.dart';
 import 'relay_connection_pool.dart';
 
 export 'relay_connection_pool.dart'
-    show RelayPublishOutcome, RelayPublishResult;
+    show RelayPublishOutcome, RelayPublishResult, RelayQueryResult;
 
 const authorsChunkSize = 100;
 
@@ -26,6 +26,18 @@ class RelayClient {
 
   Future<List<NostrEvent>> query(Set<String> relayUrls, NostrFilter filter) {
     return RelayConnectionPool.instance.query(
+      relayUrls,
+      filter,
+      timeout: timeout,
+    );
+  }
+
+  // Like [query], but also says how many relays actually answered.
+  Future<RelayQueryResult> queryWithStatus(
+    Set<String> relayUrls,
+    NostrFilter filter,
+  ) {
+    return RelayConnectionPool.instance.queryWithStatus(
       relayUrls,
       filter,
       timeout: timeout,

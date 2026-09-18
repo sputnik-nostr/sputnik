@@ -19,7 +19,10 @@ class RelayPostRepository implements PostRepository {
   Future<List<NostrPost>> fetchPosts() => _fetchPosts();
 
   Future<List<NostrPost>> fetchPostsByAuthor(String pubkeyHex) =>
-      _fetchPosts(authors: [pubkeyHex]);
+      fetchPostsByAuthors([pubkeyHex]);
+
+  Future<List<NostrPost>> fetchPostsByAuthors(List<String> pubkeysHex) =>
+      _fetchPosts(authors: pubkeysHex);
 
   Future<NostrPost?> fetchPostById(String id) async {
     final events = await client.query(
@@ -36,18 +39,27 @@ class RelayPostRepository implements PostRepository {
   }
 
   Future<List<NostrPost>> _fetchPosts({List<String>? authors}) async {
-    final events = await client.query(
-      relayUrls,
-      NostrFilter(kinds: const [1], authors: authors, limit: limit),
+    final wanted = authors?.map((a) => a.toLowerCase()).toSet();
+    final filters = [
+      if (wanted == null)
+        NostrFilter(kinds: const [1], limit: limit)
+      else
+        for (final chunk in chunkedAuthors(wanted.toList()))
+          NostrFilter(kinds: const [1], authors: chunk, limit: limit),
+    ];
+
+    final eventsByFilter = await Future.wait(
+      filters.map((filter) => client.query(relayUrls, filter)),
     );
 
-    final wanted = authors?.map((a) => a.toLowerCase()).toSet();
-    final matching = [
-      for (final event in events)
-        if (event.kind == 1 &&
-            (wanted == null || wanted.contains(event.pubkey)))
-          event,
-    ]..sort(compareNewestFirst);
+    final eventsById = {
+      for (final events in eventsByFilter)
+        for (final event in events)
+          if (event.kind == 1 &&
+              (wanted == null || wanted.contains(event.pubkey)))
+            event.id: event,
+    };
+    final matching = eventsById.values.toList()..sort(compareNewestFirst);
 
     return matching.take(limit).map(nostrPostFromEvent).toList();
   }

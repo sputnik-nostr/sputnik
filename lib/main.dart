@@ -22,7 +22,11 @@ final ValueNotifier<AppSeedColor> seedColorNotifier = ValueNotifier(
   AppSeedColor.blue,
 );
 
+// The global feed, from every selected relay.
 final ValueNotifier<List<Note>?> notesNotifier = ValueNotifier(null);
+
+// Posts from the active identity and the people it follows.
+final ValueNotifier<List<Note>?> followingNotesNotifier = ValueNotifier(null);
 
 final ValueNotifier<Map<String, Note>> bookmarkedNotesNotifier = ValueNotifier(
   const {},
@@ -127,15 +131,10 @@ Future<void> main() async {
 
   runApp(const MainApp());
 
-  loadFeed().catchError((Object error, StackTrace stack) {
-    FlutterError.reportError(
-      FlutterErrorDetails(
-        exception: error,
-        stack: stack,
-        library: 'sputnik',
-        context: ErrorDescription('loading the initial feed'),
-      ),
-    );
+  runFeedLoad(loadFollowingFeed, 'loading the following feed');
+  activeIdentityPubkeyNotifier.addListener(() {
+    followingNotesNotifier.value = null;
+    runFeedLoad(loadFollowingFeed, 'loading the following feed');
   });
 }
 

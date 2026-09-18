@@ -8,6 +8,7 @@ import '../models/time_format.dart';
 import '../nostr/nip05.dart';
 import '../nostr/nostr.dart';
 import '../theme/app_text_styles.dart';
+import '../widgets/compact_tab_bar.dart';
 import '../widgets/count_label.dart';
 import '../widgets/fade_in_avatar.dart';
 import '../widgets/follow_button.dart';
@@ -27,6 +28,9 @@ const _avatarMinDecodeExtent = 400;
 const _avatarRadius = 40.0;
 const _avatarOverlap = _avatarRadius * 2 * 0.25;
 const _avatarInitialFontSize = _avatarRadius * 0.7;
+
+// Replies are fetched alongside posts, so this needs headroom for both.
+const _profileEventLimit = 100;
 
 void openProfile(BuildContext context, String pubkeyHex) {
   // Otherwise a text field left focused offstage (e.g. search) can pop the
@@ -53,9 +57,15 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
   late final String? _resolvedPubkeyHex =
       widget.pubkeyHex ?? activeIdentityPubkeyNotifier.value;
+
+  late final TabController _tabController = TabController(
+    length: 2,
+    vsync: this,
+  );
 
   List<Note>? _fetchedNotes;
   bool _loadingNotes = true;
@@ -90,6 +100,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
     final pubkeyHex = _resolvedPubkeyHex;
@@ -113,6 +129,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final posts = await RelayPostRepository(
       relayUrls: relayUrls,
       client: widget.relayClient,
+      limit: _profileEventLimit,
     ).fetchPostsByAuthor(pubkeyHex);
     if (!mounted) return;
 
@@ -258,6 +275,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   )
                   .toList()
                 ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          final posts = [
+            for (final note in ownNotes)
+              if (!note.isReply) note,
+          ];
+          final replies = [
+            for (final note in ownNotes)
+              if (note.isReply) note,
+          ];
           final displayName =
               metadata?.resolvedName ??
               (ownNotes.isNotEmpty
@@ -272,291 +297,333 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           return RefreshIndicator(
             onRefresh: _refresh,
-            child: ListView(
-              padding: EdgeInsets.zero,
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: [
-                SizedBox(
-                  height: _bannerHeight + _avatarRadius * 2 - _avatarOverlap,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      GestureDetector(
-                        onTap: bannerUrl != null
-                            ? () => _openImage(context, bannerUrl)
-                            : null,
-                        child: ClipRect(
-                          child: SizedBox(
-                            height: _bannerHeight,
-                            width: double.infinity,
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [
-                                        theme.colorScheme.primary,
-                                        theme.colorScheme.tertiary,
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                if (bannerUrl != null &&
-                                    loadMediaNotifier.value)
-                                  Image(
-                                    image: ResizeImage(
-                                      NetworkImage(bannerUrl),
-                                      width: _bannerMaxDecodeExtent,
-                                      height: _bannerMaxDecodeExtent,
-                                      policy: ResizeImagePolicy.fit,
-                                    ),
-                                    fit: BoxFit.cover,
-                                    frameBuilder:
-                                        (
-                                          context,
-                                          child,
-                                          frame,
-                                          wasSynchronouslyLoaded,
-                                        ) {
-                                          if (wasSynchronouslyLoaded) {
-                                            return child;
-                                          }
-                                          return AnimatedOpacity(
-                                            opacity: frame == null ? 0 : 1,
-                                            duration: const Duration(
-                                              milliseconds: 300,
-                                            ),
-                                            curve: Curves.easeOut,
-                                            child: child,
-                                          );
-                                        },
-                                    errorBuilder: (_, _, _) =>
-                                        const SizedBox.shrink(),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: SafeArea(
-                          bottom: false,
-                          child: _FloatingBackButton(
-                            onTap: () => Navigator.pop(context),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 8,
-                        right: 16,
-                        child: _isCurrentUser
-                            ? IconButton.filled(
-                                key: const Key('editProfileButton'),
-                                tooltip: 'Edit profile',
-                                onPressed: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const EditProfileScreen(),
-                                  ),
-                                ),
-                                icon: const Icon(Icons.edit_outlined, size: 16),
-                                style: IconButton.styleFrom(
-                                  backgroundColor:
-                                      theme.colorScheme.inverseSurface,
-                                  foregroundColor:
-                                      theme.colorScheme.onInverseSurface,
-                                  shape: const StadiumBorder(),
-                                  minimumSize: const Size(44, 30),
-                                  padding: EdgeInsets.zero,
-                                ),
-                              )
-                            : activeIdentityPubkeyNotifier.value == null
-                            ? const SizedBox.shrink()
-                            : FollowButton(
-                                targetPubkeyHex: pubkeyHex,
-                                relayClient: widget.relayClient,
-                              ),
-                      ),
-                      Positioned(
-                        top: _bannerHeight - _avatarOverlap,
-                        left: 16,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: theme.colorScheme.surface,
-                          ),
-                          child: GestureDetector(
-                            onTap: pictureUrl != null
-                                ? () => _openImage(context, pictureUrl)
-                                : null,
-                            child: FadeInAvatar(
-                              radius: _avatarRadius,
-                              minDecodeExtent: _avatarMinDecodeExtent,
-                              imageUrl: pictureUrl,
-                              backgroundColor:
-                                  theme.colorScheme.primaryContainer,
-                              fallback: Text(
-                                displayName[0].toUpperCase(),
-                                style: theme.avatarFallback.copyWith(
-                                  fontSize: _avatarInitialFontSize,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            // The notes lists sit deeper than the default depth of 0.
+            notificationPredicate: (n) => n.metrics.axis == Axis.vertical,
+            child: NestedScrollView(
+              headerSliverBuilder: (context, _) => [
+                SliverToBoxAdapter(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        displayName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(truncateNpub(npub), style: theme.metadata),
-                          const SizedBox(width: 4),
-                          InkWell(
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(12),
-                            ),
-                            onTap: () {
-                              Clipboard.setData(ClipboardData(text: npub));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Copied npub to clipboard'),
+                      SizedBox(
+                        height:
+                            _bannerHeight + _avatarRadius * 2 - _avatarOverlap,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            GestureDetector(
+                              onTap: bannerUrl != null
+                                  ? () => _openImage(context, bannerUrl)
+                                  : null,
+                              child: ClipRect(
+                                child: SizedBox(
+                                  height: _bannerHeight,
+                                  width: double.infinity,
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                            colors: [
+                                              theme.colorScheme.primary,
+                                              theme.colorScheme.tertiary,
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      if (bannerUrl != null &&
+                                          loadMediaNotifier.value)
+                                        Image(
+                                          image: ResizeImage(
+                                            NetworkImage(bannerUrl),
+                                            width: _bannerMaxDecodeExtent,
+                                            height: _bannerMaxDecodeExtent,
+                                            policy: ResizeImagePolicy.fit,
+                                          ),
+                                          fit: BoxFit.cover,
+                                          frameBuilder:
+                                              (
+                                                context,
+                                                child,
+                                                frame,
+                                                wasSynchronouslyLoaded,
+                                              ) {
+                                                if (wasSynchronouslyLoaded) {
+                                                  return child;
+                                                }
+                                                return AnimatedOpacity(
+                                                  opacity: frame == null
+                                                      ? 0
+                                                      : 1,
+                                                  duration: const Duration(
+                                                    milliseconds: 300,
+                                                  ),
+                                                  curve: Curves.easeOut,
+                                                  child: child,
+                                                );
+                                              },
+                                          errorBuilder: (_, _, _) =>
+                                              const SizedBox.shrink(),
+                                        ),
+                                    ],
+                                  ),
                                 ),
-                              );
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.all(4),
-                              child: Icon(
-                                Icons.copy,
-                                size: 14,
-                                color: theme.colorScheme.outline,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      if (nip05 != null && nip05.trim().isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Nip05Badge(
-                          identifier: nip05.trim(),
-                          status: _nip05Status,
-                        ),
-                      ],
-                      if (ownNotes.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          formatLastActiveFromPostedAt(ownNotes.first.postedAt),
-                          style: theme.metadata,
-                        ),
-                      ],
-                      if (hasBio) ...[
-                        const SizedBox(height: 8),
-                        LinkifiedText(bio, style: theme.textTheme.bodyMedium),
-                      ],
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          CountLabel(
-                            count: _following?.length,
-                            label: 'following',
-                            onTap: _following == null
-                                ? null
-                                : () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => UsersListScreen(
-                                        title: 'Following',
-                                        pubkeys: _following!,
+                            Positioned(
+                              top: 8,
+                              left: 8,
+                              child: SafeArea(
+                                bottom: false,
+                                child: _FloatingBackButton(
+                                  onTap: () => Navigator.pop(context),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 8,
+                              right: 16,
+                              child: _isCurrentUser
+                                  ? IconButton.filled(
+                                      key: const Key('editProfileButton'),
+                                      tooltip: 'Edit profile',
+                                      onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const EditProfileScreen(),
+                                        ),
+                                      ),
+                                      icon: const Icon(
+                                        Icons.edit_outlined,
+                                        size: 16,
+                                      ),
+                                      style: IconButton.styleFrom(
+                                        backgroundColor:
+                                            theme.colorScheme.inverseSurface,
+                                        foregroundColor:
+                                            theme.colorScheme.onInverseSurface,
+                                        shape: const StadiumBorder(),
+                                        minimumSize: const Size(44, 30),
+                                        padding: EdgeInsets.zero,
+                                      ),
+                                    )
+                                  : activeIdentityPubkeyNotifier.value == null
+                                  ? const SizedBox.shrink()
+                                  : FollowButton(
+                                      targetPubkeyHex: pubkeyHex,
+                                      relayClient: widget.relayClient,
+                                    ),
+                            ),
+                            Positioned(
+                              top: _bannerHeight - _avatarOverlap,
+                              left: 16,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: theme.colorScheme.surface,
+                                ),
+                                child: GestureDetector(
+                                  onTap: pictureUrl != null
+                                      ? () => _openImage(context, pictureUrl)
+                                      : null,
+                                  child: FadeInAvatar(
+                                    radius: _avatarRadius,
+                                    minDecodeExtent: _avatarMinDecodeExtent,
+                                    imageUrl: pictureUrl,
+                                    backgroundColor:
+                                        theme.colorScheme.primaryContainer,
+                                    fallback: Text(
+                                      displayName[0].toUpperCase(),
+                                      style: theme.avatarFallback.copyWith(
+                                        fontSize: _avatarInitialFontSize,
                                       ),
                                     ),
                                   ),
-                          ),
-                          const SizedBox(width: 16),
-                          CountLabel(
-                            count: _followers?.length,
-                            label: 'followers',
-                            onTap: _followers == null
-                                ? null
-                                : () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => UsersListScreen(
-                                        title: 'Followers',
-                                        pubkeys: _followers!,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              displayName,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(truncateNpub(npub), style: theme.metadata),
+                                const SizedBox(width: 4),
+                                InkWell(
+                                  borderRadius: const BorderRadius.all(
+                                    Radius.circular(12),
+                                  ),
+                                  onTap: () {
+                                    Clipboard.setData(
+                                      ClipboardData(text: npub),
+                                    );
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Copied npub to clipboard',
+                                        ),
                                       ),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(4),
+                                    child: Icon(
+                                      Icons.copy,
+                                      size: 14,
+                                      color: theme.colorScheme.outline,
                                     ),
                                   ),
-                          ),
-                        ],
-                      ),
-                      if (visiblePaymentTargets.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              for (
-                                var i = 0;
-                                i < visiblePaymentTargets.length;
-                                i++
-                              ) ...[
-                                if (i > 0) const SizedBox(width: 8),
-                                PaymentTargetChip(
-                                  target: visiblePaymentTargets[i],
                                 ),
                               ],
+                            ),
+                            if (nip05 != null && nip05.trim().isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Nip05Badge(
+                                identifier: nip05.trim(),
+                                status: _nip05Status,
+                              ),
                             ],
-                          ),
+                            if (ownNotes.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                formatLastActiveFromPostedAt(
+                                  ownNotes.first.postedAt,
+                                ),
+                                style: theme.metadata,
+                              ),
+                            ],
+                            if (hasBio) ...[
+                              const SizedBox(height: 8),
+                              LinkifiedText(
+                                bio,
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                CountLabel(
+                                  count: _following?.length,
+                                  label: 'following',
+                                  onTap: _following == null
+                                      ? null
+                                      : () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => UsersListScreen(
+                                              title: 'Following',
+                                              pubkeys: _following!,
+                                            ),
+                                          ),
+                                        ),
+                                ),
+                                const SizedBox(width: 16),
+                                CountLabel(
+                                  count: _followers?.length,
+                                  label: 'followers',
+                                  onTap: _followers == null
+                                      ? null
+                                      : () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => UsersListScreen(
+                                              title: 'Followers',
+                                              pubkeys: _followers!,
+                                            ),
+                                          ),
+                                        ),
+                                ),
+                              ],
+                            ),
+                            if (visiblePaymentTargets.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    for (
+                                      var i = 0;
+                                      i < visiblePaymentTargets.length;
+                                      i++
+                                    ) ...[
+                                      if (i > 0) const SizedBox(width: 8),
+                                      PaymentTargetChip(
+                                        target: visiblePaymentTargets[i],
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                      ],
+                      ),
+                      CompactTabBar(
+                        controller: _tabController,
+                        labels: const ['Posts', 'Replies'],
+                      ),
                     ],
                   ),
                 ),
-                const Divider(height: 1),
-                if (ownNotes.isEmpty && _loadingNotes)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 48),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (ownNotes.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 48),
-                    child: PlaceholderTab(
-                      icon: Icons.notes_outlined,
-                      label: 'No posts yet',
-                    ),
-                  )
-                else
-                  for (final note in ownNotes) ...[
-                    NoteTile(note: note),
-                    const Divider(height: 1),
-                  ],
               ],
+              body: TabBarView(
+                controller: _tabController,
+                children: [
+                  _notesTab('posts', posts, 'No posts yet'),
+                  _notesTab('replies', replies, 'No replies yet'),
+                ],
+              ),
             ),
           );
         },
       ),
+    );
+  }
+
+  Widget _notesTab(String storageKey, List<Note> notes, String emptyLabel) {
+    return ListView(
+      key: PageStorageKey(storageKey),
+      padding: EdgeInsets.zero,
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        if (notes.isEmpty && _loadingNotes)
+          const Padding(
+            padding: EdgeInsets.only(top: 48),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (notes.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 48),
+            child: PlaceholderTab(
+              icon: Icons.notes_outlined,
+              label: emptyLabel,
+            ),
+          )
+        else
+          for (final note in notes) ...[
+            NoteTile(note: note),
+            const Divider(height: 1),
+          ],
+      ],
     );
   }
 }

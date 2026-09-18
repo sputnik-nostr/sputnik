@@ -31,6 +31,7 @@ Note noteFromNostrPost(NostrPost post, {NostrMetadata? authorMetadata}) {
     replyCount: post.replyCount,
     repostCount: post.repostCount,
     likeCount: post.likeCount,
+    isReply: post.isReply,
   );
 }
 

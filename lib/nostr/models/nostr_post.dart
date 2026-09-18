@@ -1,3 +1,4 @@
+import '../nip10.dart';
 import '../nip19.dart';
 import 'nostr_event.dart';
 
@@ -12,6 +13,7 @@ NostrPost nostrPostFromEvent(NostrEvent event) {
     ),
     content: event.content,
     createdAt: event.createdAt,
+    isReply: replyParentId(event) != null,
   );
 }
 
@@ -36,6 +38,7 @@ class NostrPost {
     this.replyCount = 0,
     this.repostCount = 0,
     this.likeCount = 0,
+    this.isReply = false,
   });
 
   final String id;
@@ -45,4 +48,5 @@ class NostrPost {
   final int replyCount;
   final int repostCount;
   final int likeCount;
+  final bool isReply;
 }

@@ -7,8 +7,11 @@ import 'package:sputnik/main.dart';
 import 'package:sputnik/models/identity.dart';
 import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/screens/users_list_screen.dart';
+import 'package:sputnik/services/follow_sync.dart';
 import 'package:sputnik/services/settings_store.dart';
 import 'package:sputnik/widgets/follow_button.dart';
+
+import 'support/answering_relay_client.dart';
 
 class _FakeSecretStore implements SecretStore {
   final _values = <String, String>{};
@@ -23,7 +26,7 @@ class _FakeSecretStore implements SecretStore {
   Future<void> delete(String key) async => _values.remove(key);
 }
 
-class _FakeRelayClient extends RelayClient {
+class _FakeRelayClient extends RelayClient with AnsweringRelayClient {
   _FakeRelayClient({
     required this.seckeyHex,
     this.followingTags = const [],
@@ -262,6 +265,8 @@ void main() {
       // Not reverted, even though the background publish failed.
       expect(find.text('Following'), findsOneWidget);
       expect(find.text('Could not update your follow list'), findsOneWidget);
+      // A failed publish is retried later; don't leave that timer running.
+      resetFollowSync();
     },
   );
 

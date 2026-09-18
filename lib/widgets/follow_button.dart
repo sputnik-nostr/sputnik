@@ -28,10 +28,11 @@ class FollowButton extends StatelessWidget {
 
     final target = targetPubkeyHex.toLowerCase();
     final updated = Set<String>.of(myFollowingNotifier.value ?? const {});
-    if (!updated.remove(target)) updated.add(target);
+    final follow = !updated.remove(target);
+    if (follow) updated.add(target);
     myFollowingNotifier.value = updated;
 
-    scheduleFollowingSync(relayClient: relayClient);
+    scheduleFollowingSync(target, follow: follow, relayClient: relayClient);
   }
 
   @override

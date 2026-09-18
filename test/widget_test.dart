@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sputnik/main.dart';
@@ -29,7 +29,13 @@ void main() {
     await tester.tap(profileButton);
     await tester.pumpAndSettle();
 
-    expect(find.text('No identity yet'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(Drawer),
+        matching: find.text('No identity yet'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Settings'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('settingsCard')));

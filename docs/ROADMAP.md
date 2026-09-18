@@ -13,7 +13,8 @@
 - [x] Publish profile edits to relays (name/bio only so far)
 - [x] Publish follow/unfollow to relays (was previously a stub)
 - [x] Allow copying text
-- [ ] Separate posts and replies on profiles
+- [x] Separate posts and replies on profiles
+- [x] Separate following and global feeds on the home page
 - [ ] Add support for profile URLs
 - [ ] Add support for Blossom and other media types
 - [ ] Show relay lists on profiles

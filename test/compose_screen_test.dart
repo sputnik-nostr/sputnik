@@ -47,6 +47,7 @@ void main() {
     // Avoid HomeScreen's indefinite loading spinner, which would keep
     // pumpAndSettle spinning forever.
     notesNotifier.value = const [];
+    followingNotesNotifier.value = const [];
 
     // A fresh, throwaway keypair generated for this test run only -- never
     // a real saved identity.

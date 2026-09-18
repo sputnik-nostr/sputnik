@@ -2,6 +2,7 @@ import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'models/nostr_post.dart';
 import 'models/post_reactions.dart';
+import 'nip10.dart';
 import 'relay_client.dart';
 import 'relay_reactions_repository.dart';
 
@@ -21,35 +22,6 @@ class ThreadData {
 }
 
 const _replyLimit = 200;
-
-const _nip10Markers = {'root', 'reply', 'mention'};
-
-bool _hasNip10Marker(List<String> tag) =>
-    tag.length >= 4 && _nip10Markers.contains(tag[3]);
-
-// Per NIP-10: prefer a marked "reply" tag, falling back to "root" for
-// top-level replies. Without markers (the deprecated positional scheme),
-// the last "e" tag is the parent; earlier ones are just citations.
-String? _directReplyParent(NostrEvent event) {
-  final eTags = [
-    for (final tag in event.tags)
-      if (tag.length > 1 && tag[0] == 'e') tag,
-  ];
-  if (eTags.isEmpty) return null;
-
-  final marked = eTags.where(_hasNip10Marker).toList();
-  if (marked.isNotEmpty) {
-    for (final tag in marked) {
-      if (tag[3] == 'reply') return tag[1].toLowerCase();
-    }
-    for (final tag in marked) {
-      if (tag[3] == 'root') return tag[1].toLowerCase();
-    }
-    return null;
-  }
-
-  return eTags.last[1].toLowerCase();
-}
 
 class RelayThreadRepository {
   const RelayThreadRepository({
@@ -78,7 +50,7 @@ class RelayThreadRepository {
     final wantedId = postId.toLowerCase();
     final matchingReplies = [
       for (final event in await repliesFuture)
-        if (event.kind == 1 && _directReplyParent(event) == wantedId) event,
+        if (event.kind == 1 && replyParentId(event) == wantedId) event,
     ]..sort(compareNewestFirst);
     final replyEvents = matchingReplies.take(_replyLimit).toList();
     final reactions = (await reactionsFuture)[postId] ?? const PostReactions();

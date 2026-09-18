@@ -3,10 +3,15 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sputnik/main.dart';
 import 'package:sputnik/models/identity.dart';
+import 'package:sputnik/models/note.dart';
 import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/screens/identities_screen.dart';
 import 'package:sputnik/screens/profile_screen.dart';
+import 'package:sputnik/widgets/compact_tab_bar.dart';
+import 'package:sputnik/services/follow_sync.dart';
 import 'package:sputnik/services/settings_store.dart';
+
+import 'support/answering_relay_client.dart';
 
 class _FakeSecretStore implements SecretStore {
   final _values = <String, String>{};
@@ -21,7 +26,7 @@ class _FakeSecretStore implements SecretStore {
   Future<void> delete(String key) async => _values.remove(key);
 }
 
-class _FakeRelayClient extends RelayClient {
+class _FakeRelayClient extends RelayClient with AnsweringRelayClient {
   _FakeRelayClient({
     this.publishOutcome = RelayPublishOutcome.accepted,
     this.paymentTargetTags = const [],
@@ -30,12 +35,14 @@ class _FakeRelayClient extends RelayClient {
   final RelayPublishOutcome publishOutcome;
   final List<List<String>> paymentTargetTags;
   NostrEvent? lastPublished;
+  int queryCount = 0;
 
   @override
   Future<List<NostrEvent>> query(
     Set<String> relayUrls,
     NostrFilter filter,
   ) async {
+    queryCount++;
     if (filter.kinds?.contains(10133) != true) return const [];
     final author = filter.authors?.first;
     if (author == null || paymentTargetTags.isEmpty) return const [];
@@ -78,6 +85,7 @@ void main() {
     myFollowingNotifier.value = null;
     hiddenPaymentTargetTypesNotifier.value = const {};
     profileCacheNotifier.value = const {};
+    notesNotifier.value = const [];
   });
 
   testWidgets('with no active identity, shows a prompt instead of a profile', (
@@ -116,6 +124,147 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('followButton')), findsNothing);
+  });
+
+  group('posts and replies tabs', () {
+    final pubkeyHex = 'b' * 64;
+
+    // Notes are shown newest first, so an id's age makes the order predictable.
+    Note note(String id, String content, {required bool isReply}) => Note(
+      id: id,
+      pubkey: pubkeyHex,
+      displayName: 'Bob',
+      handle: 'bob',
+      content: content,
+      postedAt: '1m',
+      createdAt: DateTime.now().subtract(
+        Duration(minutes: int.tryParse(id) ?? 0),
+      ),
+      isReply: isReply,
+    );
+
+    Future<void> pumpProfile(WidgetTester tester) async {
+      notesNotifier.value = [
+        note('1', 'a top-level post', isReply: false),
+        note('2', 'a reply to someone', isReply: true),
+      ];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProfileScreen(
+            pubkeyHex: pubkeyHex,
+            relayClient: _FakeRelayClient(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('opens on posts and hides replies', (tester) async {
+      await pumpProfile(tester);
+
+      expect(find.text('a top-level post'), findsOneWidget);
+      expect(find.text('a reply to someone'), findsNothing);
+    });
+
+    testWidgets('the replies tab shows replies and hides posts', (
+      tester,
+    ) async {
+      await pumpProfile(tester);
+
+      await tester.tap(find.text('Replies'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('a reply to someone'), findsOneWidget);
+      expect(find.text('a top-level post'), findsNothing);
+    });
+
+    testWidgets('swiping moves between posts and replies', (tester) async {
+      await pumpProfile(tester);
+
+      await tester.drag(find.byType(TabBarView), const Offset(-600, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('a reply to someone'), findsOneWidget);
+      expect(find.text('a top-level post'), findsNothing);
+
+      await tester.drag(find.byType(TabBarView), const Offset(600, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('a top-level post'), findsOneWidget);
+      expect(find.text('a reply to someone'), findsNothing);
+    });
+
+    testWidgets('scrolling a long list moves the header out of the way', (
+      tester,
+    ) async {
+      notesNotifier.value = [
+        for (var i = 0; i < 30; i++)
+          note('$i', 'post number $i', isReply: false),
+      ];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProfileScreen(
+            pubkeyHex: pubkeyHex,
+            relayClient: _FakeRelayClient(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final before = tester.getTopLeft(find.byType(CompactTabBar)).dy;
+      await tester.drag(find.byType(CompactTabBar), const Offset(0, -300));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getTopLeft(find.byType(CompactTabBar)).dy,
+        lessThan(before),
+      );
+      for (var i = 0; i < 4; i++) {
+        await tester.drag(
+          find.byType(NestedScrollView),
+          const Offset(0, -1500),
+        );
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('post number 29'), findsOneWidget);
+    });
+
+    testWidgets('pulling down refreshes the profile', (tester) async {
+      final client = _FakeRelayClient();
+      notesNotifier.value = [note('1', 'a top-level post', isReply: false)];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProfileScreen(pubkeyHex: pubkeyHex, relayClient: client),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final before = client.queryCount;
+
+      await tester.fling(
+        find.text('a top-level post'),
+        const Offset(0, 400),
+        1000,
+      );
+      await tester.pumpAndSettle();
+
+      expect(client.queryCount, greaterThan(before));
+    });
+
+    testWidgets('an empty tab says so', (tester) async {
+      notesNotifier.value = [note('1', 'only a post', isReply: false)];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProfileScreen(
+            pubkeyHex: pubkeyHex,
+            relayClient: _FakeRelayClient(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Replies'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No replies yet'), findsOneWidget);
+    });
   });
 
   testWidgets('a hidden payment target type is not shown on a profile', (
@@ -332,6 +481,8 @@ void main() {
         // Not reverted, even though the background publish failed.
         expect(find.text('Following'), findsOneWidget);
         expect(find.text('Could not update your follow list'), findsOneWidget);
+        // A failed publish is retried later; don't leave that timer running.
+        resetFollowSync();
       },
     );
   });

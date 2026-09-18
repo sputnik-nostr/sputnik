@@ -9,7 +9,9 @@ import 'package:sputnik/nostr/relay_post_repository.dart';
 import 'package:sputnik/nostr/relay_reactions_repository.dart';
 import 'package:sputnik/nostr/relay_thread_repository.dart';
 
-class _RelayReturning extends RelayClient {
+import 'support/answering_relay_client.dart';
+
+class _RelayReturning extends RelayClient with AnsweringRelayClient {
   const _RelayReturning(this.events);
 
   final List<NostrEvent> events;
@@ -24,7 +26,8 @@ class _RelayReturning extends RelayClient {
 // A mutable sibling of _RelayReturning for tests that also publish -- kept
 // separate since _RelayReturning's const constructor is relied on elsewhere
 // (e.g. the top-level _noReactions below).
-class _RelayReturningAndPublishing extends RelayClient {
+class _RelayReturningAndPublishing extends RelayClient
+    with AnsweringRelayClient {
   _RelayReturningAndPublishing(
     this.events, {
     this.publishOutcome = RelayPublishOutcome.accepted,
@@ -48,6 +51,42 @@ class _RelayReturningAndPublishing extends RelayClient {
     lastPublished = event;
     return {
       for (final url in relayUrls) url: RelayPublishResult(publishOutcome),
+    };
+  }
+}
+
+// A client whose relays did not all answer a query: empty results.
+class _UnreachableRelay extends RelayClient {
+  _UnreachableRelay({this.answered = 0});
+
+  final int answered;
+  final published = <NostrEvent>[];
+
+  @override
+  Future<List<NostrEvent>> query(
+    Set<String> relayUrls,
+    NostrFilter filter,
+  ) async => const [];
+
+  @override
+  Future<RelayQueryResult> queryWithStatus(
+    Set<String> relayUrls,
+    NostrFilter filter,
+  ) async => RelayQueryResult(
+    events: const [],
+    answeredRelays: answered,
+    queriedRelays: 2,
+  );
+
+  @override
+  Future<Map<String, RelayPublishResult>> publish(
+    NostrEvent event,
+    Set<String> relayUrls,
+  ) async {
+    published.add(event);
+    return {
+      for (final url in relayUrls)
+        url: const RelayPublishResult(RelayPublishOutcome.accepted),
     };
   }
 }
@@ -388,11 +427,21 @@ void main() {
     });
   });
 
-  group('follow-list sync (background sync from myFollowingNotifier)', () {
+  group('follow-list changes', () {
     final me = generateNostrKeyPair();
 
-    test('publishes exactly the desired set, preserving kept tags and adding '
-        'bare tags for new ones', () async {
+    Future<({Map<String, RelayPublishResult> results, Set<String> following})>
+    apply(RelayClient client, Map<String, bool> changes) {
+      return RelayContactsRepository(client: client).applyFollowChanges(
+        seckeyHex: me.privateKeyHex,
+        myPubkeyHex: me.publicKeyHex,
+        changes: changes,
+        relayUrls: {'wss://r'},
+      );
+    }
+
+    test('applies changes on top of the relay list, preserving kept tags and '
+        'adding bare tags for new ones', () async {
       final client = _RelayReturningAndPublishing([
         event(
           pubkey: me.publicKeyHex,
@@ -403,50 +452,70 @@ void main() {
           ],
         ),
       ]);
-      final repository = RelayContactsRepository(client: client);
 
       // Drop victim, keep other, add attacker.
-      final results = await repository.syncFollowingTo(
-        seckeyHex: me.privateKeyHex,
-        myPubkeyHex: me.publicKeyHex,
-        desiredFollowing: {other, attacker},
-        relayUrls: {'wss://r'},
-      );
+      final outcome = await apply(client, {victim: false, attacker: true});
 
       expect(
-        results.values.every((r) => r.outcome == RelayPublishOutcome.accepted),
+        outcome.results.values.every(
+          (r) => r.outcome == RelayPublishOutcome.accepted,
+        ),
         isTrue,
       );
+      expect(outcome.following, {other, attacker});
       expect(client.lastPublished!.tags, [
         ['p', other, 'wss://their-relay', 'petname'],
         ['p', attacker],
       ]);
     });
 
+    test('an unchanged list is republished as it was', () async {
+      final client = _RelayReturningAndPublishing([
+        event(
+          pubkey: me.publicKeyHex,
+          kind: 3,
+          tags: [
+            ['p', other],
+          ],
+        ),
+      ]);
+
+      await apply(client, {other: true});
+
+      expect(client.lastPublished!.tags, [
+        ['p', other],
+      ]);
+    });
+
+    test('starts a new list when the relays answered and have none', () async {
+      final client = _RelayReturningAndPublishing(const []);
+
+      final outcome = await apply(client, {other: true});
+
+      expect(outcome.following, {other});
+      expect(client.lastPublished!.tags, [
+        ['p', other],
+      ]);
+    });
+
+    test('publishes nothing when no relay answered the list query', () async {
+      final client = _UnreachableRelay();
+
+      final outcome = await apply(client, {other: true});
+
+      expect(outcome.results, isEmpty);
+      expect(client.published, isEmpty);
+    });
+
     test(
-      'collapses to a no-op publish when the desired set is unchanged',
+      'publishes nothing when only some relays answered "no list"',
       () async {
-        final client = _RelayReturningAndPublishing([
-          event(
-            pubkey: me.publicKeyHex,
-            kind: 3,
-            tags: [
-              ['p', other],
-            ],
-          ),
-        ]);
-        final repository = RelayContactsRepository(client: client);
+        final client = _UnreachableRelay(answered: 1);
 
-        await repository.syncFollowingTo(
-          seckeyHex: me.privateKeyHex,
-          myPubkeyHex: me.publicKeyHex,
-          desiredFollowing: {other},
-          relayUrls: {'wss://r'},
-        );
+        final outcome = await apply(client, {other: true});
 
-        expect(client.lastPublished!.tags, [
-          ['p', other],
-        ]);
+        expect(outcome.results, isEmpty);
+        expect(client.published, isEmpty);
       },
     );
   });
