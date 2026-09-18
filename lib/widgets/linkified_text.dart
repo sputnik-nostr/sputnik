@@ -17,10 +17,18 @@ final _linkPattern = RegExp(
 );
 
 class LinkifiedText extends StatefulWidget {
-  const LinkifiedText(this.text, {super.key, this.style});
+  const LinkifiedText(
+    this.text, {
+    super.key,
+    this.style,
+    this.selectable = true,
+  });
 
   final String text;
   final TextStyle? style;
+
+  // Off inside tappable rows, where a selection area would swallow the taps.
+  final bool selectable;
 
   @override
   State<LinkifiedText> createState() => _LinkifiedTextState();
@@ -112,11 +120,11 @@ class _LinkifiedTextState extends State<LinkifiedText> {
       if (!live.contains(key)) _recognizers.remove(key)?.dispose();
     }
 
-    // SelectionArea lets the text be selected/copied while still passing
-    // plain taps through to each span's TapGestureRecognizer for links.
-    return SelectionArea(
-      child: Text.rich(TextSpan(style: widget.style, children: spans)),
-    );
+    final text = Text.rich(TextSpan(style: widget.style, children: spans));
+    if (!widget.selectable) return text;
+
+    // Plain taps still reach each link span's recognizer.
+    return SelectionArea(child: text);
   }
 
   Future<void> _openHttpUrl(BuildContext context, String url) async {

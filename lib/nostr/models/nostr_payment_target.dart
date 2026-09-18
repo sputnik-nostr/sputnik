@@ -1,7 +1,7 @@
 import 'nostr_event.dart';
 import 'payment_target_types.dart';
 
-String _canonicalPaymentTargetType(String type) {
+String canonicalPaymentTargetType(String type) {
   final lower = type.toLowerCase();
   return paymentTargetTypeAliases[lower] ?? lower;
 }
@@ -11,7 +11,7 @@ class NostrPaymentTarget {
 
   factory NostrPaymentTarget.fromJson(Map<String, dynamic> json) =>
       NostrPaymentTarget(
-        type: _canonicalPaymentTargetType(json['type'] as String),
+        type: canonicalPaymentTargetType(json['type'] as String),
         address: json['address'] as String,
       );
 
@@ -39,7 +39,7 @@ List<NostrPaymentTarget> paymentTargetsFromEvent(NostrEvent event) {
     for (final tag in event.tags)
       if (tag.length > 2 && tag[0] == 'payto')
         NostrPaymentTarget(
-          type: _canonicalPaymentTargetType(tag[1]),
+          type: canonicalPaymentTargetType(tag[1]),
           address: tag[2],
         ),
   ];

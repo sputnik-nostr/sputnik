@@ -24,7 +24,8 @@ void runFeedLoad(Future<void> Function() load, String description) {
 Future<void> loadGlobalFeed() async {
   final generation = ++_globalGeneration;
   final relayUrls = selectedRelaysNotifier.value;
-  final posts = await RelayPostRepository(relayUrls: relayUrls).fetchPosts();
+  final posts = await RelayPostRepository(relayUrls: relayUrls)
+      .fetchPosts(includeReplies: false);
   if (generation != _globalGeneration) return;
 
   await _showPosts(
@@ -50,7 +51,7 @@ Future<void> loadFollowingFeed() async {
 
   final authors = {...?myFollowingNotifier.value, myPubkeyHex}.toList();
   final posts = await RelayPostRepository(relayUrls: relayUrls)
-      .fetchPostsByAuthors(authors);
+      .fetchPostsByAuthors(authors, includeReplies: false);
   if (generation != _followingGeneration) return;
 
   await _showPosts(

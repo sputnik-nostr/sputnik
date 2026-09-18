@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../models/note.dart';
+import '../nostr/nostr.dart';
+import '../screens/compose_screen.dart';
 import '../screens/post_screen.dart';
 import '../screens/profile_screen.dart';
 import '../theme/app_text_styles.dart';
@@ -67,6 +69,7 @@ class NoteTile extends StatelessWidget {
                   LinkifiedText(
                     note.content,
                     style: theme.textTheme.bodyMedium,
+                    selectable: false,
                   ),
                   const SizedBox(height: 8),
                   SingleChildScrollView(
@@ -74,8 +77,11 @@ class NoteTile extends StatelessWidget {
                     child: Row(
                       children: [
                         _StatButton(
+                          key: const Key('replyButton'),
                           icon: Icons.chat_bubble_outline,
                           count: note.replyCount,
+                          tooltip: 'Reply',
+                          onPressed: () => openReplyComposer(context, note),
                         ),
                         const SizedBox(width: 20),
                         _StatButton(
@@ -102,18 +108,41 @@ class NoteTile extends StatelessWidget {
   }
 }
 
+// Opens the composer for a reply and returns the published reply, if any.
+Future<NostrEvent?> openReplyComposer(
+  BuildContext context,
+  Note note, {
+  RelayClient relayClient = const RelayClient(),
+}) {
+  return Navigator.push<NostrEvent>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => ComposeScreen(replyTo: note, relayClient: relayClient),
+      fullscreenDialog: true,
+    ),
+  );
+}
+
 class _StatButton extends StatelessWidget {
-  const _StatButton({required this.icon, required this.count});
+  const _StatButton({
+    super.key,
+    required this.icon,
+    required this.count,
+    this.tooltip,
+    this.onPressed,
+  });
 
   final IconData icon;
   final int count;
+  final String? tooltip;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = theme.colorScheme.outline;
 
-    return Row(
+    final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 16, color: color),
@@ -122,6 +151,16 @@ class _StatButton extends StatelessWidget {
           Text('$count', style: theme.metadata),
         ],
       ],
+    );
+    if (onPressed == null) return content;
+
+    return Tooltip(
+      message: tooltip ?? '',
+      child: InkResponse(
+        onTap: onPressed,
+        radius: 20,
+        child: Padding(padding: const EdgeInsets.all(4), child: content),
+      ),
     );
   }
 }

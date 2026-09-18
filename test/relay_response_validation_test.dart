@@ -362,6 +362,31 @@ void main() {
       },
     );
 
+    test(
+      'a follow made in the same second as the last list is dated after it',
+      () async {
+        final previous = event(
+          pubkey: me.publicKeyHex,
+          kind: 3,
+          createdAt: DateTime.now(),
+        );
+        final client = _RelayReturningAndPublishing([previous]);
+
+        await RelayContactsRepository(client: client).setFollowing(
+          seckeyHex: me.privateKeyHex,
+          myPubkeyHex: me.publicKeyHex,
+          targetPubkeyHex: victim,
+          follow: true,
+          relayUrls: {'wss://r'},
+        );
+
+        expect(
+          client.lastPublished!.createdAt.isAfter(previous.createdAt),
+          isTrue,
+        );
+      },
+    );
+
     test('unfollowing someone removes only their tag', () async {
       final client = _RelayReturningAndPublishing([
         event(
@@ -578,7 +603,7 @@ void main() {
 
       final thread = await repository.fetchThread(wantedId, {'wss://r'});
       expect(thread.replies, hasLength(1));
-      expect(thread.replies.single.content, 'a real reply');
+      expect(thread.replies.single.post.content, 'a real reply');
     });
 
     test('a marked "mention" tag does not make a note a reply', () async {

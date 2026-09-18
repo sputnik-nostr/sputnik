@@ -15,16 +15,17 @@
 - [x] Allow copying text
 - [x] Separate posts and replies on profiles
 - [x] Separate following and global feeds on the home page
+- [x] Keep replies out of the home feeds (they stay on profiles and in threads)
 - [ ] Add support for profile URLs
 - [ ] Add support for Blossom and other media types
-- [ ] Show relay lists on profiles
+- [x] Show relay lists on profiles
 - [ ] Add recovery seed phrase support
 
 ## Posting and interaction (current state)
 
 - [x] Compose and publish a top-level note
 - [x] Follow/unfollow (instant UI, published in the background)
-- [ ] Reply to a post (threads are readable, but there's no way to post into one)
+- [x] Reply to a post (with the full thread: ancestors and nested replies)
 - [ ] Repost a note (repost counts are shown, but read-only)
 - [ ] React to a note, e.g. a like (like counts are shown, but read-only)
 - [ ] Real notifications (the Notifications tab is still a placeholder)
@@ -38,7 +39,10 @@
 - [ ] Make sure crypto logic is secure
 - [ ] Add desktop support for macOS
 - [ ] Rewrite doc comments
-- [ ] Let editing a profile cover more fields than name/bio (picture, banner, NIP-05, website)
+- [x] Let editing a profile cover more fields than name/bio (picture, banner, NIP-05, website)
+- [x] Publish your own relay list (NIP-65) and use it to set your relays
+- [x] Edit your own payment targets
+- [ ] Route posts by relay lists (outbox model), instead of only the selected relays
 - [ ] Add an option to hide/show client ID string
 - [ ] Add payment targets support for Zano and Firo
 - [ ] Have some visual indication that there are more payment target chips to scroll to

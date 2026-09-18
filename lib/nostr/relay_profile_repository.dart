@@ -3,7 +3,9 @@ import '../services/cache_store.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'models/nostr_metadata.dart';
+import 'profile_content.dart';
 import 'relay_client.dart';
+import 'replaceable_events.dart';
 
 class RelayProfileRepository {
   const RelayProfileRepository({this.client = const RelayClient()});
@@ -70,5 +72,39 @@ class RelayProfileRepository {
     }
 
     return {...cached, ...metadataByPubkey};
+  }
+
+  // Uncached, so an edit builds on what is really published.
+  Future<OwnEvent> fetchOwnProfileEvent(
+    String pubkeyHex,
+    Set<String> relayUrls,
+  ) {
+    return fetchOwnReplaceable(
+      client,
+      kind: 0,
+      pubkeyHex: pubkeyHex,
+      relayUrls: relayUrls,
+    );
+  }
+
+  // Publishes [fields] over [base]; its other fields and tags carry over.
+  Future<({NostrEvent event, Map<String, RelayPublishResult> results})>
+  publishProfile({
+    required String seckeyHex,
+    required String pubkeyHex,
+    required NostrEvent? base,
+    required Map<String, String> fields,
+    required Set<String> relayUrls,
+  }) async {
+    final event = signEvent(
+      seckeyHex: seckeyHex,
+      pubkeyHex: pubkeyHex,
+      kind: 0,
+      tags: base?.tags ?? const [],
+      content: editedProfileContent(base?.content, fields),
+      createdAt: nextReplaceableTime(base),
+    );
+    final results = await client.publish(event, relayUrls);
+    return (event: event, results: results);
   }
 }

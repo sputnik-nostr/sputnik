@@ -102,6 +102,113 @@ void main() {
     });
   });
 
+  group('threadRootId', () {
+    test('is null for a note that is not a reply', () {
+      expect(threadRootId(_note(const [])), isNull);
+    });
+
+    test('uses the root marker', () {
+      expect(
+        threadRootId(
+          _note([
+            ['e', root, '', 'root'],
+            ['e', parent, '', 'reply'],
+          ]),
+        ),
+        root,
+      );
+    });
+
+    test('a lone reply marker is its own root', () {
+      expect(
+        threadRootId(
+          _note([
+            ['e', parent, '', 'reply'],
+          ]),
+        ),
+        parent,
+      );
+    });
+
+    test('unmarked e tags use the first one', () {
+      expect(
+        threadRootId(
+          _note([
+            ['e', root],
+            ['e', cited],
+            ['e', parent],
+          ]),
+        ),
+        root,
+      );
+    });
+  });
+
+  group('replyTags', () {
+    final author = 'aa' * 32;
+    final other = 'bb' * 32;
+
+    NostrEvent target(String id, List<List<String>> tags) => NostrEvent(
+      id: id,
+      pubkey: author,
+      createdAt: DateTime.now(),
+      kind: 1,
+      tags: tags,
+      content: 'hi',
+      sig: 'sig',
+    );
+
+    test('a reply to a top-level note has a single root e tag', () {
+      expect(replyTags(target(root, const [])), [
+        ['e', root, '', 'root', author],
+        ['p', author],
+      ]);
+    });
+
+    test('a reply to a reply marks the root and the parent', () {
+      final tags = replyTags(
+        target(parent, [
+          ['e', root, '', 'root'],
+        ]),
+      );
+
+      expect(tags.take(2), [
+        ['e', root, '', 'root'],
+        ['e', parent, '', 'reply', author],
+      ]);
+    });
+
+    test('carries the parent p tags after the parent author', () {
+      final tags = replyTags(
+        target(root, [
+          ['p', other],
+          ['p', author],
+          ['p', 'not a pubkey'],
+        ]),
+      );
+
+      expect(
+        [
+          for (final tag in tags)
+            if (tag[0] == 'p') tag[1],
+        ],
+        [author, other],
+      );
+    });
+
+    test('bounds how many people a reply mentions', () {
+      final tags = replyTags(
+        target(root, [
+          for (var i = 0; i < 200; i++)
+            ['p', i.toRadixString(16).padLeft(64, '0')],
+        ]),
+      );
+
+      expect(tags.where((tag) => tag[0] == 'p').length, lessThanOrEqualTo(50));
+      expect(tags.where((tag) => tag[0] == 'p').first[1], author);
+    });
+  });
+
   test('nostrPostFromEvent flags replies', () {
     expect(nostrPostFromEvent(_note(const [])).isReply, isFalse);
     expect(

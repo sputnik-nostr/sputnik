@@ -2,15 +2,24 @@ import 'package:flutter/material.dart';
 
 import '../main.dart';
 import '../models/identity.dart';
+import '../models/note.dart';
+import '../nostr/nip10.dart';
 import '../nostr/nostr.dart';
 import '../services/settings_store.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/fade_in_avatar.dart';
 
 class ComposeScreen extends StatefulWidget {
-  const ComposeScreen({super.key, this.relayClient = const RelayClient()});
+  const ComposeScreen({
+    super.key,
+    this.relayClient = const RelayClient(),
+    this.replyTo,
+  });
 
   final RelayClient relayClient;
+
+  // The note being answered, or null for a new top-level note.
+  final Note? replyTo;
 
   @override
   State<ComposeScreen> createState() => _ComposeScreenState();
@@ -22,9 +31,19 @@ class _ComposeScreenState extends State<ComposeScreen> {
   bool _hasText = false;
   bool _posting = false;
 
+  // The parent's tags decide how a reply is threaded, so it is fetched early.
+  Future<NostrEvent?>? _parentFuture;
+
+  RelayPostRepository get _posts => RelayPostRepository(
+    relayUrls: selectedRelaysNotifier.value,
+    client: widget.relayClient,
+  );
+
   @override
   void initState() {
     super.initState();
+    final replyTo = widget.replyTo;
+    if (replyTo != null) _parentFuture = _posts.fetchEventById(replyTo.id);
     _controller.addListener(() {
       final hasText = _controller.text.trim().isNotEmpty;
       if (hasText != _hasText) setState(() => _hasText = hasText);
@@ -38,13 +57,16 @@ class _ComposeScreenState extends State<ComposeScreen> {
   }
 
   Future<bool> _confirmPost(int relayCount) async {
+    final isReply = widget.replyTo != null;
+    final noun = isReply ? 'reply' : 'note';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Post to relays?'),
+        title: Text(isReply ? 'Post reply to relays?' : 'Post to relays?'),
         content: Text(
-          'This publishes your note to $relayCount relay(s). Notes on '
-          'Nostr are public and cannot be reliably deleted afterward.',
+          'This publishes your $noun to $relayCount relay(s). '
+          '${isReply ? 'Replies' : 'Notes'} on Nostr are public and cannot '
+          'be reliably deleted afterward.',
         ),
         actions: [
           TextButton(
@@ -71,11 +93,39 @@ class _ComposeScreenState extends State<ComposeScreen> {
     final relayUrls = selectedRelaysNotifier.value;
     if (!await _confirmPost(relayUrls.length) || !mounted) return;
 
+    setState(() => _posting = true);
+    try {
+      await _sign(identity, relayUrls);
+    } finally {
+      if (mounted) setState(() => _posting = false);
+    }
+  }
+
+  Future<void> _sign(Identity identity, Set<String> relayUrls) async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    List<List<String>> tags = const [];
+    if (widget.replyTo != null) {
+      final parent =
+          await _parentFuture ??
+          await _posts.fetchEventById(widget.replyTo!.id);
+      if (!mounted) return;
+      if (parent == null) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Could not load the note you are replying to'),
+          ),
+        );
+        return;
+      }
+      tags = replyTags(parent);
+    }
+
     // Only touch secure storage once the user has actually confirmed.
     final privkeyHex = await SettingsStore.loadPrivateKey(identity.pubkeyHex);
     if (!mounted) return;
     if (privkeyHex == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
           content: Text("Could not find this identity's private key"),
         ),
@@ -89,22 +139,18 @@ class _ComposeScreenState extends State<ComposeScreen> {
         seckeyHex: privkeyHex,
         pubkeyHex: identity.pubkeyHex,
         kind: 1,
+        tags: tags,
         content: _controller.text.trim(),
       );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Could not sign this note: $e')));
-      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not sign this note: $e')),
+      );
       return;
     }
 
-    setState(() => _posting = true);
-    final messenger = ScaffoldMessenger.of(context);
     final results = await widget.relayClient.publish(event, relayUrls);
     if (!mounted) return;
-    setState(() => _posting = false);
 
     final accepted = results.values
         .where((result) => result.outcome == RelayPublishOutcome.accepted)
@@ -112,9 +158,15 @@ class _ComposeScreenState extends State<ComposeScreen> {
 
     if (accepted > 0) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Posted to $accepted/${results.length} relays')),
+        SnackBar(
+          content: Text(
+            widget.replyTo != null
+                ? 'Reply posted to $accepted/${results.length} relays'
+                : 'Posted to $accepted/${results.length} relays',
+          ),
+        ),
       );
-      Navigator.pop(context);
+      Navigator.pop(context, event);
     } else {
       String? reason;
       for (final result in results.values) {
@@ -134,6 +186,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final replyTo = widget.replyTo;
     final pubkeyHex = activeIdentityPubkeyNotifier.value;
     final metadata = pubkeyHex == null
         ? null
@@ -168,40 +221,98 @@ class _ComposeScreenState extends State<ComposeScreen> {
                 : FilledButton(
                     key: const Key('composePostButton'),
                     onPressed: pubkeyHex != null && _hasText ? _post : null,
-                    child: const Text('Post'),
+                    child: Text(replyTo == null ? 'Post' : 'Reply'),
                   ),
           ),
         ],
       ),
-      body: Padding(
+      body: ListView(
         padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            FadeInAvatar(
-              radius: 20,
-              imageUrl: metadata?.picture,
-              backgroundColor: theme.colorScheme.primaryContainer,
-              fallback: Text(fallbackLabel, style: theme.avatarFallback),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                key: const Key('composeTextField'),
-                controller: _controller,
-                autofocus: true,
-                maxLines: null,
-                minLines: 6,
-                textCapitalization: TextCapitalization.sentences,
-                style: theme.textTheme.bodyLarge,
-                cursorHeight: (theme.textTheme.bodyLarge?.fontSize ?? 16) * 1.2,
-                decoration: const InputDecoration.collapsed(
-                  hintText: "What's happening?",
+        children: [
+          if (replyTo != null) _ReplyContext(note: replyTo),
+          if (pubkeyHex == null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                'Create or import an identity to post.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.error,
                 ),
               ),
             ),
-          ],
-        ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              FadeInAvatar(
+                radius: 20,
+                imageUrl: metadata?.picture,
+                backgroundColor: theme.colorScheme.primaryContainer,
+                fallback: Text(fallbackLabel, style: theme.avatarFallback),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  key: const Key('composeTextField'),
+                  controller: _controller,
+                  autofocus: true,
+                  maxLines: null,
+                  minLines: 6,
+                  textCapitalization: TextCapitalization.sentences,
+                  style: theme.textTheme.bodyLarge,
+                  cursorHeight:
+                      (theme.textTheme.bodyLarge?.fontSize ?? 16) * 1.2,
+                  decoration: InputDecoration.collapsed(
+                    hintText: replyTo == null
+                        ? "What's happening?"
+                        : 'Post your reply',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReplyContext extends StatelessWidget {
+  const _ReplyContext({required this.note});
+
+  final Note note;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text.rich(
+            TextSpan(
+              text: 'Replying to ',
+              children: [
+                TextSpan(text: note.displayName, style: theme.avatarName),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.metadata,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            note.content,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.outline,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+        ],
       ),
     );
   }

@@ -20,6 +20,7 @@ import '../widgets/placeholder_tab.dart';
 import 'edit_profile_screen.dart';
 import 'identities_screen.dart';
 import 'image_viewer_screen.dart';
+import 'user_relays_screen.dart';
 import 'users_list_screen.dart';
 
 const _bannerHeight = 140.0 * 0.8;
@@ -389,13 +390,19 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   ? IconButton.filled(
                                       key: const Key('editProfileButton'),
                                       tooltip: 'Edit profile',
-                                      onPressed: () => Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const EditProfileScreen(),
-                                        ),
-                                      ),
+                                      onPressed: () async {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => EditProfileScreen(
+                                              relayClient: widget.relayClient,
+                                            ),
+                                          ),
+                                        );
+                                        if (mounted) {
+                                          _loadPaymentTargets(pubkeyHex);
+                                        }
+                                      },
                                       icon: const Icon(
                                         Icons.edit_outlined,
                                         size: 16,
@@ -551,6 +558,56 @@ class _ProfileScreenState extends State<ProfileScreen>
                                             ),
                                           ),
                                         ),
+                                ),
+                                const Spacer(),
+                                Material(
+                                  color: Colors.transparent,
+                                  shape: StadiumBorder(
+                                    side: BorderSide(
+                                      color: theme.colorScheme.outlineVariant,
+                                    ),
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    key: const Key('profileRelaysButton'),
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => UserRelaysScreen(
+                                          pubkeyHex: pubkeyHex,
+                                          relayClient: widget.relayClient,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 5,
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.dns_outlined,
+                                            size: 14,
+                                            color: theme
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Relays',
+                                            style: theme.textTheme.labelMedium
+                                                ?.copyWith(
+                                                  color: theme
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),

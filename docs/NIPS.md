@@ -7,12 +7,12 @@ A list of Nostr NIPs, detailing which ones we plan to implement (or not).
 | `01` | Basic protocol flow description                      | Implemented (read + post)   |
 | `02` | Follow List                                          | Implemented (read + write)  |
 | `05` | Mapping Nostr keys to DNS-based internet identifiers | Implemented (verification)  |
-| `10` | Text Notes and Threads                               | Read-only (no replying yet) |
+| `10` | Text Notes and Threads                               | Implemented (read + reply)  |
 | `19` | bech32-encoded entities                              | Implemented                 |
 | `21` | `nostr:` URI scheme                                  | Implemented                 |
 | `27` | Text Note References                                 | Implemented                 |
-| `65` | Relay List Metadata                                  | Support planned             |
-| `A3` | Payment addresses via `payto` tags                   | Implemented                 |
+| `65` | Relay List Metadata                                  | Partial (no outbox routing) |
+| `A3` | Payment addresses via `payto` tags                   | Implemented (read + write)  |
 
 ## Longer-term:
 

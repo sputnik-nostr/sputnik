@@ -8,6 +8,7 @@ import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/screens/identities_screen.dart';
 import 'package:sputnik/screens/profile_screen.dart';
 import 'package:sputnik/widgets/compact_tab_bar.dart';
+import 'package:sputnik/widgets/count_label.dart';
 import 'package:sputnik/services/follow_sync.dart';
 import 'package:sputnik/services/settings_store.dart';
 
@@ -158,6 +159,37 @@ void main() {
       );
       await tester.pumpAndSettle();
     }
+
+    testWidgets('the relays link opens their relay list', (tester) async {
+      await pumpProfile(tester);
+
+      await tester.ensureVisible(find.byKey(const Key('profileRelaysButton')));
+      await tester.tap(find.byKey(const Key('profileRelaysButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No relay list found'), findsOneWidget);
+    });
+
+    testWidgets('the relays chip sits apart from the follow counts', (
+      tester,
+    ) async {
+      await pumpProfile(tester);
+
+      final chip = tester.getRect(find.byKey(const Key('profileRelaysButton')));
+      final followers = tester.getRect(find.byType(CountLabel).last);
+
+      expect(find.text('Relays'), findsOneWidget);
+      expect(chip.left - followers.right, greaterThan(32));
+
+      final icon = tester.getRect(
+        find.descendant(
+          of: find.byKey(const Key('profileRelaysButton')),
+          matching: find.byIcon(Icons.dns_outlined),
+        ),
+      );
+      final label = tester.getRect(find.text('Relays'));
+      expect(icon.left - chip.left, closeTo(chip.right - label.right, 0.5));
+    });
 
     testWidgets('opens on posts and hides replies', (tester) async {
       await pumpProfile(tester);

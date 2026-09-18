@@ -3,6 +3,7 @@ import '../services/cache_store.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'relay_client.dart';
+import 'replaceable_events.dart';
 
 final _pubkeyPattern = RegExp(r'^[0-9a-fA-F]{64}$');
 
@@ -149,22 +150,31 @@ class RelayContactsRepository {
   Future<List<List<String>>?> fetchOwnContactTags(
     String pubkeyHex,
     Set<String> relayUrls,
-  ) async {
-    final result = await client.queryWithStatus(
-      relayUrls,
-      NostrFilter(kinds: const [3], authors: [pubkeyHex], limit: 1),
-    );
-    final author = pubkeyHex.toLowerCase();
-    final own = [
-      for (final event in result.events)
-        if (event.kind == 3 && event.pubkey == author) event,
-    ]..sort(compareNewestFirst);
-    if (own.isEmpty) return result.allRelaysAnswered ? const [] : null;
+  ) async => (await _fetchOwnContactList(pubkeyHex, relayUrls))?.tags;
 
-    return [
-      for (final tag in own.first.tags)
-        if (tag.isNotEmpty && tag[0] == 'p') tag,
-    ];
+  Future<({List<List<String>> tags, NostrEvent? event})?> _fetchOwnContactList(
+    String pubkeyHex,
+    Set<String> relayUrls,
+  ) async {
+    final own = await fetchOwnReplaceable(
+      client,
+      kind: 3,
+      pubkeyHex: pubkeyHex,
+      relayUrls: relayUrls,
+    );
+    final event = own.event;
+    if (event == null) {
+      if (!own.conclusive) return null;
+      return (tags: const <List<String>>[], event: null);
+    }
+
+    return (
+      tags: [
+        for (final tag in event.tags)
+          if (tag.isNotEmpty && tag[0] == 'p') tag,
+      ],
+      event: event,
+    );
   }
 
   // Adds/removes targetPubkeyHex and republishes the full list (NIP-02:
@@ -193,9 +203,9 @@ class RelayContactsRepository {
     required Map<String, bool> changes,
     required Set<String> relayUrls,
   }) async {
-    final currentTags = await fetchOwnContactTags(myPubkeyHex, relayUrls);
+    final current = await _fetchOwnContactList(myPubkeyHex, relayUrls);
     // Publishing blind would replace the real list with just these changes.
-    if (currentTags == null) {
+    if (current == null) {
       return (
         results: const <String, RelayPublishResult>{},
         following: const <String>{},
@@ -203,7 +213,7 @@ class RelayContactsRepository {
     }
 
     final desired = {
-      for (final tag in currentTags)
+      for (final tag in current.tags)
         if (tag.length > 1) tag[1].toLowerCase(),
     };
     for (final change in changes.entries) {
@@ -218,7 +228,8 @@ class RelayContactsRepository {
     final results = await _publishFollowing(
       seckeyHex: seckeyHex,
       myPubkeyHex: myPubkeyHex,
-      currentTags: currentTags,
+      currentTags: current.tags,
+      previous: current.event,
       desiredFollowing: desired,
       relayUrls: relayUrls,
     );
@@ -229,6 +240,7 @@ class RelayContactsRepository {
     required String seckeyHex,
     required String myPubkeyHex,
     required List<List<String>> currentTags,
+    required NostrEvent? previous,
     required Set<String> desiredFollowing,
     required Set<String> relayUrls,
   }) async {
@@ -250,6 +262,7 @@ class RelayContactsRepository {
       kind: 3,
       tags: newTags,
       content: '',
+      createdAt: nextReplaceableTime(previous),
     );
     final results = await client.publish(event, relayUrls);
 

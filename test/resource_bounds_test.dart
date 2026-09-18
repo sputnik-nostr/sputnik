@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sputnik/main.dart';
 import 'package:sputnik/models/note.dart';
+import 'package:sputnik/nostr/models/nostr_event.dart';
 import 'package:sputnik/nostr/models/nostr_post.dart';
 import 'package:sputnik/nostr/relay_thread_repository.dart';
 import 'package:sputnik/screens/post_screen.dart';
@@ -15,9 +16,15 @@ class _StubThread extends RelayThreadRepository {
   final List<NostrPost> replies;
 
   @override
-  Future<ThreadData> fetchThread(String postId, Set<String> relayUrls) async {
+  Future<ThreadData> fetchThread(
+    String postId,
+    Set<String> relayUrls, {
+    List<NostrEvent> extraEvents = const [],
+  }) async {
     return ThreadData(
-      replies: replies,
+      replies: [
+        for (final reply in replies) ThreadReply(post: reply, depth: 0),
+      ],
       likerPubkeys: const [],
       reposterPubkeys: const [],
     );
