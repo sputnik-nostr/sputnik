@@ -16,14 +16,9 @@ class NostrMetadata {
 
   factory NostrMetadata.fromContent(String content) {
     final json = jsonDecode(content) as Map<String, dynamic>;
-    String? string(String key) {
-      final value = json[key];
-      return value is String ? value : null;
-    }
-
     String? text(String key) {
-      final value = string(key);
-      return value == null ? null : sanitizeUtf16(value);
+      final value = json[key];
+      return value is String ? sanitizeUtf16(value) : null;
     }
 
     // Non-standard fields some clients use instead of a NIP-A3 payto tag.
@@ -39,10 +34,10 @@ class NostrMetadata {
       name: text('name'),
       displayName: text('display_name') ?? text('displayName'),
       about: text('about'),
-      picture: string('picture'),
-      banner: string('banner'),
-      nip05: string('nip05'),
-      website: string('website'),
+      picture: text('picture'),
+      banner: text('banner'),
+      nip05: text('nip05'),
+      website: text('website'),
       legacyMoneroAddress: legacyMoneroAddress(),
     );
   }

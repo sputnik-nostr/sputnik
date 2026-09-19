@@ -470,7 +470,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     backgroundColor:
                                         theme.colorScheme.primaryContainer,
                                     fallback: Text(
-                                      displayName[0].toUpperCase(),
+                                      avatarInitial(displayName),
                                       style: theme.avatarFallback.copyWith(
                                         fontSize: _avatarInitialFontSize,
                                       ),

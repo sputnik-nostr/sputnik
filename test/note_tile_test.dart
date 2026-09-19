@@ -21,6 +21,20 @@ void main() {
     createdAt: DateTime(2024),
   );
 
+  testWidgets('renders an avatar for a display name starting with an emoji', (
+    tester,
+  ) async {
+    final emojiNote = note.copyWith(displayName: '\u{1F600} Name');
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: NoteTile(note: emojiNote)),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('\u{1F600}'), findsOneWidget);
+  });
+
   for (final platform in [TargetPlatform.linux, TargetPlatform.android]) {
     for (final kind in [PointerDeviceKind.mouse, PointerDeviceKind.touch]) {
       testWidgets('clicking the note text opens the post ($platform, $kind)', (

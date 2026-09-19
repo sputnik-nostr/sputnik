@@ -10,7 +10,7 @@
 - [x] Add support for crypto addresses on profiles (payment targets)
 - [x] Add UI for compose button
 - [x] Publish notes to relays (signed, with a confirm step)
-- [x] Publish profile edits to relays (name/bio only so far)
+- [x] Publish profile edits to relays
 - [x] Publish follow/unfollow to relays (was previously a stub)
 - [x] Allow copying text
 - [x] Separate posts and replies on profiles
@@ -53,5 +53,4 @@
 # Ideas to improve performance
 
 - Use `LazyBox` for Hive, if that's preferable
-- Use Dart isolates to offload JSON parsing
 - Lazy-loading of Hive keys

@@ -8,11 +8,11 @@ A list of Nostr NIPs, detailing which ones we plan to implement (or not).
 | `02` | Follow List                                          | Implemented (read + write)  |
 | `05` | Mapping Nostr keys to DNS-based internet identifiers | Implemented (verification)  |
 | `10` | Text Notes and Threads                               | Implemented (read + reply)  |
-| `19` | bech32-encoded entities                              | Implemented                 |
-| `21` | `nostr:` URI scheme                                  | Implemented                 |
-| `27` | Text Note References                                 | Implemented                 |
+| `19` | bech32-encoded entities                              | Partial (no `naddr`)        |
+| `21` | `nostr:` URI scheme                                  | Partial (no `naddr`)        |
+| `27` | Text Note References                                 | Implemented (read only)     |
 | `65` | Relay List Metadata                                  | Partial (no outbox routing) |
-| `A3` | Payment addresses via `payto` tags                   | Implemented (read + write)  |
+| `A3` | payto: Payment Targets                               | Implemented (read + write)  |
 
 ## Longer-term:
 
@@ -22,8 +22,8 @@ A list of Nostr NIPs, detailing which ones we plan to implement (or not).
 | `11` | Relay Information Document | Support planned  |
 | `14` | Subject tag in Text events | Support planned  |
 | `18` | Reposts                    | Read-only counts |
-| `25` | Reactions                  | Read-only counts |
 | `23` | Long-form Content          | Considering      |
+| `25` | Reactions                  | Read-only counts |
 
 ## Not planned
 

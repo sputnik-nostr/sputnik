@@ -15,6 +15,18 @@ void main() {
     expect(metadata.name, 'bad�name');
   });
 
+  test('sanitizes a lone surrogate in every displayed or fetched field', () {
+    final metadata = NostrMetadata.fromContent(
+      '{"nip05": "a\\ud800@b.example", "website": "https://x\\udc00", '
+      '"picture": "https://p\\ud800", "banner": "https://b\\ud800"}',
+    );
+
+    expect(metadata.nip05, 'a\u{FFFD}@b.example');
+    expect(metadata.website, 'https://x\u{FFFD}');
+    expect(metadata.picture, 'https://p\u{FFFD}');
+    expect(metadata.banner, 'https://b\u{FFFD}');
+  });
+
   test('keeps a valid surrogate pair (emoji) intact', () {
     final metadata = NostrMetadata.fromContent('{"name": "hi \\ud83d\\ude00"}');
     expect(metadata.name, 'hi 😀');

@@ -26,7 +26,7 @@ class CountLabel extends StatelessWidget {
           style: theme.textTheme.bodySmall,
           children: [
             TextSpan(
-              text: '${count ?? '···'} ',
+              text: '${count ?? '...'} ',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             TextSpan(

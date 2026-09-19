@@ -345,7 +345,7 @@ class _PostHeader extends StatelessWidget {
                       imageUrl: note.pictureUrl,
                       backgroundColor: theme.colorScheme.primaryContainer,
                       fallback: Text(
-                        note.displayName[0].toUpperCase(),
+                        avatarInitial(note.displayName),
                         style: theme.avatarFallback,
                       ),
                     ),

@@ -39,6 +39,40 @@ List<List<String>> _tagsFromJson(Object? raw) {
   return tags;
 }
 
+final _needsEscape = RegExp(r'[\x00-\x1f"\\]');
+
+const _nip01Escapes = {
+  0x08: r'\b',
+  0x09: r'\t',
+  0x0a: r'\n',
+  0x0c: r'\f',
+  0x0d: r'\r',
+  0x22: r'\"',
+  0x5c: r'\\',
+};
+
+String _encodeString(String value) {
+  if (!_needsEscape.hasMatch(value)) return '"$value"';
+  final buffer = StringBuffer('"');
+  for (final unit in value.codeUnits) {
+    final escape = _nip01Escapes[unit];
+    if (escape == null) {
+      buffer.writeCharCode(unit);
+    } else {
+      buffer.write(escape);
+    }
+  }
+  return (buffer..write('"')).toString();
+}
+
+String _encodeJson(Object? value) => switch (value) {
+  String() => _encodeString(value),
+  List() => '[${value.map(_encodeJson).join(',')}]',
+  Map() =>
+    '{${value.entries.map((e) => '${_encodeString('${e.key}')}:${_encodeJson(e.value)}').join(',')}}',
+  _ => jsonEncode(value),
+};
+
 // The NIP-01 id-hash input: [0, pubkey, created_at, kind, tags, content].
 // Shared by verification and signing so the two can't drift apart.
 Uint8List _canonicalSerialization({
@@ -48,7 +82,7 @@ Uint8List _canonicalSerialization({
   required Object? tags,
   required Object? content,
 }) {
-  return utf8.encode(jsonEncode([0, pubkey, createdAt, kind, tags, content]));
+  return utf8.encode(_encodeJson([0, pubkey, createdAt, kind, tags, content]));
 }
 
 bool _isAuthentic(

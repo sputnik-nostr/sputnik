@@ -16,8 +16,9 @@ String _activeIdentityInitial() {
   if (pubkeyHex == null) return '?';
   final resolvedName = profileCacheNotifier.value[pubkeyHex]?.resolvedName
       ?.trim();
-  return (resolvedName?.isNotEmpty == true ? resolvedName! : pubkeyHex)[0]
-      .toUpperCase();
+  return avatarInitial(
+    resolvedName?.isNotEmpty == true ? resolvedName! : pubkeyHex,
+  );
 }
 
 class RootScreen extends StatefulWidget {

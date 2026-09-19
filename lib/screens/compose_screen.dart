@@ -193,9 +193,9 @@ class _ComposeScreenState extends State<ComposeScreen> {
         : profileCacheNotifier.value[pubkeyHex];
     final resolvedName = metadata?.resolvedName?.trim();
     final fallbackLabel = resolvedName?.isNotEmpty == true
-        ? resolvedName![0].toUpperCase()
+        ? avatarInitial(resolvedName!)
         : pubkeyHex?.isNotEmpty == true
-        ? pubkeyHex![0].toUpperCase()
+        ? avatarInitial(pubkeyHex!)
         : '?';
 
     return Scaffold(

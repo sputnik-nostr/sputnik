@@ -55,7 +55,7 @@ class AppDrawer extends StatelessWidget {
                           radius: 20,
                           backgroundColor: theme.colorScheme.primaryContainer,
                           child: Text(
-                            label[0].toUpperCase(),
+                            avatarInitial(label),
                             style: theme.avatarFallback,
                           ),
                         ),

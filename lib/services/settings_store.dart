@@ -18,7 +18,10 @@ abstract class SecretStore {
 
 class _SecureSecretStore implements SecretStore {
   const _SecureSecretStore();
-  static const _storage = FlutterSecureStorage();
+  // The default would erase every stored key on a keystore error.
+  static const _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(resetOnError: false),
+  );
 
   @override
   Future<String?> read(String key) => _storage.read(key: key);
@@ -184,28 +187,36 @@ class SettingsStore {
     final decoded = jsonDecode(raw) as List<dynamic>;
     final identities = <Identity>[];
     var migratedAny = false;
+    var migrationFailed = false;
 
     for (final item in decoded) {
+      final Identity identity;
+      final String? legacyPrivkeyHex;
       try {
         final map = item as Map<String, dynamic>;
-        identities.add(Identity.fromJson(map));
-
-        // Migrate a private key that used to live inline here.
-        final legacyPrivkeyHex = map['privkeyHex'];
-        if (legacyPrivkeyHex is String) {
-          final pubkeyHex = map['pubkeyHex'] as String;
-          if (await loadPrivateKey(pubkeyHex) == null) {
-            await savePrivateKey(pubkeyHex, legacyPrivkeyHex);
-          }
-          migratedAny = true;
-        }
+        identity = Identity.fromJson(map);
+        final legacy = map['privkeyHex'];
+        legacyPrivkeyHex = legacy is String ? legacy : null;
       } catch (_) {
         // Skip malformed identity entries.
+        continue;
+      }
+      identities.add(identity);
+      if (legacyPrivkeyHex == null) continue;
+
+      // Migrate a private key that used to live inline here.
+      try {
+        if (await loadPrivateKey(identity.pubkeyHex) == null) {
+          await savePrivateKey(identity.pubkeyHex, legacyPrivkeyHex);
+        }
+        migratedAny = true;
+      } catch (_) {
+        migrationFailed = true;
       }
     }
 
-    // Persist so this doesn't repeat next load.
-    if (migratedAny) await saveIdentities(identities);
+    // Rewriting the index would drop an inline key that failed to migrate.
+    if (migratedAny && !migrationFailed) await saveIdentities(identities);
 
     return identities;
   }
