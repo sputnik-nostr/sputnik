@@ -6,6 +6,8 @@ const defaultRelays = [
   'wss://nos.lol',
   'wss://relay.primal.net',
   'wss://relay.snort.social',
+  'wss://relay.nostr.band',
+  'wss://relay.ditto.pub',
 ];
 
 // Maximum number of user-added relays.
