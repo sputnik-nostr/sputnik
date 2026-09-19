@@ -123,5 +123,26 @@ void main() {
         expect((await lookup()).conclusive, isFalse);
       },
     );
+
+    test(
+      'a found event is conclusive only when most relays answered',
+      () async {
+        final client = InMemoryRelayClient([
+          fakeEvent(id: '01', pubkey: me, kind: 0),
+        ]);
+        Future<OwnEvent> lookup() => fetchOwnReplaceable(
+          client,
+          kind: 0,
+          pubkeyHex: me,
+          relayUrls: {'wss://a', 'wss://b', 'wss://c'},
+        );
+
+        expect((await lookup()).conclusive, isTrue);
+        client.relaysAnswer = false;
+        final silent = await lookup();
+        expect(silent.event, isNotNull);
+        expect(silent.conclusive, isFalse);
+      },
+    );
   });
 }

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
+import 'hex.dart';
 import 'secp256k1_bindings.dart';
 
 typedef NostrKeyPair = ({String privateKeyHex, String publicKeyHex});
@@ -15,9 +16,20 @@ String _hexFromPointer(Pointer<Uint8> bytes, int length) {
   return buffer.toString();
 }
 
-void _bytesFromHexInto(Pointer<Uint8> dest, String hex) {
-  for (var i = 0; i * 2 < hex.length; i++) {
-    dest[i] = int.parse(hex.substring(i * 2, i * 2 + 2), radix: 16);
+void _bytesFromHexInto(Pointer<Uint8> dest, String hex, int length) {
+  if (hex.length != length * 2) throw ArgumentError('invalid hex length');
+
+  final Uint8List bytes;
+  try {
+    bytes = hexDecode(hex);
+  } on FormatException {
+    // Deliberately no value in the message: it may be a secret.
+    throw ArgumentError('invalid hex');
+  }
+  try {
+    dest.asTypedList(length).setAll(0, bytes);
+  } finally {
+    bytes.fillRange(0, bytes.length, 0);
   }
 }
 
@@ -43,7 +55,7 @@ String xonlyPubkeyHexFromSeckeyHex(String seckeyHex) {
   final pubkeyOut = calloc<Uint8>(32);
 
   try {
-    _bytesFromHexInto(seckey, seckeyHex);
+    _bytesFromHexInto(seckey, seckeyHex, 32);
 
     if (bindings.pubkeyFromSeckey(wrapper, seckey, pubkeyOut) != 1) {
       throw ArgumentError('invalid secp256k1 secret key');
@@ -92,7 +104,7 @@ Uint8List signSchnorrSignature({
   final sigOut = calloc<Uint8>(64);
 
   try {
-    _bytesFromHexInto(seckey, seckeyHex);
+    _bytesFromHexInto(seckey, seckeyHex, 32);
     msg.asTypedList(32).setAll(0, msg32);
 
     if (bindings.signSchnorr(wrapper, seckey, msg, sigOut) != 1) {

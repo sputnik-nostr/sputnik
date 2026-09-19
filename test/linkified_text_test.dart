@@ -347,4 +347,81 @@ void main() {
       expect(find.text('Note not found'), findsOneWidget);
     });
   });
+
+  group('web links stop where the URL stops', () {
+    List<String> linkTexts(WidgetTester tester) {
+      final root = tester.widget<RichText>(find.byType(RichText).first).text;
+      final found = <String>[];
+      root.visitChildren((span) {
+        if (span is TextSpan && span.recognizer != null) {
+          found.add(span.text ?? '');
+        }
+        return true;
+      });
+      return found;
+    }
+
+    Future<void> expectLinks(
+      WidgetTester tester,
+      String text,
+      List<String> links,
+    ) async {
+      await _pumpText(tester, text);
+      expect(linkTexts(tester), links, reason: text);
+      expect(_shown(tester), text, reason: 'the text itself is unchanged');
+    }
+
+    testWidgets('a sentence-ending period is not part of the link', (
+      tester,
+    ) async {
+      await expectLinks(tester, 'see https://example.com/a.', [
+        'https://example.com/a',
+      ]);
+    });
+
+    testWidgets('other trailing punctuation is left out too', (tester) async {
+      await expectLinks(tester, 'wow https://example.com/a?b=1, ok', [
+        'https://example.com/a?b=1',
+      ]);
+      await expectLinks(tester, 'https://example.com!!!', [
+        'https://example.com',
+      ]);
+      await expectLinks(tester, 'why https://example.com/x?', [
+        'https://example.com/x',
+      ]);
+    });
+
+    testWidgets('a closing bracket is left out unless the URL opened it', (
+      tester,
+    ) async {
+      await expectLinks(tester, '(see https://example.com/a)', [
+        'https://example.com/a',
+      ]);
+      await expectLinks(
+        tester,
+        'https://en.wikipedia.org/wiki/Nostr_(protocol)',
+        ['https://en.wikipedia.org/wiki/Nostr_(protocol)'],
+      );
+      await expectLinks(tester, '(https://en.wikipedia.org/wiki/A_(b)).', [
+        'https://en.wikipedia.org/wiki/A_(b)',
+      ]);
+    });
+
+    testWidgets('quotes and angle brackets around a URL are not in it', (
+      tester,
+    ) async {
+      await expectLinks(tester, '<https://example.com/x>', [
+        'https://example.com/x',
+      ]);
+      await expectLinks(tester, 'say "https://example.com/x" now', [
+        'https://example.com/x',
+      ]);
+    });
+
+    testWidgets('punctuation that leaves no host is not a link', (
+      tester,
+    ) async {
+      await expectLinks(tester, 'https://.', const []);
+    });
+  });
 }

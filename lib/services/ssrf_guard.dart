@@ -1,21 +1,62 @@
 import 'dart:io';
 
-// Blocks probing the device's own network via an attacker-controlled URL.
-bool isBlockedAddress(InternetAddress address) {
-  if (address.isLoopback || address.isLinkLocal || address.isMulticast) {
+bool _inCidr(List<int> bytes, List<int> prefix, int bits) {
+  final whole = bits ~/ 8;
+  for (var i = 0; i < whole; i++) {
+    if (bytes[i] != prefix[i]) return false;
+  }
+  final rest = bits % 8;
+  if (rest == 0) return true;
+  final mask = (0xff << (8 - rest)) & 0xff;
+  return (bytes[whole] & mask) == (prefix[whole] & mask);
+}
+
+bool _isBlockedV4(List<int> b) {
+  return _inCidr(b, [0], 8) || // 0.0.0.0/8
+      _inCidr(b, [10], 8) ||
+      _inCidr(b, [100, 64], 10) || // carrier-grade NAT
+      _inCidr(b, [127], 8) ||
+      _inCidr(b, [169, 254], 16) || // link-local, cloud metadata
+      _inCidr(b, [172, 16], 12) ||
+      _inCidr(b, [192, 0, 0], 24) ||
+      _inCidr(b, [192, 0, 2], 24) ||
+      _inCidr(b, [192, 88, 99], 24) ||
+      _inCidr(b, [192, 168], 16) ||
+      _inCidr(b, [198, 18], 15) || // benchmarking
+      _inCidr(b, [198, 51, 100], 24) ||
+      _inCidr(b, [203, 0, 113], 24) ||
+      b[0] >= 224; // multicast, reserved, broadcast
+}
+
+bool _isBlockedV6(List<int> b) {
+  final zeroPrefix = b.take(10).every((byte) => byte == 0);
+  if (zeroPrefix) {
+    // ::ffff:a.b.c.d reaches the IPv4 host; every other ::/80 form is local.
+    if (b[10] == 0xff && b[11] == 0xff) return _isBlockedV4(b.sublist(12));
     return true;
   }
-  final bytes = address.rawAddress;
-  if (address.type == InternetAddressType.IPv4) {
-    if (bytes[0] == 0) return true; // 0.0.0.0/8
-    if (bytes[0] == 10) return true; // 10.0.0.0/8
-    if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) return true;
-    if (bytes[0] == 192 && bytes[1] == 168) return true; // 192.168.0.0/16
-    if (bytes[0] == 169 && bytes[1] == 254) return true; // link-local/meta
-  } else if (address.type == InternetAddressType.IPv6) {
-    if ((bytes[0] & 0xfe) == 0xfc) return true; // fc00::/7 unique local
+  // 64:ff9b::/96 NAT64 embeds an IPv4 address.
+  if (_inCidr(b, [0x00, 0x64, 0xff, 0x9b, 0, 0, 0, 0, 0, 0, 0, 0], 96)) {
+    return _isBlockedV4(b.sublist(12));
   }
+  // Only 2000::/3 is global unicast; the rest is ULA, link-local, multicast.
+  if ((b[0] & 0xe0) != 0x20) return true;
+  if (_inCidr(b, [0x20, 0x01, 0x00], 23)) return true; // 2001::/23
+  if (_inCidr(b, [0x20, 0x01, 0x0d, 0xb8], 32)) return true; // docs
+  if (_inCidr(b, [0x3f, 0xff, 0x00], 20)) return true; // docs
+  // 2002::/16 6to4 embeds an IPv4 address.
+  if (b[0] == 0x20 && b[1] == 0x02) return _isBlockedV4(b.sublist(2, 6));
   return false;
+}
+
+// Blocks probing the device's own network via an attacker-controlled URL.
+bool isBlockedAddress(InternetAddress address) {
+  final bytes = address.rawAddress;
+  return switch (address.type) {
+    InternetAddressType.IPv4 => _isBlockedV4(bytes),
+    InternetAddressType.IPv6 => _isBlockedV6(bytes),
+    _ => true,
+  };
 }
 
 int effectivePort(Uri url) =>

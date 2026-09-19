@@ -32,17 +32,128 @@ void main() {
   });
 
   group('isBlockedAddress', () {
-    bool blocked(String ip) =>
-        isBlockedAddress(InternetAddress(ip, type: InternetAddressType.IPv4));
+    bool blocked(String ip) => isBlockedAddress(InternetAddress(ip));
 
-    test('blocks loopback', () => expect(blocked('127.0.0.1'), isTrue));
-    test('blocks 10.0.0.0/8', () => expect(blocked('10.1.2.3'), isTrue));
-    test('blocks 172.16.0.0/12', () => expect(blocked('172.20.0.1'), isTrue));
-    test('blocks 192.168.0.0/16', () => expect(blocked('192.168.1.1'), isTrue));
-    test(
-      'blocks link-local/cloud metadata',
-      () => expect(blocked('169.254.169.254'), isTrue),
-    );
-    test('allows a public address', () => expect(blocked('8.8.8.8'), isFalse));
+    test('blocks the IPv4 private and special-use ranges', () {
+      for (final ip in [
+        '0.0.0.0',
+        '10.1.2.3',
+        '100.64.0.1',
+        '100.127.255.254',
+        '127.0.0.1',
+        '127.9.9.9',
+        '169.254.169.254',
+        '172.16.0.1',
+        '172.31.255.255',
+        '192.0.0.1',
+        '192.0.2.1',
+        '192.168.1.1',
+        '198.18.0.1',
+        '198.19.255.255',
+        '198.51.100.1',
+        '203.0.113.1',
+        '224.0.0.1',
+        '240.0.0.1',
+        '255.255.255.255',
+      ]) {
+        expect(blocked(ip), isTrue, reason: ip);
+      }
+    });
+
+    test('allows public IPv4 addresses next to the blocked ranges', () {
+      for (final ip in [
+        '8.8.8.8',
+        '1.1.1.1',
+        '100.63.255.255',
+        '100.128.0.1',
+        '172.15.255.255',
+        '172.32.0.1',
+        '198.17.255.255',
+        '198.20.0.1',
+        '223.255.255.255',
+      ]) {
+        expect(blocked(ip), isFalse, reason: ip);
+      }
+    });
+
+    test('blocks IPv4 addresses carried inside IPv6', () {
+      for (final ip in [
+        '::ffff:127.0.0.1',
+        '::ffff:7f00:1',
+        '::ffff:10.0.0.1',
+        '::ffff:192.168.1.1',
+        '::ffff:169.254.169.254',
+        '64:ff9b::7f00:1',
+        '64:ff9b::a9fe:a9fe',
+        '2002:7f00:1::',
+        '2002:c0a8:101::1',
+      ]) {
+        expect(blocked(ip), isTrue, reason: ip);
+      }
+    });
+
+    test('allows a public IPv4 address carried inside IPv6', () {
+      expect(blocked('::ffff:8.8.8.8'), isFalse);
+      expect(blocked('64:ff9b::808:808'), isFalse);
+      expect(blocked('2002:808:808::1'), isFalse);
+    });
+
+    test('blocks IPv6 loopback, unspecified and local ranges', () {
+      for (final ip in [
+        '::',
+        '::1',
+        '::2',
+        '::7f00:1',
+        'fc00::1',
+        'fd12:3456::1',
+        'fe80::1',
+        'fec0::1',
+        'ff02::1',
+        '100::1',
+        '2001::1',
+        '2001:db8::1',
+        '3fff::1',
+      ]) {
+        expect(blocked(ip), isTrue, reason: ip);
+      }
+    });
+
+    test('allows public IPv6 unicast addresses', () {
+      for (final ip in [
+        '2606:4700:4700::1111',
+        '2001:4860:4860::8888',
+        '2a00:1450:4001:81b::200e',
+      ]) {
+        expect(blocked(ip), isFalse, reason: ip);
+      }
+    });
+  });
+
+  group('guardedConnectionFactory', () {
+    test('cannot reach a loopback service through a mapped address', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      var served = 0;
+      server.listen((request) {
+        served++;
+        request.response.close();
+      });
+
+      for (final host in [
+        '127.0.0.1',
+        '[::ffff:127.0.0.1]',
+        '[::ffff:7f00:1]',
+      ]) {
+        final client = HttpClient()
+          ..connectionFactory = guardedConnectionFactory;
+        addTearDown(() => client.close(force: true));
+        await expectLater(
+          client.getUrl(Uri.parse('http://$host:${server.port}/')),
+          throwsA(isA<SocketException>()),
+          reason: host,
+        );
+      }
+      expect(served, 0);
+    });
   });
 }

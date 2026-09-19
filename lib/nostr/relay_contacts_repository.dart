@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../main.dart';
 import '../services/cache_store.dart';
 import 'models/nostr_event.dart';
@@ -6,6 +8,20 @@ import 'relay_client.dart';
 import 'replaceable_events.dart';
 
 final _pubkeyPattern = RegExp(r'^[0-9a-fA-F]{64}$');
+
+// Newest own contact list seen or published; older copies are not built on.
+final _newestOwnContactList = <String, DateTime>{};
+
+@visibleForTesting
+void resetKnownContactLists() => _newestOwnContactList.clear();
+
+void _noteContactList(String pubkeyHex, DateTime createdAt) {
+  final key = pubkeyHex.toLowerCase();
+  final known = _newestOwnContactList[key];
+  if (known == null || createdAt.isAfter(known)) {
+    _newestOwnContactList[key] = createdAt;
+  }
+}
 
 // Which identity myFollowingNotifier holds data for, and its load future.
 String? _myFollowingLoadedForPubkeyHex;
@@ -162,11 +178,17 @@ class RelayContactsRepository {
       pubkeyHex: pubkeyHex,
       relayUrls: relayUrls,
     );
+    if (!own.conclusive) return null;
+
+    final known = _newestOwnContactList[pubkeyHex.toLowerCase()];
     final event = own.event;
     if (event == null) {
-      if (!own.conclusive) return null;
+      // A list we saw before that no relay returns now is lagging, not gone.
+      if (known != null) return null;
       return (tags: const <List<String>>[], event: null);
     }
+    if (known != null && event.createdAt.isBefore(known)) return null;
+    _noteContactList(pubkeyHex, event.createdAt);
 
     return (
       tags: [
@@ -270,6 +292,7 @@ class RelayContactsRepository {
       (result) => result.outcome == RelayPublishOutcome.accepted,
     );
     if (accepted) {
+      _noteContactList(myPubkeyHex, event.createdAt);
       await CacheStore.putFollowing(myPubkeyHex, desiredFollowing.toList());
     }
     return results;

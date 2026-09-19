@@ -51,8 +51,11 @@ class RelayProfileRepository {
     final events = eventsByChunk.expand((events) => events).toList()
       ..sort(compareNewestFirst);
 
+    final requested = {for (final pubkey in toFetch) pubkey.toLowerCase()};
     final metadataByPubkey = <String, NostrMetadata>{};
     for (final event in events) {
+      // Any signed event from a relay is authentic, not necessarily asked for.
+      if (event.kind != 0 || !requested.contains(event.pubkey)) continue;
       if (metadataByPubkey.containsKey(event.pubkey)) continue;
       try {
         metadataByPubkey[event.pubkey] = NostrMetadata.fromContent(

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'hex.dart';
@@ -95,6 +96,14 @@ class RelayQueryResult {
       queriedRelays > 0 && answeredRelays == queriedRelays;
 }
 
+// A failing caller must not evict a newer connection another one opened.
+@visibleForTesting
+bool removeIfCurrent<T>(Map<String, T> connections, String url, T connection) {
+  if (!identical(connections[url], connection)) return false;
+  connections.remove(url);
+  return true;
+}
+
 class RelayConnectionPool {
   RelayConnectionPool._();
 
@@ -136,13 +145,13 @@ class RelayConnectionPool {
     NostrFilter filter,
     Duration timeout,
   ) async {
+    _RelayConnection? connection;
     try {
-      final connection = await _connectionFor(relayUrl, timeout);
+      connection = await _connectionFor(relayUrl, timeout);
       return await connection.subscribe(filter, timeout);
     } catch (_) {
-      // Relay is unreachable, or the persistent connection just failed;
-      // drop it so the next query reconnects fresh.
-      await _connections.remove(relayUrl)?.close();
+      // Drop the failed connection so the next query reconnects.
+      if (connection != null) await _drop(relayUrl, connection);
       return (events: const <NostrEvent>[], eose: false);
     }
   }
@@ -156,8 +165,18 @@ class RelayConnectionPool {
 
     final connection = _RelayConnection(relayUrl);
     _connections[relayUrl] = connection;
-    await connection.ready.timeout(connectTimeout);
+    try {
+      await connection.ready.timeout(connectTimeout);
+    } catch (_) {
+      await _drop(relayUrl, connection);
+      rethrow;
+    }
     return connection;
+  }
+
+  Future<void> _drop(String relayUrl, _RelayConnection connection) async {
+    removeIfCurrent(_connections, relayUrl, connection);
+    await connection.close();
   }
 
   Future<Map<String, RelayPublishResult>> publishToAll(
@@ -177,11 +196,12 @@ class RelayConnectionPool {
     NostrEvent event,
     Duration timeout,
   ) async {
+    _RelayConnection? connection;
     try {
-      final connection = await _connectionFor(relayUrl, timeout);
+      connection = await _connectionFor(relayUrl, timeout);
       return await connection.publish(event, timeout);
     } catch (_) {
-      await _connections.remove(relayUrl)?.close();
+      if (connection != null) await _drop(relayUrl, connection);
       return const RelayPublishResult(RelayPublishOutcome.connectionFailed);
     }
   }
@@ -215,7 +235,10 @@ class _RelayConnection {
     if (raw is! String) return;
 
     final dispatched = _dispatchQueue.then((_) async {
-      final parsed = await RelayMessageParser.instance.parse(raw);
+      final parsed = await RelayMessageParser.instance.parse(
+        raw,
+        subscriptionIds: _handlers.keys.toSet(),
+      );
       if (parsed == null) return;
       if (parsed.type == 'OK') {
         _publishWaiters.resolve(
@@ -251,6 +274,13 @@ class _RelayConnection {
     await ready;
     final subscriptionId = _generateSubscriptionId();
     final events = <NostrEvent>[];
+    final seenIds = <String>{};
+    final matcher = filter.matcher();
+    // Relays may overshoot a limit; only EOSE says the answer is complete.
+    final keep = min(
+      filter.limit ?? _maxEventsPerSubscription,
+      _maxEventsPerSubscription,
+    );
     var eose = false;
     final completer = Completer<void>();
     Timer? idleTimer;
@@ -272,7 +302,9 @@ class _RelayConnection {
       switch (message.type) {
         case 'EVENT':
           final event = message.event;
-          if (event != null) events.add(event);
+          if (event == null || !matcher.matches(event)) break;
+          if (events.length >= keep || !seenIds.add(event.id)) break;
+          events.add(event);
           if (events.length >= _maxEventsPerSubscription &&
               !completer.isCompleted) {
             completer.complete();

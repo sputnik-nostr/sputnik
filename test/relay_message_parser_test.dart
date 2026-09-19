@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sputnik/nostr/keys.dart';
+import 'package:sputnik/nostr/models/nostr_event.dart';
 import 'package:sputnik/nostr/relay_message_parser.dart';
 
 void main() {
@@ -73,5 +75,60 @@ void main() {
       expect(parsed.accepted, isNull);
       expect(parsed.message, isNull);
     }
+  });
+
+  group('signed events', () {
+    final key = generateNostrKeyPair();
+
+    String eventMessage(String subId, {DateTime? at}) {
+      final event = signEvent(
+        seckeyHex: key.privateKeyHex,
+        pubkeyHex: key.publicKeyHex,
+        kind: 1,
+        content: 'hello',
+        createdAt: at,
+      );
+      return jsonEncode(['EVENT', subId, event.toJson()]);
+    }
+
+    test('an EVENT for a live subscription is parsed', () async {
+      final parsed = await parser.parse(
+        eventMessage('live'),
+        subscriptionIds: {'live'},
+      );
+
+      expect(parsed?.event?.content, 'hello');
+    });
+
+    test('an EVENT for any other subscription is dropped', () async {
+      final parsed = await parser.parse(
+        eventMessage('stale'),
+        subscriptionIds: {'live'},
+      );
+
+      expect(parsed, isNull);
+    });
+
+    test('without a subscription list every EVENT is parsed', () async {
+      expect(await parser.parse(eventMessage('any')), isNotNull);
+    });
+
+    test('OK messages do not depend on the subscription list', () async {
+      final raw = jsonEncode(['OK', 'a' * 64, true, '']);
+
+      expect(await parser.parse(raw, subscriptionIds: {'live'}), isNotNull);
+    });
+
+    test('an event dated beyond the skew allowance is dropped', () async {
+      final late = DateTime.now().add(maxEventFutureSkew * 2);
+
+      expect(await parser.parse(eventMessage('s', at: late)), isNull);
+    });
+
+    test('an event a little ahead of our clock is kept', () async {
+      final near = DateTime.now().add(maxEventFutureSkew ~/ 4);
+
+      expect(await parser.parse(eventMessage('s', at: near)), isNotNull);
+    });
   });
 }

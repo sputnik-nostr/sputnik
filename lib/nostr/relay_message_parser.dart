@@ -17,6 +17,9 @@ String? _sanitizedOkMessage(Object? raw) {
   return sanitizeUtf16(truncated);
 }
 
+// Relay clocks and ours drift; past this an event is dated, not just skewed.
+const maxEventFutureSkew = Duration(hours: 1);
+
 class ParsedRelayMessage {
   const ParsedRelayMessage({
     required this.subscriptionId,
@@ -28,6 +31,7 @@ class ParsedRelayMessage {
 
   final String subscriptionId;
   final String type;
+
   final NostrEvent? event;
 
   // Only set for an "OK" message (a relay's response to a published event,
@@ -37,10 +41,11 @@ class ParsedRelayMessage {
 }
 
 class _ParseRequest {
-  const _ParseRequest(this.id, this.raw);
+  const _ParseRequest(this.id, this.raw, this.subscriptionIds);
 
   final int id;
   final String raw;
+  final Set<String>? subscriptionIds;
 }
 
 class _ParseResponse {
@@ -50,7 +55,7 @@ class _ParseResponse {
   final ParsedRelayMessage? message;
 }
 
-ParsedRelayMessage? _parse(String raw) {
+ParsedRelayMessage? _parse(String raw, Set<String>? subscriptionIds) {
   try {
     final message = jsonDecode(raw);
     if (message is! List || message.length < 2) return null;
@@ -63,7 +68,15 @@ ParsedRelayMessage? _parse(String raw) {
     bool? accepted;
     String? okMessage;
     if (type == 'EVENT' && message.length >= 3) {
+      // Checked before the signature so unsolicited events cost no crypto.
+      if (subscriptionIds != null &&
+          !subscriptionIds.contains(subscriptionId)) {
+        return null;
+      }
       event = NostrEvent.fromJson(message[2] as Map<String, dynamic>);
+      if (event.createdAt.isAfter(DateTime.now().add(maxEventFutureSkew))) {
+        return null;
+      }
     } else if (type == 'OK') {
       accepted = message.length >= 3 && message[2] == true;
       okMessage = _sanitizedOkMessage(message.length >= 4 ? message[3] : null);
@@ -87,7 +100,9 @@ void _parserIsolateMain(SendPort mainSendPort) {
   mainSendPort.send(receivePort.sendPort);
   receivePort.listen((dynamic data) {
     final request = data as _ParseRequest;
-    mainSendPort.send(_ParseResponse(request.id, _parse(request.raw)));
+    mainSendPort.send(
+      _ParseResponse(request.id, _parse(request.raw, request.subscriptionIds)),
+    );
   });
 }
 
@@ -101,7 +116,11 @@ class RelayMessageParser {
   int _nextRequestId = 0;
   final _pending = <int, Completer<ParsedRelayMessage?>>{};
 
-  Future<ParsedRelayMessage?> parse(String raw) async {
+  // With [subscriptionIds], an EVENT for any other subscription is dropped.
+  Future<ParsedRelayMessage?> parse(
+    String raw, {
+    Set<String>? subscriptionIds,
+  }) async {
     if (_workerSendPort == null) {
       final spawning = _spawning ??= _spawn();
       try {
@@ -115,7 +134,7 @@ class RelayMessageParser {
     final id = _nextRequestId++;
     final completer = Completer<ParsedRelayMessage?>();
     _pending[id] = completer;
-    _workerSendPort!.send(_ParseRequest(id, raw));
+    _workerSendPort!.send(_ParseRequest(id, raw, subscriptionIds));
     return completer.future;
   }
 

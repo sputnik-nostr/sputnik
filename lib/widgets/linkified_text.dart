@@ -15,9 +15,37 @@ import '../screens/profile_screen.dart';
 
 // A bare npub, nprofile, note or nevent is a citation too, not only nostr:.
 final _linkPattern = RegExp(
-  r'(https?://\S+)|(nostr:\w+)|(\bn(?:pub|profile|ote|event)1[02-9ac-hj-np-z]+)',
+  r'(https?://[^\s<>"]+)|(nostr:\w+)|(\bn(?:pub|profile|ote|event)1[02-9ac-hj-np-z]+)',
   caseSensitive: false,
 );
+
+const _urlTrailingPunctuation = '.,;:!?\'*';
+const _urlClosers = {')': '(', ']': '[', '}': '{'};
+
+// Sentence punctuation and unmatched closers after a URL belong to the text.
+String _trimUrlEnd(String url) {
+  var end = url.length;
+  while (end > 0) {
+    final last = url[end - 1];
+    final opener = _urlClosers[last];
+    final trailing =
+        _urlTrailingPunctuation.contains(last) ||
+        (opener != null && _count(url, end, last) > _count(url, end, opener));
+    if (!trailing) break;
+    end--;
+  }
+  return url.substring(0, end);
+}
+
+int _count(String text, int end, String char) {
+  var count = 0;
+  for (var i = 0; i < end; i++) {
+    if (text[i] == char) count++;
+  }
+  return count;
+}
+
+bool _hasHost(String url) => Uri.tryParse(url)?.host.isNotEmpty ?? false;
 
 // Bounds the profile lookups a single post can trigger.
 const _maxMentionLookups = 20;
@@ -28,9 +56,11 @@ const _maxMentionNameLength = 40;
 final _lookedUp = <String>{};
 
 class _Link {
-  const _Link(this.match, this.httpUrl, this.target);
+  const _Link(this.start, this.end, this.text, this.httpUrl, this.target);
 
-  final RegExpMatch match;
+  final int start;
+  final int end;
+  final String text;
   final String? httpUrl;
   final NostrUriTarget? target;
 }
@@ -68,15 +98,32 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     if (_parsedText == text) return _links!;
     _parsedText = text;
     return _links = [
-      for (final match in _linkPattern.allMatches(text))
-        _Link(
-          match,
-          match.group(1),
-          match.group(1) != null
-              ? null
-              : decodeNostrUri(match.group(2) ?? match.group(3)!),
-        ),
+      for (final match in _linkPattern.allMatches(text)) _linkFor(match),
     ];
+  }
+
+  _Link _linkFor(RegExpMatch match) {
+    final url = match.group(1);
+    if (url == null) {
+      final entity = match.group(2) ?? match.group(3)!;
+      return _Link(
+        match.start,
+        match.end,
+        match.group(0)!,
+        null,
+        decodeNostrUri(entity),
+      );
+    }
+
+    final trimmed = _trimUrlEnd(url);
+    final end = match.start + trimmed.length;
+    return _Link(
+      match.start,
+      end,
+      trimmed,
+      _hasHost(trimmed) ? trimmed : null,
+      null,
+    );
   }
 
   @override
@@ -167,12 +214,11 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     var start = 0;
 
     for (final link in links) {
-      final match = link.match;
-      if (match.start > start) {
-        spans.add(TextSpan(text: widget.text.substring(start, match.start)));
+      if (link.start > start) {
+        spans.add(TextSpan(text: widget.text.substring(start, link.start)));
       }
 
-      final matchedText = match.group(0)!;
+      final matchedText = link.text;
       final httpUrl = link.httpUrl;
       final nostrTarget = link.target;
 
@@ -180,11 +226,11 @@ class _LinkifiedTextState extends State<LinkifiedText> {
         // An unrecognized `nostr:` entity (e.g. `nsec`, `naddr`); leave as
         // plain text rather than linkifying something we can't open.
         spans.add(TextSpan(text: matchedText));
-        start = match.end;
+        start = link.end;
         continue;
       }
 
-      final key = '${match.start}:$matchedText';
+      final key = '${link.start}:$matchedText';
       live.add(key);
       final recognizer = _recognizerFor(
         key,
@@ -209,7 +255,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
           recognizer: recognizer,
         ),
       );
-      start = match.end;
+      start = link.end;
     }
 
     if (start < widget.text.length) {

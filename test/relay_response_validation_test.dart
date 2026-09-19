@@ -298,6 +298,8 @@ void main() {
   });
 
   group('follow publishing', () {
+    setUp(resetKnownContactLists);
+
     // A fresh, throwaway keypair generated for this test run only -- never
     // a real saved identity.
     final me = generateNostrKeyPair();
@@ -453,6 +455,8 @@ void main() {
   });
 
   group('follow-list changes', () {
+    setUp(resetKnownContactLists);
+
     final me = generateNostrKeyPair();
 
     Future<({Map<String, RelayPublishResult> results, Set<String> following})>

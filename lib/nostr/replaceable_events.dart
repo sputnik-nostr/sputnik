@@ -8,7 +8,7 @@ class OwnEvent {
 
   final NostrEvent? event;
 
-  // False when nothing was found but a relay never answered.
+  // False unless every relay answered, or a majority did and one had it.
   final bool conclusive;
 }
 
@@ -30,7 +30,10 @@ Future<OwnEvent> fetchOwnReplaceable(
 
   return OwnEvent(
     event: own.isEmpty ? null : own.first,
-    conclusive: own.isNotEmpty || result.allRelaysAnswered,
+    // A lagging relay can hold an older copy while the newest one is silent.
+    conclusive:
+        result.allRelaysAnswered ||
+        (own.isNotEmpty && result.answeredRelays * 2 > result.queriedRelays),
   );
 }
 

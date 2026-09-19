@@ -79,4 +79,50 @@ void main() {
       isFalse,
     );
   });
+
+  group('secret key hex input', () {
+    final valid = '${'00' * 31}03';
+
+    test(
+      'a key longer than 32 bytes is rejected, not copied past the buffer',
+      () {
+        expect(
+          () => xonlyPubkeyHexFromSeckeyHex('${valid}00'),
+          throwsArgumentError,
+        );
+        expect(
+          () =>
+              signSchnorrSignature(seckeyHex: valid * 4, msg32: Uint8List(32)),
+          throwsArgumentError,
+        );
+      },
+    );
+
+    test('a key shorter than 32 bytes is rejected', () {
+      expect(() => xonlyPubkeyHexFromSeckeyHex('03'), throwsArgumentError);
+      expect(() => xonlyPubkeyHexFromSeckeyHex(''), throwsArgumentError);
+    });
+
+    test('only well-formed hex digits are accepted', () {
+      // int.parse alone would accept a sign or whitespace in a pair.
+      for (final bad in ['-f', '+f', ' f', 'f ', '0x']) {
+        final key = (bad * 32).substring(0, 64);
+        expect(
+          () => xonlyPubkeyHexFromSeckeyHex(key),
+          throwsArgumentError,
+          reason: bad,
+        );
+      }
+    });
+
+    test('the error does not echo the secret', () {
+      final secret = 'zz${'00' * 31}';
+      try {
+        xonlyPubkeyHexFromSeckeyHex(secret);
+        fail('expected an error');
+      } on ArgumentError catch (e) {
+        expect(e.toString(), isNot(contains('zz')));
+      }
+    });
+  });
 }
