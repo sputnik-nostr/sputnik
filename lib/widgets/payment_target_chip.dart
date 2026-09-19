@@ -19,12 +19,13 @@ const _brandColors = <String, Color>{
   'monero': Color(0xFFFF6600),
   'ethereum': Color(0xFF627EEA),
   'zcash': Color(0xFFF4B728),
+  'zano': Color(0xFF274CFF),
+  'firo': Color(0xFFBA2A45),
   'nano': Color(0xFF209CE9),
   'solana': Color(0xFF9945FF),
   'tron': Color(0xFFFF060A),
   'paypal': Color(0xFF0070BA),
   'venmo': Color(0xFF3D95CE),
-  'revolut': Color(0xFF191C1F),
   'cashme': Color(0xFF00D632),
 };
 
@@ -93,7 +94,10 @@ class PaymentTargetChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tint = _brandColors[target.type] ?? theme.colorScheme.outline;
+    // Revolut's brand color is near-black, so follow the theme to stay legible.
+    final tint = target.type == 'revolut'
+        ? theme.colorScheme.onSurface
+        : _brandColors[target.type] ?? theme.colorScheme.outline;
     final background = Color.alphaBlend(
       tint.withValues(alpha: theme.brightness == Brightness.dark ? 0.24 : 0.14),
       theme.colorScheme.surface,

@@ -58,6 +58,17 @@ void main() {
     );
   });
 
+  test('uses the native scheme for zano and firo', () {
+    expect(
+      const NostrPaymentTarget(type: 'zano', address: 'ZxAddr').launchUri,
+      Uri.parse('zano:ZxAddr'),
+    );
+    expect(
+      const NostrPaymentTarget(type: 'firo', address: 'aAddr').launchUri,
+      Uri.parse('firo:aAddr'),
+    );
+  });
+
   test('falls back to payto:// for unrecognized schemes', () {
     const target = NostrPaymentTarget(
       type: 'unknowntype',

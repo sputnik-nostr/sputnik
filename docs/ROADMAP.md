@@ -19,7 +19,6 @@
 - [x] Show a cited npub or nprofile as the person's name, linking to their profile
 - [x] Show a cited note or nevent as a short link that opens the post
 - [x] Infinite scroll on the home feeds and profiles (up to 1000 posts loaded per list)
-- [ ] Add support for profile URLs
 - [ ] Add support for Blossom and other media types
 - [x] Show relay lists on profiles
 - [ ] Add recovery seed phrase support
@@ -47,7 +46,7 @@
 - [x] Edit your own payment targets
 - [ ] Route posts by relay lists (outbox model), instead of only the selected relays
 - [ ] Add an option to hide/show client ID string
-- [ ] Add payment targets support for Zano and Firo
+- [x] Add payment targets support for Zano and Firo
 - [ ] Have some visual indication that there are more payment target chips to scroll to
 
 # Ideas to improve performance

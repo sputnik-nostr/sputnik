@@ -57,9 +57,32 @@ void main() {
     expect(find.text('Copied Bitcoin address to clipboard'), findsOneWidget);
   });
 
+  testWidgets('revolut follows the theme so it stays readable', (tester) async {
+    const revolut = NostrPaymentTarget(type: 'revolut', address: '@someone');
+
+    for (final brightness in Brightness.values) {
+      final theme = ThemeData(brightness: brightness);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: const Scaffold(body: PaymentTargetChip(target: revolut)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final label = tester.widget<Text>(find.text('REVOLUT'));
+      expect(label.style?.color, theme.colorScheme.onSurface);
+    }
+  });
+
   group('paymentTargetTypeSubtitle', () {
     test('a plain currency type just shows its ticker', () {
       expect(paymentTargetTypeSubtitle('monero'), 'XMR');
+    });
+
+    test('zano and firo show their tickers', () {
+      expect(paymentTargetTypeSubtitle('zano'), 'ZANO');
+      expect(paymentTargetTypeSubtitle('firo'), 'FIRO');
     });
 
     test('a name that hides the underlying currency adds a description', () {

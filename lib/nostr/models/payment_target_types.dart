@@ -77,6 +77,16 @@ const paymentTargetTypes = <String, PaymentTargetTypeInfo>{
     hasDirectUriScheme: true,
     tickerIsAlias: true,
   ),
+  'zano': PaymentTargetTypeInfo(
+    displayName: 'Zano',
+    ticker: 'ZANO',
+    hasDirectUriScheme: true,
+  ),
+  'firo': PaymentTargetTypeInfo(
+    displayName: 'Firo',
+    ticker: 'FIRO',
+    hasDirectUriScheme: true,
+  ),
   'nano': PaymentTargetTypeInfo(
     displayName: 'Nano',
     ticker: 'NANO',
