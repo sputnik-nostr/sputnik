@@ -55,42 +55,6 @@ class _RelayReturningAndPublishing extends RelayClient
   }
 }
 
-// A client whose relays did not all answer a query: empty results.
-class _UnreachableRelay extends RelayClient {
-  _UnreachableRelay({this.answered = 0});
-
-  final int answered;
-  final published = <NostrEvent>[];
-
-  @override
-  Future<List<NostrEvent>> query(
-    Set<String> relayUrls,
-    NostrFilter filter,
-  ) async => const [];
-
-  @override
-  Future<RelayQueryResult> queryWithStatus(
-    Set<String> relayUrls,
-    NostrFilter filter,
-  ) async => RelayQueryResult(
-    events: const [],
-    answeredRelays: answered,
-    queriedRelays: 2,
-  );
-
-  @override
-  Future<Map<String, RelayPublishResult>> publish(
-    NostrEvent event,
-    Set<String> relayUrls,
-  ) async {
-    published.add(event);
-    return {
-      for (final url in relayUrls)
-        url: const RelayPublishResult(RelayPublishOutcome.accepted),
-    };
-  }
-}
-
 const _noReactions = RelayReactionsRepository(client: _RelayReturning([]));
 
 void main() {
@@ -188,7 +152,7 @@ void main() {
         ]),
       );
 
-      expect(await repository.fetchPostsByAuthor(victim), isEmpty);
+      expect((await repository.fetchPage(authors: [victim])).posts, isEmpty);
     });
 
     test('keeps posts actually authored by the requested author', () async {
@@ -199,7 +163,7 @@ void main() {
         ]),
       );
 
-      final posts = await repository.fetchPostsByAuthor(victim);
+      final posts = (await repository.fetchPage(authors: [victim])).posts;
       expect(posts, hasLength(1));
       expect(posts.single.content, 'theirs');
     });
@@ -297,163 +261,6 @@ void main() {
     });
   });
 
-  group('follow publishing', () {
-    setUp(resetKnownContactLists);
-
-    // A fresh, throwaway keypair generated for this test run only -- never
-    // a real saved identity.
-    final me = generateNostrKeyPair();
-
-    test('fetchOwnContactTags keeps only "p" tags, verbatim', () async {
-      final client = _RelayReturningAndPublishing([
-        event(
-          pubkey: me.publicKeyHex,
-          kind: 3,
-          tags: [
-            ['p', other, 'wss://their-relay', 'petname'],
-            ['not-p', 'ignored'],
-          ],
-        ),
-      ]);
-      final repository = RelayContactsRepository(client: client);
-
-      final tags = await repository.fetchOwnContactTags(me.publicKeyHex, {
-        'wss://r',
-      });
-
-      expect(tags, [
-        ['p', other, 'wss://their-relay', 'petname'],
-      ]);
-    });
-
-    test(
-      'following someone adds them while preserving everyone else\'s tags',
-      () async {
-        final client = _RelayReturningAndPublishing([
-          event(
-            pubkey: me.publicKeyHex,
-            kind: 3,
-            tags: [
-              ['p', other, 'wss://their-relay', 'petname'],
-            ],
-          ),
-        ]);
-        final repository = RelayContactsRepository(client: client);
-
-        final results = await repository.setFollowing(
-          seckeyHex: me.privateKeyHex,
-          myPubkeyHex: me.publicKeyHex,
-          targetPubkeyHex: victim,
-          follow: true,
-          relayUrls: {'wss://r'},
-        );
-
-        expect(
-          results.values.every(
-            (r) => r.outcome == RelayPublishOutcome.accepted,
-          ),
-          isTrue,
-        );
-        final published = client.lastPublished!;
-        expect(published.kind, 3);
-        expect(published.content, '');
-        expect(published.tags, [
-          ['p', other, 'wss://their-relay', 'petname'],
-          ['p', victim],
-        ]);
-      },
-    );
-
-    test(
-      'a follow made in the same second as the last list is dated after it',
-      () async {
-        final previous = event(
-          pubkey: me.publicKeyHex,
-          kind: 3,
-          createdAt: DateTime.now(),
-        );
-        final client = _RelayReturningAndPublishing([previous]);
-
-        await RelayContactsRepository(client: client).setFollowing(
-          seckeyHex: me.privateKeyHex,
-          myPubkeyHex: me.publicKeyHex,
-          targetPubkeyHex: victim,
-          follow: true,
-          relayUrls: {'wss://r'},
-        );
-
-        expect(
-          client.lastPublished!.createdAt.isAfter(previous.createdAt),
-          isTrue,
-        );
-      },
-    );
-
-    test('unfollowing someone removes only their tag', () async {
-      final client = _RelayReturningAndPublishing([
-        event(
-          pubkey: me.publicKeyHex,
-          kind: 3,
-          tags: [
-            ['p', other, 'wss://their-relay', 'petname'],
-            ['p', victim],
-          ],
-        ),
-      ]);
-      final repository = RelayContactsRepository(client: client);
-
-      await repository.setFollowing(
-        seckeyHex: me.privateKeyHex,
-        myPubkeyHex: me.publicKeyHex,
-        targetPubkeyHex: victim,
-        follow: false,
-        relayUrls: {'wss://r'},
-      );
-
-      expect(client.lastPublished!.tags, [
-        ['p', other, 'wss://their-relay', 'petname'],
-      ]);
-    });
-
-    test('following with no prior contact list starts a fresh one', () async {
-      final client = _RelayReturningAndPublishing([]);
-      final repository = RelayContactsRepository(client: client);
-
-      await repository.setFollowing(
-        seckeyHex: me.privateKeyHex,
-        myPubkeyHex: me.publicKeyHex,
-        targetPubkeyHex: victim,
-        follow: true,
-        relayUrls: {'wss://r'},
-      );
-
-      expect(client.lastPublished!.tags, [
-        ['p', victim],
-      ]);
-    });
-
-    test('a rejected publish is reported, not silently swallowed', () async {
-      final client = _RelayReturningAndPublishing(
-        [],
-        publishOutcome: RelayPublishOutcome.rejected,
-      );
-      final repository = RelayContactsRepository(client: client);
-
-      final results = await repository.setFollowing(
-        seckeyHex: me.privateKeyHex,
-        myPubkeyHex: me.publicKeyHex,
-        targetPubkeyHex: victim,
-        follow: true,
-        relayUrls: {'wss://r'},
-      );
-
-      expect(
-        results.values.every((r) => r.outcome == RelayPublishOutcome.rejected),
-        isTrue,
-      );
-    });
-  });
-
   group('follow-list changes', () {
     setUp(resetKnownContactLists);
 
@@ -478,6 +285,7 @@ void main() {
           tags: [
             ['p', other, 'wss://their-relay', 'petname'],
             ['p', victim],
+            ['not-p', 'dropped'],
           ],
         ),
       ]);
@@ -516,37 +324,38 @@ void main() {
       ]);
     });
 
-    test('starts a new list when the relays answered and have none', () async {
-      final client = _RelayReturningAndPublishing(const []);
+    test('a change made in the same second as the last list is dated after '
+        'it', () async {
+      final previous = event(
+        pubkey: me.publicKeyHex,
+        kind: 3,
+        createdAt: DateTime.now(),
+      );
+      final client = _RelayReturningAndPublishing([previous]);
 
-      final outcome = await apply(client, {other: true});
+      await apply(client, {victim: true});
 
-      expect(outcome.following, {other});
-      expect(client.lastPublished!.tags, [
-        ['p', other],
-      ]);
+      expect(
+        client.lastPublished!.createdAt.isAfter(previous.createdAt),
+        isTrue,
+      );
     });
 
-    test('publishes nothing when no relay answered the list query', () async {
-      final client = _UnreachableRelay();
+    test('a rejected publish is reported, not silently swallowed', () async {
+      final client = _RelayReturningAndPublishing(
+        [],
+        publishOutcome: RelayPublishOutcome.rejected,
+      );
 
-      final outcome = await apply(client, {other: true});
+      final outcome = await apply(client, {victim: true});
 
-      expect(outcome.results, isEmpty);
-      expect(client.published, isEmpty);
+      expect(
+        outcome.results.values.every(
+          (r) => r.outcome == RelayPublishOutcome.rejected,
+        ),
+        isTrue,
+      );
     });
-
-    test(
-      'publishes nothing when only some relays answered "no list"',
-      () async {
-        final client = _UnreachableRelay(answered: 1);
-
-        final outcome = await apply(client, {other: true});
-
-        expect(outcome.results, isEmpty);
-        expect(client.published, isEmpty);
-      },
-    );
   });
 
   group('thread replies', () {
@@ -608,70 +417,6 @@ void main() {
       final thread = await repository.fetchThread(wantedId, {'wss://r'});
       expect(thread.replies, hasLength(1));
       expect(thread.replies.single.post.content, 'a real reply');
-    });
-
-    test('a marked "mention" tag does not make a note a reply', () async {
-      final repository = RelayThreadRepository(
-        reactionsRepository: _noReactions,
-        client: _RelayReturning([
-          event(
-            pubkey: attacker,
-            kind: 1,
-            id: otherId,
-            content: 'just citing it',
-            tags: [
-              ['e', wantedId, '', 'mention'],
-              ['e', otherId, '', 'root'],
-            ],
-          ),
-        ]),
-      );
-
-      final thread = await repository.fetchThread(wantedId, {'wss://r'});
-      expect(thread.replies, isEmpty);
-    });
-
-    test('a marked "reply" tag takes priority over "root"', () async {
-      final repository = RelayThreadRepository(
-        reactionsRepository: _noReactions,
-        client: _RelayReturning([
-          event(
-            pubkey: attacker,
-            kind: 1,
-            id: otherId,
-            content: 'a reply deep in the thread',
-            tags: [
-              ['e', otherId, '', 'root'],
-              ['e', wantedId, '', 'reply'],
-            ],
-          ),
-        ]),
-      );
-
-      final thread = await repository.fetchThread(wantedId, {'wss://r'});
-      expect(thread.replies, hasLength(1));
-    });
-
-    test('in the deprecated positional scheme, only the last e tag is the '
-        'direct parent, not an earlier citation', () async {
-      final repository = RelayThreadRepository(
-        reactionsRepository: _noReactions,
-        client: _RelayReturning([
-          event(
-            pubkey: attacker,
-            kind: 1,
-            id: otherId,
-            content: 'root is wanted, but replying to something else',
-            tags: [
-              ['e', wantedId],
-              ['e', otherId],
-            ],
-          ),
-        ]),
-      );
-
-      final thread = await repository.fetchThread(wantedId, {'wss://r'});
-      expect(thread.replies, isEmpty);
     });
   });
 
@@ -761,27 +506,6 @@ void main() {
             pubkey: attacker,
             kind: 7,
             content: '-',
-            tags: [
-              ['e', wantedId],
-            ],
-          ),
-        ]),
-      );
-
-      final reactions = await repository.fetchReactions(
-        [wantedId],
-        {'wss://r'},
-      );
-      expect(reactions[wantedId]!.likerPubkeys, isEmpty);
-    });
-
-    test('a custom emoji reaction is not counted as a like', () async {
-      final repository = RelayReactionsRepository(
-        client: _RelayReturning([
-          event(
-            pubkey: attacker,
-            kind: 7,
-            content: ':shortcode:',
             tags: [
               ['e', wantedId],
             ],

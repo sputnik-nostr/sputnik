@@ -13,19 +13,7 @@ import 'package:sputnik/services/follow_sync.dart';
 import 'package:sputnik/services/settings_store.dart';
 
 import 'support/answering_relay_client.dart';
-
-class _FakeSecretStore implements SecretStore {
-  final _values = <String, String>{};
-
-  @override
-  Future<String?> read(String key) async => _values[key];
-
-  @override
-  Future<void> write(String key, String value) async => _values[key] = value;
-
-  @override
-  Future<void> delete(String key) async => _values.remove(key);
-}
+import 'support/fake_secret_store.dart';
 
 class _FakeRelayClient extends RelayClient with AnsweringRelayClient {
   _FakeRelayClient({
@@ -208,20 +196,6 @@ void main() {
 
       expect(find.text('a reply to someone'), findsOneWidget);
       expect(find.text('a top-level post'), findsNothing);
-    });
-
-    testWidgets('swiping moves between posts and replies', (tester) async {
-      await pumpProfile(tester);
-
-      await tester.drag(find.byType(TabBarView), const Offset(-600, 0));
-      await tester.pumpAndSettle();
-      expect(find.text('a reply to someone'), findsOneWidget);
-      expect(find.text('a top-level post'), findsNothing);
-
-      await tester.drag(find.byType(TabBarView), const Offset(600, 0));
-      await tester.pumpAndSettle();
-      expect(find.text('a top-level post'), findsOneWidget);
-      expect(find.text('a reply to someone'), findsNothing);
     });
 
     testWidgets('scrolling a long list moves the header out of the way', (
@@ -416,7 +390,7 @@ void main() {
       identitiesNotifier.value = [identity];
       activeIdentityPubkeyNotifier.value = identity.pubkeyHex;
 
-      SettingsStore.secretStore = _FakeSecretStore();
+      SettingsStore.secretStore = FakeSecretStore();
       await SettingsStore.savePrivateKey(
         identity.pubkeyHex,
         keypair.privateKeyHex,

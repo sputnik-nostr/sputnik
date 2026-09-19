@@ -2,7 +2,6 @@ import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'models/nostr_post.dart';
 import 'nip10.dart';
-import 'post_repository.dart';
 import 'relay_client.dart';
 
 // Replies are dropped after the query, so ask for more to still fill a page.
@@ -11,7 +10,7 @@ const _replyOverfetch = 3;
 // Bounds the queries one page can cost when most results are dropped.
 const _maxPageRounds = 4;
 
-class RelayPostRepository implements PostRepository {
+class RelayPostRepository {
   const RelayPostRepository({
     required this.relayUrls,
     this.limit = 30,
@@ -21,18 +20,6 @@ class RelayPostRepository implements PostRepository {
   final Set<String> relayUrls;
   final int limit;
   final RelayClient client;
-
-  @override
-  Future<List<NostrPost>> fetchPosts({bool includeReplies = true}) =>
-      _fetchPosts(includeReplies: includeReplies);
-
-  Future<List<NostrPost>> fetchPostsByAuthor(String pubkeyHex) =>
-      fetchPostsByAuthors([pubkeyHex]);
-
-  Future<List<NostrPost>> fetchPostsByAuthors(
-    List<String> pubkeysHex, {
-    bool includeReplies = true,
-  }) => _fetchPosts(authors: pubkeysHex, includeReplies: includeReplies);
 
   Future<NostrPost?> fetchPostById(String id) async {
     final event = await fetchEventById(id);
@@ -49,17 +36,6 @@ class RelayPostRepository implements PostRepository {
       if (event.kind == 1 && event.id == wantedId) return event;
     }
     return null;
-  }
-
-  Future<List<NostrPost>> _fetchPosts({
-    List<String>? authors,
-    bool includeReplies = true,
-  }) async {
-    final page = await fetchPage(
-      authors: authors,
-      includeReplies: includeReplies,
-    );
-    return page.posts;
   }
 
   // Pass the previous page's [PostPage.next] as [until] to get the next page.

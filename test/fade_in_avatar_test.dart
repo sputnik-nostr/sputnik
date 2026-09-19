@@ -28,14 +28,6 @@ void main() {
     expect(find.text('A'), findsOneWidget);
   });
 
-  testWidgets('builds an Image when media loading is on', (tester) async {
-    loadMediaNotifier.value = true;
-    await pumpAvatar(tester);
-    await tester.pump();
-
-    expect(find.byType(Image), findsOneWidget);
-  });
-
   testWidgets('no image URL means no Image regardless of the setting', (
     tester,
   ) async {

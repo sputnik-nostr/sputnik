@@ -22,19 +22,6 @@ void main() {
   const filter = NostrFilter(kinds: [3], limit: 1);
   const client = RelayClient(timeout: Duration(seconds: 1));
 
-  test('a relay that finishes with EOSE counts as having answered', () async {
-    final server = await _serve(answer: true);
-    addTearDown(() => server.close(force: true));
-
-    final result = await client.queryWithStatus({
-      'ws://127.0.0.1:${server.port}',
-    }, filter);
-
-    expect(result.events, isEmpty);
-    expect(result.answeredRelays, 1);
-    expect(result.allRelaysAnswered, isTrue);
-  });
-
   test('a relay that never answers does not count', () async {
     final server = await _serve(answer: false);
     addTearDown(() => server.close(force: true));

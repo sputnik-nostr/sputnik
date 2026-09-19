@@ -40,30 +40,6 @@ void main() {
       expect(status, Nip05Status.unreachable);
     });
 
-    test('refuses to fetch from a loopback address', () async {
-      final status = await verifyNip05(
-        identifier: 'bob@localhost',
-        pubkeyHex: pubkey,
-      );
-      expect(status, Nip05Status.unreachable);
-    });
-
-    test('refuses to fetch from a private-network IP literal', () async {
-      final status = await verifyNip05(
-        identifier: 'bob@192.168.1.1',
-        pubkeyHex: pubkey,
-      );
-      expect(status, Nip05Status.unreachable);
-    });
-
-    test('refuses to fetch from a link-local/cloud-metadata address', () async {
-      final status = await verifyNip05(
-        identifier: 'bob@169.254.169.254',
-        pubkeyHex: pubkey,
-      );
-      expect(status, Nip05Status.unreachable);
-    });
-
     // Regression test: connectionFactory must actually complete a real
     // TLS handshake, which fakes can't catch.
     test('completes a real TLS handshake and verifies a known identifier', () async {

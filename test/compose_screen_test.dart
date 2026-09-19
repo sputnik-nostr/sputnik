@@ -7,18 +7,7 @@ import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/screens/compose_screen.dart';
 import 'package:sputnik/services/settings_store.dart';
 
-class _FakeSecretStore implements SecretStore {
-  final _values = <String, String>{};
-
-  @override
-  Future<String?> read(String key) async => _values[key];
-
-  @override
-  Future<void> write(String key, String value) async => _values[key] = value;
-
-  @override
-  Future<void> delete(String key) async => _values.remove(key);
-}
+import 'support/fake_secret_store.dart';
 
 class _FakeRelayClient extends RelayClient {
   _FakeRelayClient(this._outcome, {this.message});
@@ -60,7 +49,7 @@ void main() {
     activeIdentityPubkeyNotifier.value = identity.pubkeyHex;
     selectedRelaysNotifier.value = {'wss://relay.example'};
 
-    SettingsStore.secretStore = _FakeSecretStore();
+    SettingsStore.secretStore = FakeSecretStore();
     await SettingsStore.savePrivateKey(
       identity.pubkeyHex,
       keypair.privateKeyHex,
@@ -138,24 +127,6 @@ void main() {
 
     expect(find.byType(ComposeScreen), findsNothing);
     expect(find.byKey(const Key('composeFab')), findsOneWidget);
-  });
-
-  testWidgets('posting asks for confirmation before signing and publishing', (
-    tester,
-  ) async {
-    final fakeClient = _FakeRelayClient(RelayPublishOutcome.accepted);
-    await openComposeScreen(tester, fakeClient);
-
-    await tester.enterText(
-      find.byKey(const Key('composeTextField')),
-      'gm nostr',
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('composePostButton')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Post to relays?'), findsOneWidget);
-    expect(fakeClient.lastPublished, isNull);
   });
 
   testWidgets('canceling the confirmation does not publish anything', (

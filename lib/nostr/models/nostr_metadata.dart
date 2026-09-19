@@ -98,20 +98,6 @@ class NostrMetadata {
     };
   }
 
-  // The kind:0 wire format, per NIP-01: snake_case display_name, unlike the
-  // camelCase used by toJson()'s internal cache shape.
-  Map<String, dynamic> toEventContent() {
-    return {
-      if (name != null) 'name': name,
-      if (displayName != null) 'display_name': displayName,
-      if (about != null) 'about': about,
-      if (picture != null) 'picture': picture,
-      if (banner != null) 'banner': banner,
-      if (nip05 != null) 'nip05': nip05,
-      if (website != null) 'website': website,
-    };
-  }
-
   NostrMetadata copyWith({
     String? name,
     String? displayName,

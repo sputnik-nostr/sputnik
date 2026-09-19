@@ -7,7 +7,6 @@ export 'models/nostr_payment_target.dart';
 export 'models/nostr_post.dart';
 export 'models/post_reactions.dart';
 export 'nip19.dart';
-export 'post_repository.dart';
 export 'profile_content.dart';
 export 'relay_client.dart';
 export 'relay_contacts_repository.dart';

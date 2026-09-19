@@ -126,6 +126,35 @@ void main() {
         'note 5', 'note 6', 'note 7', 'note 101', 'note 8', 'note 9',
       ]);
     });
+
+    test(
+      'asks for extra when leaving replies out so a page fills up',
+      () async {
+        final client = InMemoryRelayClient();
+
+        await _repository(client).fetchPage(includeReplies: false);
+        await _repository(client).fetchPage();
+
+        expect(client.queries.map((f) => f.limit), [9, 3]);
+      },
+    );
+
+    test('keeps replies unless asked to leave them out', () async {
+      final client = InMemoryRelayClient([_note(0, reply: true)]);
+
+      final page = await _repository(client).fetchPage();
+
+      expect(page.posts, hasLength(1));
+    });
+
+    test('does not query for an empty author list', () async {
+      final client = InMemoryRelayClient();
+
+      final page = await _repository(client).fetchPage(authors: const []);
+
+      expect(page.posts, isEmpty);
+      expect(client.queries, isEmpty);
+    });
   });
 
   test('a busy author of replies does not hide their older posts', () async {

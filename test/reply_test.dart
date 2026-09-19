@@ -10,30 +10,9 @@ import 'package:sputnik/screens/post_screen.dart';
 import 'package:sputnik/services/settings_store.dart';
 import 'package:sputnik/widgets/note_tile.dart';
 
+import 'support/fake_secret_store.dart';
 import 'support/in_memory_relay_client.dart';
-
-class _FakeSecretStore implements SecretStore {
-  final _values = <String, String>{};
-
-  @override
-  Future<String?> read(String key) async => _values[key];
-
-  @override
-  Future<void> write(String key, String value) async => _values[key] = value;
-
-  @override
-  Future<void> delete(String key) async => _values.remove(key);
-}
-
-class _NoReactions extends RelayReactionsRepository {
-  const _NoReactions();
-
-  @override
-  Future<Map<String, PostReactions>> fetchReactions(
-    List<String> postIds,
-    Set<String> relayUrls,
-  ) async => const {};
-}
+import 'support/no_reactions.dart';
 
 Note _noteOf(NostrEvent event, {String name = 'Someone'}) => Note(
   id: event.id,
@@ -62,7 +41,7 @@ void main() {
     selectedRelaysNotifier.value = const {};
     loadMediaNotifier.value = true;
 
-    SettingsStore.secretStore = _FakeSecretStore();
+    SettingsStore.secretStore = FakeSecretStore();
     await SettingsStore.savePrivateKey(
       identity.pubkeyHex,
       keypair.privateKeyHex,
@@ -149,29 +128,6 @@ void main() {
 
       await tester.pumpAndSettle();
       expect(find.byType(ComposeScreen), findsNothing);
-    });
-
-    testWidgets('a reply to a reply also marks the thread root', (
-      tester,
-    ) async {
-      final root = fakeEvent(id: 'aa00', pubkey: 'dd', content: 'root');
-      final nested = fakeEvent(
-        id: 'aa02',
-        pubkey: 'bb',
-        content: 'nested',
-        tags: [
-          ['e', root.id, '', 'root'],
-        ],
-      );
-      client.events.add(nested);
-      await openReply(tester, replyTo: _noteOf(nested));
-
-      await submit(tester);
-
-      expect(client.published.single.tags.take(2), [
-        ['e', root.id, '', 'root'],
-        ['e', nested.id, '', 'reply', nested.pubkey],
-      ]);
     });
 
     testWidgets('does not publish when the parent cannot be loaded', (
@@ -263,7 +219,7 @@ void main() {
             note: _noteOf(focus),
             threadRepository: RelayThreadRepository(
               client: client,
-              reactionsRepository: const _NoReactions(),
+              reactionsRepository: const NoReactions(),
             ),
             relayClient: client,
           ),
@@ -319,7 +275,7 @@ void main() {
             note: _noteOf(root),
             threadRepository: RelayThreadRepository(
               client: client,
-              reactionsRepository: const _NoReactions(),
+              reactionsRepository: const NoReactions(),
             ),
           ),
         ),

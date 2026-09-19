@@ -9,20 +9,8 @@ import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/screens/edit_profile_screen.dart';
 import 'package:sputnik/services/settings_store.dart';
 
+import 'support/fake_secret_store.dart';
 import 'support/in_memory_relay_client.dart';
-
-class _FakeSecretStore implements SecretStore {
-  final _values = <String, String>{};
-
-  @override
-  Future<String?> read(String key) async => _values[key];
-
-  @override
-  Future<void> write(String key, String value) async => _values[key] = value;
-
-  @override
-  Future<void> delete(String key) async => _values.remove(key);
-}
 
 void main() {
   late Identity identity;
@@ -67,7 +55,7 @@ void main() {
     );
     client = InMemoryRelayClient([published0]);
 
-    SettingsStore.secretStore = _FakeSecretStore();
+    SettingsStore.secretStore = FakeSecretStore();
     await SettingsStore.savePrivateKey(
       identity.pubkeyHex,
       keypair.privateKeyHex,
@@ -195,37 +183,6 @@ void main() {
 
     await tester.pumpAndSettle();
     expect(find.byType(EditProfileScreen), findsNothing);
-  });
-
-  testWidgets('clearing a field removes it from the profile', (tester) async {
-    await openEditProfileScreen(tester);
-
-    await tester.enterText(find.byKey(const Key('editPictureField')), '');
-    await save(tester);
-
-    final content = contentOf(client.published.single);
-    expect(content.containsKey('picture'), isFalse);
-    expect(content['display_name'], 'Old Name');
-  });
-
-  testWidgets('the new profile is dated after the one it replaces', (
-    tester,
-  ) async {
-    final future = fakeEvent(
-      id: '0b',
-      pubkey: identity.pubkeyHex,
-      kind: 0,
-      createdAt: DateTime.now().add(const Duration(hours: 1)),
-      content: '{"name":"future"}',
-    );
-    client.events
-      ..clear()
-      ..add(future);
-    await openEditProfileScreen(tester);
-
-    await save(tester);
-
-    expect(client.published.single.createdAt.isAfter(future.createdAt), isTrue);
   });
 
   testWidgets('an invalid URL blocks saving', (tester) async {

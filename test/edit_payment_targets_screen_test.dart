@@ -9,20 +9,8 @@ import 'package:sputnik/screens/edit_payment_targets_screen.dart';
 import 'package:sputnik/screens/edit_profile_screen.dart';
 import 'package:sputnik/services/settings_store.dart';
 
+import 'support/fake_secret_store.dart';
 import 'support/in_memory_relay_client.dart';
-
-class _FakeSecretStore implements SecretStore {
-  final _values = <String, String>{};
-
-  @override
-  Future<String?> read(String key) async => _values[key];
-
-  @override
-  Future<void> write(String key, String value) async => _values[key] = value;
-
-  @override
-  Future<void> delete(String key) async => _values.remove(key);
-}
 
 void main() {
   late Identity identity;
@@ -39,7 +27,7 @@ void main() {
     selectedRelaysNotifier.value = {'wss://relay.example'};
     profileCacheNotifier.value = const {};
 
-    SettingsStore.secretStore = _FakeSecretStore();
+    SettingsStore.secretStore = FakeSecretStore();
     await SettingsStore.savePrivateKey(
       identity.pubkeyHex,
       keypair.privateKeyHex,

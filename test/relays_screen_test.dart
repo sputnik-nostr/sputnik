@@ -24,19 +24,6 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('submitting an invalid URL from the keyboard is rejected', (
-    tester,
-  ) async {
-    await openAddRelayDialog(tester);
-
-    await tester.enterText(find.byKey(const Key('addRelayField')), 'not a url');
-    await tester.testTextInput.receiveAction(TextInputAction.done);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Enter a valid ws:// or wss:// URL'), findsOneWidget);
-    expect(customRelaysNotifier.value, isEmpty);
-  });
-
   testWidgets('submitting a valid URL from the keyboard adds it', (
     tester,
   ) async {

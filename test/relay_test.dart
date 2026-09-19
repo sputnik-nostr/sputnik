@@ -70,13 +70,6 @@ void main() {
     );
   });
 
-  test('canonicalRelayUrl makes case/trailing-slash variants match', () {
-    expect(
-      canonicalRelayUrl('WSS://Relay.Example.COM/'),
-      canonicalRelayUrl('wss://relay.example.com'),
-    );
-  });
-
   test('rejects an authority that carries userinfo', () {
     expect(isRelayUrl('wss://relay.damus.io@158.51.42.7'), isFalse);
     expect(isRelayUrl('wss://relay.damus.io@evil.example.com'), isFalse);

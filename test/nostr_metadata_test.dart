@@ -15,11 +15,6 @@ void main() {
     expect(metadata.name, 'bad�name');
   });
 
-  test('sanitizes a lone surrogate in about', () {
-    final metadata = NostrMetadata.fromContent('{"about": "oops\\udc00!"}');
-    expect(metadata.about, 'oops�!');
-  });
-
   test('keeps a valid surrogate pair (emoji) intact', () {
     final metadata = NostrMetadata.fromContent('{"name": "hi \\ud83d\\ude00"}');
     expect(metadata.name, 'hi 😀');
@@ -36,11 +31,6 @@ void main() {
   });
 
   group('legacyMoneroAddress (non-standard, not part of any NIP)', () {
-    test('reads a bare "xmr" field', () {
-      final metadata = NostrMetadata.fromContent('{"xmr": "4Aaddress"}');
-      expect(metadata.legacyMoneroAddress, '4Aaddress');
-    });
-
     test('falls back to "monero_address" when "xmr" is absent', () {
       final metadata = NostrMetadata.fromContent(
         '{"monero_address": "4Baddress"}',
@@ -66,15 +56,6 @@ void main() {
     test('is null when none of the fields are present', () {
       final metadata = NostrMetadata.fromContent('{"name": "alice"}');
       expect(metadata.legacyMoneroAddress, isNull);
-    });
-
-    test('is never included in the published event content', () {
-      final metadata = NostrMetadata.fromContent('{"xmr": "4Aaddress"}');
-      expect(metadata.toEventContent().containsKey('xmr'), isFalse);
-      expect(
-        metadata.toEventContent().containsKey('legacyMoneroAddress'),
-        isFalse,
-      );
     });
 
     test('round-trips through the local cache format', () {

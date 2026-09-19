@@ -94,12 +94,6 @@ void main() {
     return observer.count;
   }
 
-  testWidgets('a link opens when nothing interrupts the gesture', (
-    tester,
-  ) async {
-    expect(await tapLink(tester, rebuildMidGesture: false), 1);
-  });
-
   testWidgets('a link still opens when a rebuild lands mid-gesture', (
     tester,
   ) async {

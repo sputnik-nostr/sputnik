@@ -160,14 +160,6 @@ class RelayContactsRepository {
             .whenComplete(() => _myFollowingLoadingFuture = null);
   }
 
-  // Raw "p" tags, kept verbatim (unlike fetchFollowing) so a republish
-  // doesn't drop others' relay/petname fields. Always fresh, not cached.
-  // Null when nothing was found and some relay may still hold a list.
-  Future<List<List<String>>?> fetchOwnContactTags(
-    String pubkeyHex,
-    Set<String> relayUrls,
-  ) async => (await _fetchOwnContactList(pubkeyHex, relayUrls))?.tags;
-
   Future<({List<List<String>> tags, NostrEvent? event})?> _fetchOwnContactList(
     String pubkeyHex,
     Set<String> relayUrls,
@@ -199,25 +191,8 @@ class RelayContactsRepository {
     );
   }
 
-  // Adds/removes targetPubkeyHex and republishes the full list (NIP-02:
-  // fully replaced each time; content unused).
-  Future<Map<String, RelayPublishResult>> setFollowing({
-    required String seckeyHex,
-    required String myPubkeyHex,
-    required String targetPubkeyHex,
-    required bool follow,
-    required Set<String> relayUrls,
-  }) async {
-    final outcome = await applyFollowChanges(
-      seckeyHex: seckeyHex,
-      myPubkeyHex: myPubkeyHex,
-      changes: {targetPubkeyHex: follow},
-      relayUrls: relayUrls,
-    );
-    return outcome.results;
-  }
-
-  // Applies follow (true) / unfollow (false) changes to the relays' list.
+  // Applies follow (true) / unfollow (false) changes to the relays' list,
+  // which NIP-02 has us republish in full each time.
   Future<({Map<String, RelayPublishResult> results, Set<String> following})>
   applyFollowChanges({
     required String seckeyHex,

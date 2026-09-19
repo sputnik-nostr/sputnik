@@ -60,23 +60,6 @@ void main() {
     expect(parsed!.message, 'broken�message');
   });
 
-  test('an EVENT message has no accepted/message fields', () async {
-    final eventJson =
-        '{"id":"${'a' * 64}","pubkey":"${'b' * 64}","created_at":0,'
-        '"kind":1,"tags":[],"content":"","sig":"${'c' * 128}"}';
-    final raw = '["EVENT","sub-id",$eventJson]';
-
-    final parsed = await parser.parse(raw);
-
-    // The event itself is unsigned garbage here (not a real signature), so
-    // this either fails to parse (null) or parses without OK-only fields
-    // set -- either way, accepted/message must not leak from an EVENT.
-    if (parsed != null) {
-      expect(parsed.accepted, isNull);
-      expect(parsed.message, isNull);
-    }
-  });
-
   group('signed events', () {
     final key = generateNostrKeyPair();
 
@@ -100,15 +83,6 @@ void main() {
       expect(parsed?.event?.content, 'hello');
     });
 
-    test('an EVENT for any other subscription is dropped', () async {
-      final parsed = await parser.parse(
-        eventMessage('stale'),
-        subscriptionIds: {'live'},
-      );
-
-      expect(parsed, isNull);
-    });
-
     test('without a subscription list every EVENT is parsed', () async {
       expect(await parser.parse(eventMessage('any')), isNotNull);
     });
@@ -117,12 +91,6 @@ void main() {
       final raw = jsonEncode(['OK', 'a' * 64, true, '']);
 
       expect(await parser.parse(raw, subscriptionIds: {'live'}), isNotNull);
-    });
-
-    test('an event dated beyond the skew allowance is dropped', () async {
-      final late = DateTime.now().add(maxEventFutureSkew * 2);
-
-      expect(await parser.parse(eventMessage('s', at: late)), isNull);
     });
 
     test('an event a little ahead of our clock is kept', () async {

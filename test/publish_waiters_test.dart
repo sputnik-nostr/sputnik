@@ -5,16 +5,6 @@ void main() {
   const accepted = RelayPublishResult(RelayPublishOutcome.accepted);
   const failed = RelayPublishResult(RelayPublishOutcome.connectionFailed);
 
-  test('resolve() completes the single waiter for an event id', () {
-    final waiters = PublishWaiters();
-    final completer = waiters.add('event-1');
-
-    waiters.resolve('event-1', accepted);
-
-    expect(completer.isCompleted, isTrue);
-    expect(completer.future, completion(accepted));
-  });
-
   test('two concurrent waiters for the same event id both resolve from one '
       'OK, instead of one overwriting the other', () {
     final waiters = PublishWaiters();

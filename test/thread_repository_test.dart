@@ -2,16 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/nostr/nostr.dart';
 
 import 'support/in_memory_relay_client.dart';
-
-class _NoReactions extends RelayReactionsRepository {
-  const _NoReactions();
-
-  @override
-  Future<Map<String, PostReactions>> fetchReactions(
-    List<String> postIds,
-    Set<String> relayUrls,
-  ) async => const {};
-}
+import 'support/no_reactions.dart';
 
 DateTime _at(int minutes) =>
     DateTime.fromMillisecondsSinceEpoch(1700000000000 + minutes * 60000);
@@ -25,7 +16,7 @@ void main() {
 
   RelayThreadRepository repository() => RelayThreadRepository(
     client: client,
-    reactionsRepository: const _NoReactions(),
+    reactionsRepository: const NoReactions(),
   );
 
   setUp(() {

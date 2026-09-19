@@ -5,18 +5,7 @@ import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/services/follow_sync.dart';
 import 'package:sputnik/services/settings_store.dart';
 
-class _FakeSecretStore implements SecretStore {
-  final _values = <String, String>{};
-
-  @override
-  Future<String?> read(String key) async => _values[key];
-
-  @override
-  Future<void> write(String key, String value) async => _values[key] = value;
-
-  @override
-  Future<void> delete(String key) async => _values.remove(key);
-}
+import 'support/fake_secret_store.dart';
 
 enum _Relays {
   // Nobody answers.
@@ -114,7 +103,7 @@ void main() {
     // A throwaway keypair, never a real saved identity.
     final keypair = generateNostrKeyPair();
     me = keypair.publicKeyHex;
-    SettingsStore.secretStore = _FakeSecretStore();
+    SettingsStore.secretStore = FakeSecretStore();
     await SettingsStore.savePrivateKey(me, keypair.privateKeyHex);
     identitiesNotifier.value = [
       Identity(pubkeyHex: me, createdAt: DateTime.now()),
@@ -205,15 +194,5 @@ void main() {
       for (final tag in relay.lastPublished!.tags) tag[1],
     ], unorderedEquals([bob, carol]));
     expect(myFollowingNotifier.value, {bob, carol});
-  });
-
-  test('unfollowing removes only that person from the relay list', () async {
-    final relay = _FlakyRelay(me, [alice, bob])..relays = _Relays.up;
-
-    scheduleFollowingSync(alice, follow: false, relayClient: relay);
-    await _waitForSync();
-
-    expect([for (final tag in relay.lastPublished!.tags) tag[1]], [bob]);
-    expect(myFollowingNotifier.value, {bob});
   });
 }

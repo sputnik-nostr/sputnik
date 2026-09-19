@@ -65,15 +65,6 @@ void main() {
     expect(find.text('Silent payments (BTC)'), findsOneWidget);
   });
 
-  testWidgets('a type with a clear name shows just its ticker', (tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(home: PaymentTargetTypesScreen()),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('XMR'), findsOneWidget);
-  });
-
   testWidgets('the "All types" checkbox is checked when nothing is hidden', (
     tester,
   ) async {

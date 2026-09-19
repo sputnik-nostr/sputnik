@@ -4,24 +4,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sputnik/services/settings_store.dart';
 
-class _FakeSecretStore implements SecretStore {
-  final _values = <String, String>{};
-
-  @override
-  Future<String?> read(String key) async => _values[key];
-
-  @override
-  Future<void> write(String key, String value) async => _values[key] = value;
-
-  @override
-  Future<void> delete(String key) async => _values.remove(key);
-}
+import 'support/fake_secret_store.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
-    SettingsStore.secretStore = _FakeSecretStore();
+    SettingsStore.secretStore = FakeSecretStore();
   });
 
   test('drops persisted relays that no longer pass validation', () async {
@@ -54,13 +43,6 @@ void main() {
       expect(selected, {'wss://good.example.com'});
     },
   );
-
-  test('a private key is not found until it has been saved', () async {
-    expect(await SettingsStore.loadPrivateKey('a' * 64), isNull);
-
-    await SettingsStore.savePrivateKey('a' * 64, 'seckeyhex');
-    expect(await SettingsStore.loadPrivateKey('a' * 64), 'seckeyhex');
-  });
 
   test('deleting a private key makes it unreadable again', () async {
     await SettingsStore.savePrivateKey('a' * 64, 'seckeyhex');

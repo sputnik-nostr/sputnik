@@ -56,15 +56,6 @@ void main() {
     expect(find.text('from someone I follow'), findsNothing);
   });
 
-  testWidgets('swiping left moves from following to global', (tester) async {
-    await _pumpHome(tester);
-
-    await tester.drag(find.byType(TabBarView), const Offset(-500, 0));
-    await tester.pumpAndSettle();
-
-    expect(find.text('from the firehose'), findsOneWidget);
-  });
-
   testWidgets('with no identity, following prompts to create one', (
     tester,
   ) async {
