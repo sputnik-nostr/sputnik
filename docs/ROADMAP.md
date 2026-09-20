@@ -19,8 +19,8 @@
 - [x] Show a cited npub or nprofile as the person's name, linking to their profile
 - [x] Show a cited note or nevent as a short link that opens the post
 - [x] Infinite scroll on the home feeds and profiles (up to 1000 posts loaded per list)
-- [ ] Add support for Blossom and other media types
 - [x] Show relay lists on profiles
+- [ ] Add support for Blossom and other media types
 - [ ] Add recovery seed phrase support
 
 ## Posting and interaction (current state)
@@ -38,18 +38,13 @@
 - [x] Rewrite unit tests, improve coverage
 - [x] Show follow buttons directly in a followers/following/reactions list
 - [x] Add an option to hide specific crypto address types from being shown on a profile
-- [ ] Make sure crypto logic is secure
-- [ ] Add desktop support for macOS
-- [ ] Rewrite doc comments
 - [x] Let editing a profile cover more fields than name/bio (picture, banner, NIP-05, website)
 - [x] Publish your own relay list (NIP-65) and use it to set your relays
 - [x] Edit your own payment targets
+- [x] Add payment targets support for Zano and Firo
+- [ ] Make sure crypto logic is secure
+- [ ] Add desktop support for macOS
+- [ ] Rewrite doc comments
 - [ ] Route posts by relay lists (outbox model), instead of only the selected relays
 - [ ] Add an option to hide/show client ID string
-- [x] Add payment targets support for Zano and Firo
 - [ ] Have some visual indication that there are more payment target chips to scroll to
-
-# Ideas to improve performance
-
-- Use `LazyBox` for Hive, if that's preferable
-- Lazy-loading of Hive keys
