@@ -683,37 +683,48 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget _notesTab(String storageKey, List<Note> notes, String emptyLabel) {
     return ValueListenableBuilder<bool>(
       valueListenable: _cursor.hasMore,
-      builder: (context, hasMore, _) => ListView(
-        key: PageStorageKey(storageKey),
-        padding: EdgeInsets.zero,
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          if (notes.isEmpty && _loadingNotes)
-            const Padding(
-              padding: EdgeInsets.only(top: 48),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (notes.isEmpty && !hasMore)
-            Padding(
-              padding: const EdgeInsets.only(top: 48),
-              child: PlaceholderTab(
-                icon: Icons.notes_outlined,
-                label: emptyLabel,
-              ),
-            )
-          else
-            for (final note in notes) ...[
-              NoteTile(note: note),
-              const Divider(height: 1),
+      builder: (context, hasMore, _) {
+        // A new key per page, so the next one is asked for if still in view.
+        Widget footer() => LoadMoreFooter(
+          key: ValueKey(_fetchedNotes?.length),
+          onLoadMore: _loadMorePosts,
+        );
+        final showFooter = hasMore && !_loadingNotes;
+
+        if (notes.isEmpty) {
+          return ListView(
+            key: PageStorageKey(storageKey),
+            padding: EdgeInsets.zero,
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              if (_loadingNotes)
+                const Padding(
+                  padding: EdgeInsets.only(top: 48),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (!hasMore)
+                Padding(
+                  padding: const EdgeInsets.only(top: 48),
+                  child: PlaceholderTab(
+                    icon: Icons.notes_outlined,
+                    label: emptyLabel,
+                  ),
+                ),
+              if (showFooter) footer(),
             ],
-          // A new key per page, so the next one is asked for if still in view.
-          if (hasMore && !_loadingNotes)
-            LoadMoreFooter(
-              key: ValueKey(_fetchedNotes?.length),
-              onLoadMore: _loadMorePosts,
-            ),
-        ],
-      ),
+          );
+        }
+
+        return ListView.separated(
+          key: PageStorageKey(storageKey),
+          padding: EdgeInsets.zero,
+          physics: const AlwaysScrollableScrollPhysics(),
+          itemCount: notes.length + (showFooter ? 1 : 0),
+          separatorBuilder: (_, _) => const Divider(height: 1),
+          itemBuilder: (context, index) =>
+              index == notes.length ? footer() : NoteTile(note: notes[index]),
+        );
+      },
     );
   }
 }

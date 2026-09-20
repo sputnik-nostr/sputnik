@@ -12,6 +12,9 @@ class CacheStore {
 
   static const staleAfter = Duration(hours: 1);
 
+  /// Entries not refreshed within this long are dropped when the cache opens.
+  static const maxAge = Duration(days: 30);
+
   static late final Box<Map> _profiles;
   static late final Box<Map> _contacts;
   static late final Box<Map> _paymentTargets;
@@ -30,6 +33,7 @@ class CacheStore {
       _contacts = boxes[1];
       _paymentTargets = boxes[2];
       _ready = true;
+      await Future.wait(boxes.map(pruneExpired));
     } catch (error, stack) {
       FlutterError.reportError(
         FlutterErrorDetails(
@@ -40,6 +44,18 @@ class CacheStore {
         ),
       );
     }
+  }
+
+  /// Deletes entries whose `fetchedAt` is older than [maxAge].
+  @visibleForTesting
+  static Future<void> pruneExpired(Box<Map> box, {DateTime? now}) {
+    final cutoff = (now ?? DateTime.now())
+        .subtract(maxAge)
+        .millisecondsSinceEpoch;
+    return box.deleteAll([
+      for (final key in box.keys)
+        if (((box.get(key)?['fetchedAt'] as int?) ?? 0) < cutoff) key,
+    ]);
   }
 
   static bool _isFresh(int? fetchedAtMillis) {

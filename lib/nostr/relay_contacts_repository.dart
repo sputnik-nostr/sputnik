@@ -133,7 +133,13 @@ class RelayContactsRepository {
     final subject = pubkeyHex.toLowerCase();
     final followers = [
       for (final event in latestByAuthor.values)
-        if (_followedPubkeys(event).contains(subject)) event.pubkey,
+        if (event.tags.any(
+          (tag) =>
+              tag.length > 1 &&
+              tag[0] == 'p' &&
+              tag[1].toLowerCase() == subject,
+        ))
+          event.pubkey,
     ];
 
     await CacheStore.putFollowers(pubkeyHex, followers);
