@@ -32,7 +32,7 @@ const _avatarRadius = 40.0;
 const _avatarOverlap = _avatarRadius * 2 * 0.25;
 const _avatarInitialFontSize = _avatarRadius * 0.7;
 
-// Replies are fetched alongside posts, so a page needs headroom for both.
+/// Replies are fetched alongside posts, so a page needs headroom for both.
 const _profileEventLimit = 100;
 
 void openProfile(BuildContext context, String pubkeyHex) {
@@ -46,7 +46,7 @@ void openProfile(BuildContext context, String pubkeyHex) {
 }
 
 class ProfileScreen extends StatefulWidget {
-  /// [pubkeyHex] null means "my profile" -- whichever identity is active.
+  /// [pubkeyHex] null means "my profile" (whichever identity is active).
   const ProfileScreen({
     super.key,
     this.pubkeyHex,
@@ -286,10 +286,8 @@ class _ProfileScreenState extends State<ProfileScreen>
               if (note.pubkey == pubkeyHex) note.id: note,
             for (final note in (_fetchedNotes ?? const [])) note.id: note,
           };
-          // Notes may have been fetched (and their author metadata
-          // resolved) before this profile's own metadata query landed,
-          // so always re-apply whatever is currently cached rather than
-          // trusting what was baked in when each note was fetched.
+          // Notes fetched before this profile's metadata landed carry stale
+          // author data, so re-apply whatever is cached now.
           final ownNotes =
               ownNotesById.values
                   .map(

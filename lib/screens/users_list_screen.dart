@@ -7,8 +7,8 @@ import '../nostr/nostr.dart';
 import '../widgets/placeholder_tab.dart';
 import '../widgets/profile_result_tile.dart';
 
-// A titled list of users, rendered as profile tiles. Used for
-// followers/following as well as for who liked/reposted a post.
+/// A list of users, rendered as profile tiles. Used for followers/following
+/// lists, as well as for who liked/reposted a post.
 class UsersListScreen extends StatefulWidget {
   const UsersListScreen({
     super.key,
@@ -26,11 +26,11 @@ class UsersListScreen extends StatefulWidget {
 }
 
 class _UsersListScreenState extends State<UsersListScreen> {
-  // Only rows that actually get built (i.e. are visible or near-visible)
-  // request their profile, rather than eagerly fetching the whole list up
-  // front. Requests are debounced so a fast scroll batches into one fetch
-  // instead of firing per row.
+  /// Only request profile data for rows that actually get built, rather than
+  /// eagerly fetching the entire list up front.
   final _requested = <String>{};
+
+  /// Awaiting the debounced fetch, so a fast scroll batches into one.
   final _pending = <String>{};
   Timer? _debounce;
 

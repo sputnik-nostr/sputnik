@@ -8,7 +8,7 @@ class RelayListRepository {
 
   final RelayClient client;
 
-  // Uncached: a relay list is only read when someone opens it.
+  /// Uncached: a relay list is only read when someone opens it.
   Future<OwnEvent> fetch(String pubkeyHex, Set<String> relayUrls) {
     return fetchOwnReplaceable(
       client,
@@ -18,7 +18,7 @@ class RelayListRepository {
     );
   }
 
-  // Publishes [entries] as the whole list; other tags carry over from [base].
+  /// Publishes [entries] as the whole list; other tags carry over from [base].
   Future<({NostrEvent event, Map<String, RelayPublishResult> results})>
   publish({
     required String seckeyHex,

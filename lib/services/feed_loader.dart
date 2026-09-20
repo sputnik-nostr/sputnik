@@ -6,12 +6,16 @@ import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
 import 'post_cursor.dart';
 
-// Tests swap this to feed the loaders without a network.
+/// Tests swap this to feed the loaders without a network.
 RelayClient feedRelayClient = const RelayClient();
 
+/// Bumped by each load, so a slower, older load can't overwrite a newer one.
 int _globalGeneration = 0;
+
+/// As [_globalGeneration], for the following feed.
 int _followingGeneration = 0;
 
+/// Runs [load] unawaited; errors are reported to Flutter as [description].
 void runFeedLoad(Future<void> Function() load, String description) {
   load().catchError((Object error, StackTrace stack) {
     FlutterError.reportError(
@@ -44,6 +48,7 @@ List<String> _followingAuthors = const [];
 ValueListenable<bool> get globalFeedHasMore => _globalCursor.hasMore;
 ValueListenable<bool> get followingFeedHasMore => _followingCursor.hasMore;
 
+/// Loads the newest notes from the selected relays into [notesNotifier].
 Future<void> loadGlobalFeed() async {
   final generation = ++_globalGeneration;
   final relayUrls = selectedRelaysNotifier.value;
@@ -58,9 +63,10 @@ Future<void> loadGlobalFeed() async {
   );
 }
 
+/// Appends the next older page to [notesNotifier].
 Future<void> loadMoreGlobalFeed() => _appendPosts(_globalCursor, notesNotifier);
 
-// Posts by the active identity and everyone it follows.
+/// Posts by the active identity and everyone it follows.
 Future<void> loadFollowingFeed() async {
   final generation = ++_followingGeneration;
   final relayUrls = selectedRelaysNotifier.value;
@@ -86,6 +92,7 @@ Future<void> loadFollowingFeed() async {
   );
 }
 
+/// Appends the next older page to [followingNotesNotifier].
 Future<void> loadMoreFollowingFeed() =>
     _appendPosts(_followingCursor, followingNotesNotifier);
 
@@ -117,9 +124,8 @@ Future<void> _showPosts(
   ValueNotifier<List<Note>?> target,
   bool Function() isCurrent,
 ) async {
-  // Show posts right away, using already-cached profile metadata where
-  // available, instead of blocking the whole feed on the profile and
-  // reaction round trips below.
+  // Show posts immediately, using cached profile data when available, instead
+  // of blocking the entire feed on the profile and reaction round trips below.
   target.value = notesFromPosts(posts, profileCacheNotifier.value);
 
   final hydrated = {

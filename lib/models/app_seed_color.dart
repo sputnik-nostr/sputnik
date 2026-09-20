@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-// Material seed color for the app's theme.
+/// Material seed color for the app's theme.
 enum AppSeedColor {
   blue(Colors.blue, 'Blue'),
   red(Colors.red, 'Red'),

@@ -1,5 +1,6 @@
 import 'nostr_event.dart';
 
+/// A NIP-01 subscription filter. Unset fields match anything.
 class NostrFilter {
   const NostrFilter({
     this.ids,
@@ -14,6 +15,8 @@ class NostrFilter {
   final List<String>? ids;
   final List<String>? authors;
   final List<int>? kinds;
+
+  /// Tag values by tag name without the `#`, e.g. `e` for `#e`.
   final Map<String, List<String>>? tags;
   final DateTime? since;
   final DateTime? until;
@@ -35,7 +38,8 @@ class NostrFilter {
   NostrFilterMatcher matcher() => NostrFilterMatcher(this);
 }
 
-// Relays are untrusted, so what they return is checked against what was asked.
+/// Checks events against a [NostrFilter], since relays are untrusted and may
+/// return events that were not asked for.
 class NostrFilterMatcher {
   NostrFilterMatcher(NostrFilter filter)
     : _ids = filter.ids?.map((id) => id.toLowerCase()).toSet(),

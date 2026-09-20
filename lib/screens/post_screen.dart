@@ -52,7 +52,7 @@ class _PostThread {
   int get directReplyCount => depths.where((depth) => depth == 0).length;
 }
 
-// Nesting past this only shifts replies off the screen.
+/// Nesting past this only shifts replies off the screen.
 const _maxIndentDepth = 4;
 
 class _PostScreenState extends State<PostScreen> {
@@ -66,7 +66,7 @@ class _PostScreenState extends State<PostScreen> {
   bool _loading = true;
   int _loadGeneration = 0;
 
-  // Replies published from this screen, which relays may not return yet.
+  /// Replies published from this screen, which relays may not return yet.
   final _publishedReplies = <NostrEvent>[];
 
   @override
@@ -81,7 +81,7 @@ class _PostScreenState extends State<PostScreen> {
     super.dispose();
   }
 
-  // Slides the direct parent into view, unless the reader already scrolled.
+  /// Slides the direct parent into view, unless the reader already scrolled.
   void _revealParent() {
     if (!mounted || !_scrollController.hasClients) return;
     final position = _scrollController.position;
@@ -95,7 +95,7 @@ class _PostScreenState extends State<PostScreen> {
     );
   }
 
-  // Keeps showing the previous thread while a newer one loads.
+  /// Keeps showing the previous thread while a newer one loads.
   Future<void> _refreshThread() async {
     final generation = ++_loadGeneration;
     _PostThread? thread;

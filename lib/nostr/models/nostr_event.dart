@@ -20,6 +20,7 @@ bool _bytesEqual(List<int> a, List<int> b) {
   return true;
 }
 
+/// Sanitizes each tag, dropping any that contain a non-string value.
 List<List<String>> _tagsFromJson(Object? raw) {
   if (raw is! List) throw const FormatException('Malformed tags');
   final tags = <List<String>>[];
@@ -41,6 +42,8 @@ List<List<String>> _tagsFromJson(Object? raw) {
 
 final _needsEscape = RegExp(r'[\x00-\x1f"\\]');
 
+/// NIP-01 escapes only these; [jsonEncode] would also escape other control
+/// characters, which changes the id hash.
 const _nip01Escapes = {
   0x08: r'\b',
   0x09: r'\t',
@@ -73,8 +76,8 @@ String _encodeJson(Object? value) => switch (value) {
   _ => jsonEncode(value),
 };
 
-// The NIP-01 id-hash input: [0, pubkey, created_at, kind, tags, content].
-// Shared by verification and signing so the two can't drift apart.
+/// The NIP-01 id-hash input: `[0, pubkey, created_at, kind, tags, content]`.
+/// Shared by verification and signing so the two can't drift apart.
 Uint8List _canonicalSerialization({
   required String pubkey,
   required Object? createdAt,
@@ -85,6 +88,9 @@ Uint8List _canonicalSerialization({
   return utf8.encode(_encodeJson([0, pubkey, createdAt, kind, tags, content]));
 }
 
+/// Whether [id] is the hash of [json] and [sig] a valid signature of it by
+/// [pubkey]. Uses the raw JSON values, since the id covers what the author
+/// signed, not the sanitized text stored on [NostrEvent].
 bool _isAuthentic(
   Map<String, dynamic> json,
   String id,
@@ -108,6 +114,8 @@ bool _isAuthentic(
   );
 }
 
+/// A NIP-01 event. [NostrEvent.fromJson] throws [FormatException] unless the
+/// id and signature check out.
 class NostrEvent {
   const NostrEvent({
     required this.id,
@@ -163,6 +171,7 @@ class NostrEvent {
   };
 }
 
+/// Newest first, with ties broken by id so the order is deterministic.
 int compareNewestFirst(NostrEvent a, NostrEvent b) {
   final byTime = b.createdAt.compareTo(a.createdAt);
   return byTime != 0 ? byTime : a.id.compareTo(b.id);

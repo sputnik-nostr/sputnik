@@ -10,6 +10,7 @@ import 'bookmark_button.dart';
 import 'fade_in_avatar.dart';
 import 'linkified_text.dart';
 
+/// A feed row for [note]; tapping it opens the post.
 class NoteTile extends StatelessWidget {
   const NoteTile({super.key, required this.note});
 
@@ -108,7 +109,7 @@ class NoteTile extends StatelessWidget {
   }
 }
 
-// Opens the composer for a reply and returns the published reply, if any.
+/// Opens the composer for a reply and returns the published reply, if any.
 Future<NostrEvent?> openReplyComposer(
   BuildContext context,
   Note note, {

@@ -1,6 +1,6 @@
 import 'dart:io';
 
-// List of hardcoded default relays.
+/// Relays selected until the user changes their selection.
 const defaultRelays = [
   'wss://relay.damus.io',
   'wss://nos.lol',
@@ -10,15 +10,18 @@ const defaultRelays = [
   'wss://relay.ditto.pub',
 ];
 
-// Maximum number of user-added relays.
+/// Maximum number of user-added relays.
 const maxCustomRelays = 20;
 
-// RFC 1035-ish hostname label.
+/// Hostname label, as relaxed by RFC 1123 to allow a leading digit.
 final _hostLabelPattern = RegExp(
   r'^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$',
 );
+
+/// Letters only, so a dotted-number string is not mistaken for a domain.
 final _tldPattern = RegExp(r'^[a-zA-Z]{2,}$');
 
+/// Rejects single-label hosts such as `localhost`.
 bool _isValidDomain(String host) {
   if (host.isEmpty || host.length > 253) return false;
 
@@ -31,7 +34,7 @@ bool _isValidDomain(String host) {
 bool _isValidHost(String host) =>
     InternetAddress.tryParse(host) != null || _isValidDomain(host);
 
-// Whether [input] is a valid WebSocket URL with a real domain, or IP as host.
+/// Whether [input] is a ws(s) URL, without userinfo, with a domain or IP host.
 bool isRelayUrl(String input) {
   final uri = Uri.tryParse(input);
   if (uri == null || !uri.hasAuthority) return false;
@@ -40,7 +43,7 @@ bool isRelayUrl(String input) {
   return _isValidHost(uri.host);
 }
 
-// Normalizes case and a bare "/" path so equivalent URLs deduplicate correctly.
+/// Lowercases scheme and host and drops a bare "/" path, for deduplication.
 String canonicalRelayUrl(String input) {
   final uri = Uri.tryParse(input.trim());
   if (uri == null) return input.trim();

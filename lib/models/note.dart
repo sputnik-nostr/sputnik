@@ -1,5 +1,6 @@
 import 'time_format.dart';
 
+/// A text note as shown in the UI, with author profile data and counts.
 class Note {
   const Note({
     required this.id,

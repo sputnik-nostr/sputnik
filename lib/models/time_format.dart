@@ -10,6 +10,7 @@ String relativeTime(DateTime time) {
   return '${diff.inDays}d';
 }
 
+/// "Last active" text built from a [relativeTime] string.
 String formatLastActiveFromPostedAt(String postedAt) {
   return postedAt == 'now'
       ? 'Last active just now'

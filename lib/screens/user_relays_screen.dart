@@ -6,7 +6,7 @@ import '../nostr/nostr.dart';
 import '../services/relay_settings.dart';
 import '../widgets/placeholder_tab.dart';
 
-// The relays someone publishes in their NIP-65 relay list.
+/// The relays published in a user's NIP-65 relay list.
 class UserRelaysScreen extends StatefulWidget {
   const UserRelaysScreen({
     super.key,

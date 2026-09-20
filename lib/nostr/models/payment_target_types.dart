@@ -1,4 +1,4 @@
-// Single source of truth for the NIP-A3 payment target types.
+/// Display and URI details for one NIP-A3 payment target type.
 class PaymentTargetTypeInfo {
   const PaymentTargetTypeInfo({
     required this.displayName,
@@ -10,21 +10,22 @@ class PaymentTargetTypeInfo {
 
   final String displayName;
 
-  // Shown next to the address (e.g. a chip badge, or a settings subtitle).
+  /// Shown next to the address (e.g. a chip badge, or a settings subtitle).
   final String? ticker;
 
-  // A short hint for types whose name alone doesn't say what they are.
+  /// A short hint for types whose name alone doesn't say what they are.
   final String? description;
 
-  // Whether launchUri should use `<type>:<address>` instead of
-  // `payto://<type>/<address>`.
+  /// Whether launchUri should use `<type>:<address>` instead of
+  /// `payto://<type>/<address>`.
   final bool hasDirectUriScheme;
 
-  // Whether this type's ticker is also accepted, on read, as an alternate
-  // spelling of the type itself (e.g. "xmr" for "monero").
+  /// Whether this type's ticker is also accepted, on read, as an alternate
+  /// spelling of the type itself (e.g. "xmr" for "monero").
   final bool tickerIsAlias;
 }
 
+/// Known payment target types, keyed by their NIP-A3 `type`.
 const paymentTargetTypes = <String, PaymentTargetTypeInfo>{
   'bitcoin': PaymentTargetTypeInfo(
     displayName: 'Bitcoin',
@@ -112,6 +113,7 @@ const paymentTargetTypes = <String, PaymentTargetTypeInfo>{
   ),
 };
 
+/// Alias (lowercase ticker such as "xmr") to canonical type ("monero").
 final Map<String, String> paymentTargetTypeAliases = {
   for (final entry in paymentTargetTypes.entries)
     if (entry.value.tickerIsAlias) entry.value.ticker!.toLowerCase(): entry.key,

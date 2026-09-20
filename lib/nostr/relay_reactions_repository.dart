@@ -3,12 +3,11 @@ import 'models/nostr_filter.dart';
 import 'models/post_reactions.dart';
 import 'relay_client.dart';
 
-// The pubkeys of authors of events (kind 6 reposts, kind 7 likes) that tag
-// one of the given post ids, grouped by which post id they tagged.
+/// Max events requested for each of likes and reposts.
 const _reactionLimit = 500;
 
-// Per NIP-25/NIP-18: with more than one "e" tag, the last one is the
-// actual target; earlier ones are just citations.
+/// Per NIP-25/NIP-18: with more than one "e" tag, the last one is the
+/// actual target; earlier ones are just citations.
 String? _lastTaggedEventId(NostrEvent event) {
   String? found;
   for (final tag in event.tags) {
@@ -17,10 +16,12 @@ String? _lastTaggedEventId(NostrEvent event) {
   return found;
 }
 
-// Per NIP-25: "+" or empty content means like, "-" means dislike, and
-// anything else (emoji, custom-emoji shortcode) is neither.
+/// Per NIP-25: "+" or empty content means like, "-" means dislike, and
+/// anything else (emoji, custom-emoji shortcode) is neither.
 bool _isLikeReaction(String content) => content.isEmpty || content == '+';
 
+/// The pubkeys of authors of events (kind 6 reposts, kind 7 likes) that tag
+/// one of the given post ids, grouped by which post id they tagged.
 Map<String, List<String>> _authorsByTaggedPost(
   List<NostrEvent> events,
   Set<String> postIds,
@@ -45,10 +46,10 @@ class RelayReactionsRepository {
 
   final RelayClient client;
 
-  // Fetches likes and reposts for many posts in a single pair of relay
-  // queries (one for kind 7, one for kind 6), rather than one query per
-  // post. Every requested id is present in the result, defaulting to no
-  // reactions when none were found.
+  /// Fetches likes and reposts for many posts in a single pair of relay
+  /// queries (one for kind 7, one for kind 6), rather than one query per
+  /// post. Every requested id is present in the result, defaulting to no
+  /// reactions when none were found.
   Future<Map<String, PostReactions>> fetchReactions(
     List<String> postIds,
     Set<String> relayUrls,

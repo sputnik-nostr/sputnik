@@ -18,7 +18,7 @@ class ComposeScreen extends StatefulWidget {
 
   final RelayClient relayClient;
 
-  // The note being answered, or null for a new top-level note.
+  /// The note being replied to, or null for a new top-level note.
   final Note? replyTo;
 
   @override
@@ -31,7 +31,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
   bool _hasText = false;
   bool _posting = false;
 
-  // The parent's tags decide how a reply is threaded, so it is fetched early.
+  /// The parent's tags decide how a reply is threaded, so it is fetched early.
   Future<NostrEvent?>? _parentFuture;
 
   RelayPostRepository get _posts => RelayPostRepository(
@@ -263,7 +263,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                       (theme.textTheme.bodyLarge?.fontSize ?? 16) * 1.2,
                   decoration: InputDecoration.collapsed(
                     hintText: replyTo == null
-                        ? "What's happening?"
+                        ? 'Post a note'
                         : 'Post your reply',
                   ),
                 ),

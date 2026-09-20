@@ -1,5 +1,7 @@
 import 'dart:io';
 
+/// Whether the first [bits] bits of [bytes] match [prefix], which may be
+/// shorter than [bytes].
 bool _inCidr(List<int> bytes, List<int> prefix, int bits) {
   final whole = bits ~/ 8;
   for (var i = 0; i < whole; i++) {
@@ -13,18 +15,18 @@ bool _inCidr(List<int> bytes, List<int> prefix, int bits) {
 
 bool _isBlockedV4(List<int> b) {
   return _inCidr(b, [0], 8) || // 0.0.0.0/8
-      _inCidr(b, [10], 8) ||
+      _inCidr(b, [10], 8) || // private
       _inCidr(b, [100, 64], 10) || // carrier-grade NAT
-      _inCidr(b, [127], 8) ||
+      _inCidr(b, [127], 8) || // loopback
       _inCidr(b, [169, 254], 16) || // link-local, cloud metadata
-      _inCidr(b, [172, 16], 12) ||
-      _inCidr(b, [192, 0, 0], 24) ||
-      _inCidr(b, [192, 0, 2], 24) ||
-      _inCidr(b, [192, 88, 99], 24) ||
-      _inCidr(b, [192, 168], 16) ||
+      _inCidr(b, [172, 16], 12) || // private
+      _inCidr(b, [192, 0, 0], 24) || // IETF protocol assignments
+      _inCidr(b, [192, 0, 2], 24) || // documentation
+      _inCidr(b, [192, 88, 99], 24) || // deprecated 6to4 relay
+      _inCidr(b, [192, 168], 16) || // private
       _inCidr(b, [198, 18], 15) || // benchmarking
-      _inCidr(b, [198, 51, 100], 24) ||
-      _inCidr(b, [203, 0, 113], 24) ||
+      _inCidr(b, [198, 51, 100], 24) || // documentation
+      _inCidr(b, [203, 0, 113], 24) || // documentation
       b[0] >= 224; // multicast, reserved, broadcast
 }
 
@@ -49,7 +51,7 @@ bool _isBlockedV6(List<int> b) {
   return false;
 }
 
-// Blocks probing the device's own network via an attacker-controlled URL.
+/// Whether [address] is loopback, private, link-local, or otherwise non-public.
 bool isBlockedAddress(InternetAddress address) {
   final bytes = address.rawAddress;
   return switch (address.type) {
@@ -62,6 +64,9 @@ bool isBlockedAddress(InternetAddress address) {
 int effectivePort(Uri url) =>
     url.port != 0 ? url.port : (url.scheme == 'https' ? 443 : 80);
 
+/// Connects to the address it vetted, so DNS can't rebind after the check.
+///
+/// Ignores [proxyHost] and [proxyPort].
 Future<ConnectionTask<Socket>> guardedConnectionFactory(
   Uri url,
   String? proxyHost,
@@ -88,7 +93,7 @@ Future<ConnectionTask<Socket>> guardedConnectionFactory(
   return ConnectionTask.fromSocket(secureSocket, rawTask.cancel);
 }
 
-// Covers NetworkImage/Image.network too - they have no other injection seam.
+/// Guards every HttpClient, including NetworkImage, which has no other seam.
 class SsrfGuardedHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {

@@ -47,7 +47,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nip05Controller = TextEditingController();
   final _websiteController = TextEditingController();
 
-  // The kind:0 event the edit is applied on top of, as read from the relays.
+  /// The kind:0 event the edit is applied on top of, as read from the relays.
   NostrEvent? _base;
   bool _loading = true;
   bool _baseConclusive = true;
@@ -74,7 +74,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
-  // A retry keeps what has been typed and only refreshes the base event.
+  /// A retry keeps what has been typed and only refreshes the base event.
   Future<void> _load({bool seedFields = true}) async {
     final pubkeyHex = activeIdentityPubkeyNotifier.value;
     if (pubkeyHex == null) {

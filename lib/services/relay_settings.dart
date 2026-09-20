@@ -20,7 +20,7 @@ void removeCustomRelay(String relay) {
   }
 }
 
-// Adds and selects a relay. False when the custom relay limit is reached.
+/// Adds and selects a relay. False when the custom relay limit is reached.
 bool addCustomRelay(String relay) {
   if (defaultRelays.contains(relay) ||
       customRelaysNotifier.value.contains(relay)) {
@@ -34,7 +34,7 @@ bool addCustomRelay(String relay) {
   return true;
 }
 
-// Selects exactly [relays]; returns how many the custom relay limit skipped.
+/// Selects exactly [relays]; returns how many the custom relay limit skipped.
 int useRelays(Iterable<String> relays) {
   var skipped = 0;
   final selected = <String>{};

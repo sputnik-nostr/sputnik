@@ -1,3 +1,4 @@
+/// Replaces unpaired UTF-16 surrogates with U+FFFD to keep the text valid.
 String sanitizeUtf16(String input) {
   final buffer = StringBuffer();
   for (var i = 0; i < input.length; i++) {

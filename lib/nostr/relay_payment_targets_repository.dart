@@ -40,7 +40,7 @@ class RelayPaymentTargetsRepository {
     return targets;
   }
 
-  // Uncached, so an edit builds on what is really published.
+  /// Uncached, so an edit builds on what is really published.
   Future<OwnEvent> fetchOwnPaymentTargetsEvent(
     String pubkeyHex,
     Set<String> relayUrls,
@@ -53,7 +53,7 @@ class RelayPaymentTargetsRepository {
     );
   }
 
-  // Publishes [paytoTags] as the whole set; other tags carry over from [base].
+  /// Publishes [paytoTags] as the whole set; other tags carry over from [base].
   Future<({NostrEvent event, Map<String, RelayPublishResult> results})>
   publishPaymentTargets({
     required String seckeyHex,

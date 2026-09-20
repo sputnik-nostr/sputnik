@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-// Asks for more items as soon as the list scrolls it into view.
+/// Asks for more items as soon as the list scrolls it into view.
 class LoadMoreFooter extends StatefulWidget {
   const LoadMoreFooter({super.key, required this.onLoadMore});
 

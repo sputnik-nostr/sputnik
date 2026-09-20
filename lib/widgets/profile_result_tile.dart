@@ -18,7 +18,7 @@ class ProfileResultTile extends StatelessWidget {
   final String pubkeyHex;
   final NostrMetadata? metadata;
 
-  // False hides the follow button (no active identity, or this is you).
+  /// False hides the follow button (no active identity, or this is you).
   final bool showFollowButton;
   final RelayClient relayClient;
 

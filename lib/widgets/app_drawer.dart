@@ -6,9 +6,7 @@ import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
 import '../theme/app_text_styles.dart';
 
-// A short label for whichever identity is active - a resolved profile name,
-// a short pubkey if none is cached yet, or a prompt when there's no
-// identity at all.
+/// Profile name if cached, else a short pubkey, else "No identity yet".
 String _activeIdentityLabel() {
   final pubkeyHex = activeIdentityPubkeyNotifier.value;
   if (pubkeyHex == null) return 'No identity yet';

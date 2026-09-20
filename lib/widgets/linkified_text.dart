@@ -13,7 +13,7 @@ import '../nostr/relay_profile_repository.dart';
 import '../screens/post_screen.dart';
 import '../screens/profile_screen.dart';
 
-// A bare npub, nprofile, note or nevent is a citation too, not only nostr:.
+/// Matches http(s) URLs, nostr: URIs, and bare npub/nprofile/note/nevent.
 final _linkPattern = RegExp(
   r'(https?://[^\s<>"]+)|(nostr:\w+)|(\bn(?:pub|profile|ote|event)1[02-9ac-hj-np-z]+)',
   caseSensitive: false,
@@ -22,7 +22,7 @@ final _linkPattern = RegExp(
 const _urlTrailingPunctuation = '.,;:!?\'*';
 const _urlClosers = {')': '(', ']': '[', '}': '{'};
 
-// Sentence punctuation and unmatched closers after a URL belong to the text.
+/// Sentence punctuation and unmatched closers after a URL belong to the text.
 String _trimUrlEnd(String url) {
   var end = url.length;
   while (end > 0) {
@@ -47,12 +47,12 @@ int _count(String text, int end, String char) {
 
 bool _hasHost(String url) => Uri.tryParse(url)?.host.isNotEmpty ?? false;
 
-// Bounds the profile lookups a single post can trigger.
+/// Bounds the profile lookups a single post can trigger.
 const _maxMentionLookups = 20;
 const _maxMentionNameLength = 40;
 
-// Pubkeys already looked up this session, so a missing profile is not
-// requested again each time its note scrolls into view.
+/// Pubkeys already looked up this session, so a missing profile is not
+/// requested again each time its note scrolls into view.
 final _lookedUp = <String>{};
 
 class _Link {
@@ -77,7 +77,7 @@ class LinkifiedText extends StatefulWidget {
   final String text;
   final TextStyle? style;
 
-  // Off inside tappable rows, where a selection area would swallow the taps.
+  /// Off inside tappable rows, where a selection area would swallow the taps.
   final bool selectable;
 
   final RelayClient relayClient;
@@ -90,7 +90,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
   final _recognizers = <String, TapGestureRecognizer>{};
   bool _opening = false;
 
-  // Avoids re-scanning unchanged text on every rebuild.
+  /// Avoids re-scanning unchanged text on every rebuild.
   String? _parsedText;
   List<_Link>? _links;
 
@@ -138,7 +138,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     if (oldWidget.text != widget.text) _lookUpMentions();
   }
 
-  // Names arrive through the profile cache, which the build listens to.
+  /// Names arrive through the profile cache, which the build listens to.
   void _lookUpMentions() {
     if (_lookedUp.length > 2000) _lookedUp.clear();
     final missing = <String>{
@@ -194,7 +194,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
         : '@${name.substring(0, _maxMentionNameLength - 3)}...';
   }
 
-  // A note id is long and unreadable; keep just enough to tell them apart.
+  /// A note id is long and unreadable; keep just enough to tell them apart.
   String _eventLabel(String matchedText) {
     final entity = matchedText.startsWith('nostr:')
         ? matchedText.substring('nostr:'.length)

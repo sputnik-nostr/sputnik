@@ -4,9 +4,9 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import '../nostr/models/nostr_metadata.dart';
 import '../nostr/models/nostr_payment_target.dart';
 
-/// Local Hive-backed cache for data fetched from relays. Each entry is
-/// stored with a fetch timestamp so callers can decide whether it's fresh
-/// enough to skip a relay round-trip.
+/// Local Hive-backed cache for data fetched from relays. Each entry is stored
+/// with a fetch timestamp, so callers can decide whether it's fresh enough to
+/// skip a relay round-trip.
 class CacheStore {
   CacheStore._();
 
@@ -48,8 +48,6 @@ class CacheStore {
     return DateTime.now().difference(fetchedAt) < staleAfter;
   }
 
-  // --- Profiles (kind 0) ---
-
   static Map<String, NostrMetadata> loadAllProfiles() {
     if (!_ready) return const <String, NostrMetadata>{};
     final result = <String, NostrMetadata>{};
@@ -86,8 +84,6 @@ class CacheStore {
     await _profiles.clear();
   }
 
-  // --- Contacts (kind 3 following/followers) ---
-
   static List<String>? getFollowing(String pubkeyHex) =>
       _getList('$pubkeyHex:following');
 
@@ -122,8 +118,6 @@ class CacheStore {
       'fetchedAt': DateTime.now().millisecondsSinceEpoch,
     });
   }
-
-  // --- Payment targets (kind 10133) ---
 
   static List<NostrPaymentTarget>? getPaymentTargets(String pubkeyHex) {
     if (!_ready) return null;

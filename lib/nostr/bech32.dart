@@ -7,6 +7,7 @@ const _generators = [
   0x2a1462b3,
 ];
 
+/// Lifts BIP-173's 90-char limit, which nprofile/nevent with relays exceed.
 const _maxLength = 5000;
 
 final _charsetReverse = () {
@@ -23,6 +24,7 @@ bool _hasOutOfRangeHrpChars(String hrp) {
 
 bool _isMixedCase(String s) => s != s.toLowerCase() && s != s.toUpperCase();
 
+/// BIP-173 checksum remainder over [values]; a valid string yields 1.
 int _polymod(List<int> values) {
   var chk = 1;
   for (final value in values) {
@@ -46,6 +48,7 @@ List<int> _createChecksum(String hrp, List<int> data) {
   return [for (var i = 0; i < 6; i++) (mod >> (5 * (5 - i))) & 31];
 }
 
+/// Regroups bits per BIP-173; an empty result also signals invalid input.
 List<int> convertBits(
   List<int> data,
   int fromBits,
@@ -73,6 +76,7 @@ List<int> convertBits(
   return result;
 }
 
+/// Encodes 5-bit [data] as Bech32 (not Bech32m), as NIP-19 requires.
 String bech32Encode(String hrp, List<int> data) {
   assert(hrp.isNotEmpty && !_hasOutOfRangeHrpChars(hrp) && !_isMixedCase(hrp));
 
@@ -81,6 +85,7 @@ String bech32Encode(String hrp, List<int> data) {
   return '${hrp}1${combined.map((d) => _charset[d]).join()}';
 }
 
+/// Decodes to the hrp and 5-bit data without the checksum, or null if invalid.
 ({String hrp, List<int> data})? bech32Decode(String input) {
   if (input.isEmpty || input.length > _maxLength || _isMixedCase(input)) {
     return null;

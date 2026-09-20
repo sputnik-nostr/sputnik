@@ -6,15 +6,17 @@ import 'nip10.dart';
 import 'relay_client.dart';
 import 'relay_reactions_repository.dart';
 
+/// A reply in a thread, and how deeply it is nested.
 class ThreadReply {
   const ThreadReply({required this.post, required this.depth});
 
   final NostrPost post;
 
-  // 0 for a direct reply to the viewed note.
+  /// 0 for a direct reply to the viewed note.
   final int depth;
 }
 
+/// Everything shown around a viewed note: ancestors, replies and reactions.
 class ThreadData {
   const ThreadData({
     required this.replies,
@@ -24,13 +26,13 @@ class ThreadData {
     this.replyToId,
   });
 
-  // The notes above the viewed one, root first.
+  /// The notes above the viewed one, root first.
   final List<NostrPost> ancestors;
 
-  // What the viewed note replies to, even when that note could not be found.
+  /// What the viewed note replies to, even when that note could not be found.
   final String? replyToId;
 
-  // Everything below the viewed note, depth-first and oldest first.
+  /// Everything below the viewed note, depth-first and oldest first.
   final List<ThreadReply> replies;
   final List<String> likerPubkeys;
   final List<String> reposterPubkeys;
@@ -40,8 +42,13 @@ class ThreadData {
   int get repostCount => reposterPubkeys.length;
 }
 
+/// Most replies kept for one thread.
 const _replyLimit = 200;
+
+/// Most events requested per query for one thread.
 const _threadEventLimit = 500;
+
+/// How far up the reply chain to walk from the viewed note.
 const _maxAncestors = 8;
 
 class RelayThreadRepository {
@@ -53,7 +60,9 @@ class RelayThreadRepository {
   final RelayClient client;
   final RelayReactionsRepository reactionsRepository;
 
-  // [extraEvents] are notes just published that relays may not return yet.
+  /// Fetches the thread around [postId]: its ancestors, replies and reactions.
+  ///
+  /// [extraEvents] are notes just published that relays may not return yet.
   Future<ThreadData> fetchThread(
     String postId,
     Set<String> relayUrls, {

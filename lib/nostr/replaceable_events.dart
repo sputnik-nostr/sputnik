@@ -2,16 +2,18 @@ import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'relay_client.dart';
 
-// The newest replaceable event you own, and whether that answer is complete.
+/// The newest copy of one of the user's replaceable events, if any. Only build
+/// an edit on it when [conclusive].
 class OwnEvent {
   const OwnEvent({required this.event, required this.conclusive});
 
   final NostrEvent? event;
 
-  // False unless every relay answered, or a majority did and one had it.
+  /// False unless every relay answered, or a majority did and one had it.
   final bool conclusive;
 }
 
+/// Queries [relayUrls] for the newest [kind] event by [pubkeyHex].
 Future<OwnEvent> fetchOwnReplaceable(
   RelayClient client, {
   required int kind,
@@ -37,7 +39,7 @@ Future<OwnEvent> fetchOwnReplaceable(
   );
 }
 
-// Relays keep the older of two same-second events, so an edit must be newer.
+/// Relays keep the older of two same-second events, so an edit must be newer.
 DateTime nextReplaceableTime(NostrEvent? previous) {
   final now = DateTime.now();
   if (previous == null) return now;

@@ -22,10 +22,10 @@ final ValueNotifier<AppSeedColor> seedColorNotifier = ValueNotifier(
   AppSeedColor.blue,
 );
 
-// The global feed, from every selected relay.
+/// The global feed, from every selected relay.
 final ValueNotifier<List<Note>?> notesNotifier = ValueNotifier(null);
 
-// Posts from the active identity and the people it follows.
+/// Posts from the active identity and the people it follows.
 final ValueNotifier<List<Note>?> followingNotesNotifier = ValueNotifier(null);
 
 final ValueNotifier<Map<String, Note>> bookmarkedNotesNotifier = ValueNotifier(
@@ -49,11 +49,11 @@ final ValueNotifier<String?> activeIdentityPubkeyNotifier = ValueNotifier(null);
 
 final ValueNotifier<bool> loadMediaNotifier = ValueNotifier(true);
 
-// Payment target types (e.g. "monero") to hide on every profile.
+/// Payment target types (e.g. "monero") to hide on every profile.
 final ValueNotifier<Set<String>> hiddenPaymentTargetTypesNotifier =
     ValueNotifier(const {});
 
-// The active identity's own following list, shared across every screen.
+/// The active identity's own following list, shared across every screen.
 final ValueNotifier<Set<String>?> myFollowingNotifier = ValueNotifier(null);
 
 final navigatorKey = GlobalKey<NavigatorState>();
@@ -64,7 +64,6 @@ Future<void> main() async {
   // Blocks SSRF via attacker-controlled URLs (e.g. profile pictures).
   HttpOverrides.global = SsrfGuardedHttpOverrides();
 
-  // Initialize cache store, load persistent settings
   final cacheInit = CacheStore.init();
   final themeModeBound = bindPersisted(
     themeModeNotifier,
@@ -126,7 +125,6 @@ Future<void> main() async {
     SettingsStore.saveSelectedRelays,
   );
 
-  // Load profile data from cache store
   profileCacheNotifier.value = CacheStore.loadAllProfiles();
 
   runApp(const MainApp());

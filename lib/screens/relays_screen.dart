@@ -176,7 +176,7 @@ class RelaysScreen extends StatelessWidget {
   }
 }
 
-// The active identity's published relay list (NIP-65).
+/// The active identity's published relay list (NIP-65).
 class _MyRelayList extends StatefulWidget {
   const _MyRelayList({super.key, required this.relayClient});
 

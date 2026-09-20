@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-// Shorter than the default 48px, which is a lot for two text-only tabs.
+/// Shorter than the default 48px, which is oversized for text-only tabs.
 const compactTabHeight = 36.0;
 
 class CompactTabBar extends StatelessWidget {

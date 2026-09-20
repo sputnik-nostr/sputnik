@@ -1,3 +1,4 @@
+/// A Nostr identity added to this app, identified by its hex public key.
 class Identity {
   const Identity({required this.pubkeyHex, required this.createdAt});
 
@@ -7,6 +8,8 @@ class Identity {
   );
 
   final String pubkeyHex;
+
+  /// When the identity was added to this app.
   final DateTime createdAt;
 
   Map<String, dynamic> toJson() => {

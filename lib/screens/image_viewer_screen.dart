@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-// Full-screen pinch-to-zoom view of a network image.
+/// Full-screen pinch-to-zoom view of a network image.
 class ImageViewerScreen extends StatelessWidget {
   const ImageViewerScreen({super.key, required this.imageUrl});
 

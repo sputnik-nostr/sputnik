@@ -2,7 +2,7 @@ import '../nostr/nostr.dart';
 import 'note.dart';
 import 'time_format.dart';
 
-// Applies reaction counts to a [List] of notes.
+/// Sets like and repost counts from [reactionsByPostId], where present.
 List<Note> applyReactionCounts(
   List<Note> notes,
   Map<String, PostReactions> reactionsByPostId,
@@ -17,7 +17,7 @@ List<Note> applyReactionCounts(
   }).toList();
 }
 
-// Turns a [NostrPost] into a [Note].
+/// Prefers the profile name in [authorMetadata] over the post's placeholder.
 Note noteFromNostrPost(NostrPost post, {NostrMetadata? authorMetadata}) {
   return Note(
     id: post.id,
@@ -35,7 +35,7 @@ Note noteFromNostrPost(NostrPost post, {NostrMetadata? authorMetadata}) {
   );
 }
 
-// Turns a [List] of [NostrPost]s into a [List] of [Note]s.
+/// Maps [posts], looking up each author in [profilesByPubkey].
 List<Note> notesFromPosts(
   List<NostrPost> posts,
   Map<String, NostrMetadata> profilesByPubkey,
@@ -50,9 +50,8 @@ List<Note> notesFromPosts(
       .toList();
 }
 
-// Fetches author profiles, either from the cache or by network request, as well
-// as reaction counts for [posts] concurrently. These are then mapped into notes
-// with reaction counts applied.
+/// Fetches author profiles and reaction counts for [posts] concurrently, then
+/// maps them to notes. [knownMetadata] skips the profile fetch.
 Future<List<Note>> hydratePosts(
   List<NostrPost> posts,
   Set<String> relayUrls, {

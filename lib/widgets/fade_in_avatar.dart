@@ -4,12 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../main.dart';
 
-// A circular avatar whose image fades in once loaded instead of abruptly
-// replacing the fallback (e.g. initials). The fallback stays visible
-// underneath while there's no image, it's still loading, or it fails to
-// load, and is hidden once the image loads so it can't show through a
-// transparent picture. Loading is gated on loadMediaNotifier (reveals the
-// viewer's IP to the image host).
+/// A circular avatar whose image fades in over [fallback] (e.g. initials).
+///
+/// The fallback is hidden once the image loads so it can't show through a
+/// transparent picture. Images load only when [loadMediaNotifier] is true,
+/// since fetching one reveals the viewer's IP to the image host.
 class FadeInAvatar extends StatefulWidget {
   const FadeInAvatar({
     super.key,
@@ -25,10 +24,8 @@ class FadeInAvatar extends StatefulWidget {
   final Widget fallback;
   final double radius;
 
-  // Raises the decode resolution above what the widget's own on-screen size
-  // would need, for placements (e.g. the profile page) that want a sharper
-  // result than a low-DPI display's native pixels, short of full source
-  // resolution.
+  /// Minimum decode size, for placements such as the profile page that want a
+  /// sharper image than the widget's own size implies.
   final int? minDecodeExtent;
 
   @override

@@ -24,7 +24,7 @@ class _Row {
   String type;
   final TextEditingController address;
 
-  // The tag this row came from, so extra elements survive an unchanged row.
+  /// The tag this row came from, so extra elements survive an unchanged row.
   final List<String>? original;
 }
 
@@ -67,7 +67,7 @@ class _EditPaymentTargetsScreenState extends State<EditPaymentTargetsScreen> {
     super.dispose();
   }
 
-  // A retry keeps what has been typed and only refreshes the base event.
+  /// A retry keeps what has been typed and only refreshes the base event.
   Future<void> _load({bool seedRows = true}) async {
     final pubkeyHex = activeIdentityPubkeyNotifier.value;
     if (pubkeyHex == null) {

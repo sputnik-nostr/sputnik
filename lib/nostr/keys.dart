@@ -47,6 +47,8 @@ final _sharedWrapper = () {
   return wrapper;
 }();
 
+/// Derives the x-only public key hex, throwing [ArgumentError] if
+/// [seckeyHex] is not a valid secret key.
 String xonlyPubkeyHexFromSeckeyHex(String seckeyHex) {
   final bindings = NostrSecp256k1Bindings.instance;
   final wrapper = _sharedWrapper;
@@ -69,6 +71,8 @@ String xonlyPubkeyHexFromSeckeyHex(String seckeyHex) {
   }
 }
 
+/// Generates a key pair. The native secret buffer is wiped; the returned hex
+/// strings cannot be.
 NostrKeyPair generateNostrKeyPair() {
   final bindings = NostrSecp256k1Bindings.instance;
   final wrapper = _sharedWrapper;
@@ -92,6 +96,8 @@ NostrKeyPair generateNostrKeyPair() {
   }
 }
 
+/// Signs the 32-byte [msg32] per BIP-340, throwing [ArgumentError] if
+/// [seckeyHex] is not a valid secret key.
 Uint8List signSchnorrSignature({
   required String seckeyHex,
   required Uint8List msg32,
@@ -120,6 +126,7 @@ Uint8List signSchnorrSignature({
   }
 }
 
+/// Whether [sig64] is a valid BIP-340 signature of [msg32] by [pubkey32].
 bool verifySchnorrSignature({
   required Uint8List msg32,
   required Uint8List sig64,

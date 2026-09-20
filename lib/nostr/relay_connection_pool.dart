@@ -12,10 +12,13 @@ import 'relay_message_parser.dart';
 
 final _random = Random();
 
+/// How long to wait for a relay's first message before giving up on it.
 const _firstResponseTimeout = Duration(seconds: 2);
 
+/// Cap on total subscription time, however steadily the relay keeps sending.
 const _maxSubscriptionDuration = Duration(seconds: 30);
 
+/// Cap on events kept per subscription, bounding what a chatty relay can send.
 const _maxEventsPerSubscription = 2000;
 
 String _generateSubscriptionId() =>
@@ -31,7 +34,7 @@ enum RelayPublishOutcome {
   /// The relay never sent an OK for this event within the timeout.
   noResponse,
 
-  /// Could not connect to, or stayed connected to, the relay at all.
+  /// Could not reach the relay, or the connection dropped before it replied.
   connectionFailed,
 }
 
@@ -39,12 +42,14 @@ class RelayPublishResult {
   const RelayPublishResult(this.outcome, {this.message});
 
   final RelayPublishOutcome outcome;
+
+  /// The relay's message from its OK reply, if any.
   final String? message;
 }
 
-// More than one publish() can be in flight for the same event id (e.g. a
-// double-submit); resolve()/failAll() complete all of them rather than one
-// overwriting another's slot.
+/// More than one publish() can be in flight for the same event id (e.g. a
+/// double-submit); resolve()/failAll() complete all of them rather than one
+/// overwriting another's slot.
 class PublishWaiters {
   final _byEventId = <String, List<Completer<RelayPublishResult>>>{};
 
@@ -85,18 +90,21 @@ class RelayQueryResult {
     required this.queriedRelays,
   });
 
+  /// Events from all queried relays, deduplicated by id.
   final List<NostrEvent> events;
 
-  // Relays that finished with EOSE, not ones that failed or timed out.
+  /// Relays that finished with EOSE, not ones that failed or timed out.
   final int answeredRelays;
+
+  /// Relays that were asked, including ones that then failed or timed out.
   final int queriedRelays;
 
-  // An empty [events] only proves absence if no relay could be hiding it.
+  /// An empty [events] only proves absence if no relay could be hiding it.
   bool get allRelaysAnswered =>
       queriedRelays > 0 && answeredRelays == queriedRelays;
 }
 
-// A failing caller must not evict a newer connection another one opened.
+/// A failing caller must not evict a newer connection another one opened.
 @visibleForTesting
 bool removeIfCurrent<T>(Map<String, T> connections, String url, T connection) {
   if (!identical(connections[url], connection)) return false;
@@ -104,6 +112,7 @@ bool removeIfCurrent<T>(Map<String, T> connections, String url, T connection) {
   return true;
 }
 
+/// Shares one WebSocket per relay across queries and publishes.
 class RelayConnectionPool {
   RelayConnectionPool._();
 
@@ -118,6 +127,7 @@ class RelayConnectionPool {
   }) async =>
       (await queryWithStatus(relayUrls, filter, timeout: timeout)).events;
 
+  /// Queries every relay in parallel.
   Future<RelayQueryResult> queryWithStatus(
     Set<String> relayUrls,
     NostrFilter filter, {
@@ -179,6 +189,7 @@ class RelayConnectionPool {
     await connection.close();
   }
 
+  /// Publishes [event] to every relay in parallel, keyed by relay URL.
   Future<Map<String, RelayPublishResult>> publishToAll(
     NostrEvent event,
     Set<String> relayUrls, {

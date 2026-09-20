@@ -2,7 +2,7 @@ import 'models/nostr_event.dart';
 
 const _nip10Markers = {'root', 'reply', 'mention'};
 
-// Caps how many people a reply mentions when the parent lists hundreds.
+/// Caps how many people a reply mentions when the parent lists hundreds.
 const _maxReplyMentions = 50;
 
 final _pubkeyPattern = RegExp(r'^[0-9a-fA-F]{64}$');
@@ -15,9 +15,10 @@ List<List<String>> _eTags(NostrEvent event) => [
     if (tag.length > 1 && tag[0] == 'e') tag,
 ];
 
-// As per NIP-10, a marked "reply" tag should be preferred over "root" for
-// top-level replies. Without markers (deprecated), the last "e" tag is the
-// parent; earlier ones are just citations. Null means it's not a reply.
+/// The id of the note [event] directly replies to, or null if it isn't a reply.
+///
+/// Prefers a marked `reply` tag, then `root`. Without markers (deprecated), the
+/// last `e` tag is the parent and earlier ones are just citations.
 String? replyParentId(NostrEvent event) {
   final eTags = _eTags(event);
   if (eTags.isEmpty) return null;
@@ -36,7 +37,9 @@ String? replyParentId(NostrEvent event) {
   return eTags.last[1].toLowerCase();
 }
 
-// The first note of the thread a reply belongs to. Null when it's not a reply.
+/// The id of the first note of [event]'s thread, or null if it isn't a reply.
+///
+/// Without markers (deprecated), the first `e` tag is the root.
 String? threadRootId(NostrEvent event) {
   final parent = replyParentId(event);
   if (parent == null) return null;
@@ -51,7 +54,7 @@ String? threadRootId(NostrEvent event) {
   return parent;
 }
 
-// The e and p tags for a reply to [parent], per NIP-10.
+/// The e and p tags for a reply to [parent], per NIP-10.
 List<List<String>> replyTags(NostrEvent parent) {
   final rootId = threadRootId(parent);
   final eTags = rootId == null || rootId == parent.id

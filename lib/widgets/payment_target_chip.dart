@@ -7,8 +7,8 @@ import '../nostr/models/payment_target_types.dart';
 import '../nostr/nip19.dart';
 import '../theme/app_text_styles.dart';
 
-// Kept separate from PaymentTargetTypeInfo since Color is a UI concern and
-// the model layer stays Flutter-free.
+/// Kept separate from PaymentTargetTypeInfo since Color is a UI concern and
+/// the model layer stays Flutter-free.
 const _brandColors = <String, Color>{
   'bitcoin': Color(0xFFF7931A),
   'lightning': Color(0xFFF7931A),
@@ -32,17 +32,17 @@ const _brandColors = <String, Color>{
 String _ticker(String type) =>
     paymentTargetTypes[type]?.ticker ?? type.toUpperCase();
 
-// Proper-noun currency names stay capitalized even mid-sentence.
+/// Proper-noun currency names stay capitalized even mid-sentence.
 String _displayName(String type) =>
     paymentTargetTypes[type]?.displayName ??
     (type.isEmpty ? type : type[0].toUpperCase() + type.substring(1));
 
-// All types the app recognizes, for the "hide address types" setting.
+/// All types the app recognizes, for the "hide address types" setting.
 final knownPaymentTargetTypes = paymentTargetTypes.keys.toList();
 
 String paymentTargetTypeDisplayName(String type) => _displayName(type);
 
-// A hint under a type's display name: its ticker, or a short description.
+/// A hint under a type's display name: its ticker, or a short description.
 String? paymentTargetTypeSubtitle(String type) {
   final info = paymentTargetTypes[type];
   final description = info?.description;

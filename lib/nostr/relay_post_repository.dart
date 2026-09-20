@@ -4,10 +4,10 @@ import 'models/nostr_post.dart';
 import 'nip10.dart';
 import 'relay_client.dart';
 
-// Replies are dropped after the query, so ask for more to still fill a page.
+/// Replies are dropped after the query, so ask for more to still fill a page.
 const _replyOverfetch = 3;
 
-// Bounds the queries one page can cost when most results are dropped.
+/// Bounds the queries one page can cost when most results are dropped.
 const _maxPageRounds = 4;
 
 class RelayPostRepository {
@@ -18,14 +18,18 @@ class RelayPostRepository {
   });
 
   final Set<String> relayUrls;
+
+  /// Notes per page.
   final int limit;
   final RelayClient client;
 
+  /// Like [fetchEventById], as a [NostrPost].
   Future<NostrPost?> fetchPostById(String id) async {
     final event = await fetchEventById(id);
     return event == null ? null : nostrPostFromEvent(event);
   }
 
+  /// The kind 1 note with [id], or null if no relay returns it.
   Future<NostrEvent?> fetchEventById(String id) async {
     final events = await client.query(
       relayUrls,
@@ -38,7 +42,10 @@ class RelayPostRepository {
     return null;
   }
 
-  // Pass the previous page's [PostPage.next] as [until] to get the next page.
+  /// Fetches up to [limit] kind 1 notes older than [until], optionally only by
+  /// [authors] and without replies.
+  ///
+  /// Pass the previous page's [PostPage.next] as [until] for the next page.
   Future<PostPage> fetchPage({
     List<String>? authors,
     bool includeReplies = true,
@@ -80,7 +87,8 @@ class RelayPostRepository {
                 event,
           ],
       ];
-      // Only a chunk that hit the limit can have older posts left to fetch.
+      // A chunk that hit its limit may lack older events, so only trust events
+      // at or newer than the newest such cutoff.
       DateTime? horizon;
       for (var i = 0; i < valid.length; i++) {
         if (eventsByFilter[i].length < queryLimit || valid[i].isEmpty) continue;
@@ -117,11 +125,12 @@ class RelayPostRepository {
 
 DateTime _older(DateTime a, DateTime b) => a.isBefore(b) ? a : b;
 
+/// One page of notes, newest first.
 class PostPage {
   const PostPage(this.posts, this.next);
 
   final List<NostrPost> posts;
 
-  // Null once nothing older is left to fetch.
+  /// Null once nothing older is left to fetch.
   final DateTime? next;
 }

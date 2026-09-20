@@ -35,7 +35,7 @@ String? _hexFromTlvSpecial(String input, String expectedHrp) {
   return null;
 }
 
-// Encodes a hex pubkey into the canonical `npub` format.
+/// Encodes a hex pubkey into the canonical `npub` format.
 String npubFromHex(String pubkeyHex) {
   return bech32Encode(
     'npub',
@@ -43,13 +43,13 @@ String npubFromHex(String pubkeyHex) {
   );
 }
 
-// Decodes an `npub`-formatted pubkey into its raw hex form.
+/// Decodes an `npub`-formatted pubkey into its raw hex form.
 String? hexFromNpub(String npub) => _hexFromBareEntity(npub, 'npub', 32);
 
-// Decodes an `nsec`-formatted secret key into its raw hex form.
+/// Decodes an `nsec`-formatted secret key into its raw hex form.
 String? hexFromNsec(String nsec) => _hexFromBareEntity(nsec, 'nsec', 32);
 
-// Encodes a hex secret key into the canonical `nsec` format.
+/// Encodes a hex secret key into the canonical `nsec` format.
 String nsecFromHex(String seckeyHex) {
   return bech32Encode(
     'nsec',
@@ -57,6 +57,7 @@ String nsecFromHex(String seckeyHex) {
   );
 }
 
+/// Encodes a hex event id into the canonical `note` format.
 String noteFromHex(String eventIdHex) {
   return bech32Encode(
     'note',
@@ -64,13 +65,18 @@ String noteFromHex(String eventIdHex) {
   );
 }
 
+/// Decodes a `note`-formatted event id into its raw hex form.
 String? hexFromNote(String note) => _hexFromBareEntity(note, 'note', 32);
 
+/// Decodes an `nprofile` into its pubkey hex, ignoring relay hints.
 String? hexFromNprofile(String nprofile) =>
     _hexFromTlvSpecial(nprofile, 'nprofile');
 
+/// Decodes an `nevent` into its event id hex, ignoring its other fields.
 String? hexFromNevent(String nevent) => _hexFromTlvSpecial(nevent, 'nevent');
 
+/// Elides the middle of [value] with "..." to fit [totalLength], keeping the
+/// last [suffixLength] characters.
 String truncateMiddle(
   String value, {
   required int totalLength,
@@ -86,11 +92,15 @@ String truncateMiddle(
 String truncateNpub(String npub) =>
     truncateMiddle(npub, totalLength: 20, suffixLength: 5);
 
+/// The first [length] characters of [pubkeyHex].
 String shortPubkey(String pubkeyHex, [int length = 8]) =>
     pubkeyHex.length <= length ? pubkeyHex : pubkeyHex.substring(0, length);
 
 typedef NostrUriTarget = ({String? pubkeyHex, String? eventIdHex});
 
+/// Decodes an npub, nprofile, note or nevent, with or without `nostr:`.
+///
+/// Returns null if it is anything else. Exactly one field of the result is set.
 NostrUriTarget? decodeNostrUri(String text) {
   final value = text.startsWith('nostr:') ? text.substring(6) : text;
 

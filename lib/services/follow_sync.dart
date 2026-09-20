@@ -9,7 +9,7 @@ import 'settings_store.dart';
 
 const _debounceDuration = Duration(milliseconds: 500);
 
-// Delay before each retry of a failed publish; the last one repeats.
+/// Delay before each retry of a failed publish; the last one repeats.
 @visibleForTesting
 List<Duration> followSyncRetryDelays = const [
   Duration(seconds: 5),
@@ -18,8 +18,10 @@ List<Duration> followSyncRetryDelays = const [
   Duration(minutes: 10),
 ];
 
-// Unpublished changes (pubkey -> follow?), sent on top of the relays' list.
+/// Unpublished changes (pubkey -> follow?), sent on top of the relays' list.
 final _pending = <String, bool>{};
+
+/// The identity [_pending] belongs to; switching identity discards the queue.
 String? _pendingFor;
 
 Timer? _timer;
@@ -27,6 +29,7 @@ bool _syncRunning = false;
 int _failedAttempts = 0;
 RelayClient _syncClient = const RelayClient();
 
+/// Queues a follow change, published in a batch after a short debounce.
 void scheduleFollowingSync(
   String targetPubkeyHex, {
   required bool follow,
@@ -63,6 +66,7 @@ void _retryLater() {
   _timer = Timer(delay, _runSync);
 }
 
+/// Publishes queued changes until none are left, backing off on failure.
 Future<void> _runSync() async {
   if (_syncRunning) return;
   _syncRunning = true;

@@ -26,7 +26,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   bool _globalRequested = false;
 
-  // The global feed is only fetched once someone actually opens it.
+  /// The global feed is only fetched once someone actually opens it.
   void _onTabChanged() {
     if (_tabController.index != 1 || _globalRequested) return;
     _globalRequested = true;
@@ -63,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
-// Keeps each feed's scroll position when swiping between tabs.
+/// Keeps each feed's scroll position when swiping between tabs.
 class _KeepAlive extends StatefulWidget {
   const _KeepAlive({required this.child});
 
@@ -176,9 +176,8 @@ class _NotesList extends StatelessWidget {
   Widget build(BuildContext context) {
     final notes = this.notes;
 
-    // RefreshIndicator needs a scrollable child to attach its drag
-    // gesture to, so the loading/empty states use a scrollable ListView
-    // too rather than a bare centered widget.
+    // RefreshIndicator needs a scrollable to attach to, so the loading and
+    // empty states use a ListView too.
     Widget body;
     if (notes == null) {
       body = ListView(

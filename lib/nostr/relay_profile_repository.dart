@@ -77,7 +77,7 @@ class RelayProfileRepository {
     return {...cached, ...metadataByPubkey};
   }
 
-  // Uncached, so an edit builds on what is really published.
+  /// Uncached, so an edit builds on what is really published.
   Future<OwnEvent> fetchOwnProfileEvent(
     String pubkeyHex,
     Set<String> relayUrls,
@@ -90,7 +90,7 @@ class RelayProfileRepository {
     );
   }
 
-  // Publishes [fields] over [base]; its other fields and tags carry over.
+  /// Publishes [fields] over [base]; its other fields and tags carry over.
   Future<({NostrEvent event, Map<String, RelayPublishResult> results})>
   publishProfile({
     required String seckeyHex,

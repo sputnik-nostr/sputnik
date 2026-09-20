@@ -2,6 +2,7 @@ import '../nip10.dart';
 import '../nip19.dart';
 import 'nostr_event.dart';
 
+/// Builds a [NostrPost] whose author is the short pubkey until a profile loads.
 NostrPost nostrPostFromEvent(NostrEvent event) {
   final handle = shortPubkey(event.pubkey);
   return NostrPost(

@@ -10,12 +10,12 @@ import '../nostr/nostr.dart';
 import '../services/settings_store.dart';
 import '../widgets/placeholder_tab.dart';
 
-// How long a copied nsec is left on the clipboard before it's cleared.
+/// How long a copied nsec is left on the clipboard before it's cleared.
 const nsecClipboardClearDelay = Duration(seconds: 30);
 
-// Clears the clipboard after [nsecClipboardClearDelay], but only if it
-// still holds the value we copied. If the user copied something else in
-// the meantime, that is left alone.
+/// Clears the clipboard after [nsecClipboardClearDelay], but only if it
+/// still holds the value we copied. If the user copied something else in
+/// the meantime, that is left alone.
 void _scheduleClipboardClear(String copiedValue) {
   Future.delayed(nsecClipboardClearDelay, () async {
     try {

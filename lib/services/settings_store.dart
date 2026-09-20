@@ -18,7 +18,8 @@ abstract class SecretStore {
 
 class _SecureSecretStore implements SecretStore {
   const _SecureSecretStore();
-  // The default would erase every stored key on a keystore error.
+
+  /// The default would erase every stored key on a keystore error.
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(resetOnError: false),
   );
@@ -34,9 +35,7 @@ class _SecureSecretStore implements SecretStore {
   Future<void> delete(String key) => _storage.delete(key: key);
 }
 
-// Loads a notifier's persisted value and wires it to save on every change.
-// Used to bind each of the app's settings notifiers without repeating the
-// "load, assign, add a saving listener" sequence for each one.
+/// Reports [error] through [FlutterError.reportError] instead of throwing.
 void _reportPersistenceError(String what, Object error, StackTrace stack) {
   FlutterError.reportError(
     FlutterErrorDetails(
@@ -48,6 +47,9 @@ void _reportPersistenceError(String what, Object error, StackTrace stack) {
   );
 }
 
+/// Loads a notifier's persisted value and wires it to save on every change.
+/// Used to bind each of the app's settings notifiers without repeating the
+/// "load, assign, add a saving listener" sequence for each one.
 Future<void> bindPersisted<T>(
   ValueNotifier<T> notifier,
   Future<T> Function() load,
@@ -86,7 +88,7 @@ class SettingsStore {
   static const _loadMediaKey = 'load_media';
   static const _hiddenPaymentTargetTypesKey = 'hidden_payment_target_types';
 
-  // Backs the identity index and each identity's private key.
+  /// Backs the identity index and each identity's private key.
   @visibleForTesting
   static SecretStore secretStore = const _SecureSecretStore();
 
@@ -242,7 +244,7 @@ class SettingsStore {
     }
   }
 
-  // One secure-storage entry per identity, read only when needed.
+  /// One secure-storage entry per identity, read only when needed.
   static Future<String?> loadPrivateKey(String pubkeyHex) {
     return secretStore.read('$_identitySecretPrefix$pubkeyHex');
   }

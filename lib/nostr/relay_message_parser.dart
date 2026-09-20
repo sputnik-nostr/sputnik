@@ -5,8 +5,8 @@ import 'dart:isolate';
 import 'models/nostr_event.dart';
 import 'models/text_sanitizer.dart';
 
-// OK messages are attacker-controlled, so sanitize/bound them like any
-// other untrusted relay text.
+/// OK messages are attacker-controlled, so sanitize/bound them like any
+/// other untrusted relay text.
 const _maxOkMessageLength = 300;
 
 String? _sanitizedOkMessage(Object? raw) {
@@ -17,9 +17,11 @@ String? _sanitizedOkMessage(Object? raw) {
   return sanitizeUtf16(truncated);
 }
 
-// Relay clocks and ours drift; past this an event is dated, not just skewed.
+/// Events dated further ahead than this are dropped, to tolerate clock drift.
 const maxEventFutureSkew = Duration(hours: 1);
 
+/// A relay message that passed validation. [event] is set for EVENT messages
+/// and [accepted] for OK messages.
 class ParsedRelayMessage {
   const ParsedRelayMessage({
     required this.subscriptionId,
@@ -30,12 +32,14 @@ class ParsedRelayMessage {
   });
 
   final String subscriptionId;
+
+  /// The message verb, e.g. `EVENT`, `EOSE` or `OK`.
   final String type;
 
   final NostrEvent? event;
 
-  // Only set for an "OK" message (a relay's response to a published event,
-  // where subscriptionId holds the event id instead of a subscription id).
+  /// Only set for OK messages, where [subscriptionId] is the event id being
+  /// acknowledged.
   final bool? accepted;
   final String? message;
 }
@@ -106,6 +110,7 @@ void _parserIsolateMain(SendPort mainSendPort) {
   });
 }
 
+/// Parses and verifies relay messages in a background isolate.
 class RelayMessageParser {
   RelayMessageParser._();
 
@@ -116,7 +121,7 @@ class RelayMessageParser {
   int _nextRequestId = 0;
   final _pending = <int, Completer<ParsedRelayMessage?>>{};
 
-  // With [subscriptionIds], an EVENT for any other subscription is dropped.
+  /// With [subscriptionIds], an EVENT for any other subscription is dropped.
   Future<ParsedRelayMessage?> parse(
     String raw, {
     Set<String>? subscriptionIds,

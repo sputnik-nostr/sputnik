@@ -17,6 +17,7 @@ enum Nip05Status {
   unreachable,
 }
 
+/// A NIP-05 identifier split into local-part and domain.
 typedef Nip05Identifier = ({String local, String domain});
 
 const _fetchTimeout = Duration(seconds: 6);
@@ -26,7 +27,7 @@ const _cacheTtl = Duration(hours: 1);
 final _localPartPattern = RegExp(r'^[a-z0-9-_.]+$');
 
 /// Splits a NIP-05 identifier into local-part and domain. A bare domain
-/// (no `@`) means the `_@domain` root identifier, per spec.
+/// (no `@`) means the `_@domain` root identifier, per the spec.
 Nip05Identifier? parseNip05(String identifier) {
   final trimmed = identifier.trim();
   if (trimmed.isEmpty) return null;
@@ -100,8 +101,9 @@ class _CacheEntry {
 
 final _cache = <String, _CacheEntry>{};
 
-/// Verifies a NIP-05 identifier against [pubkeyHex], per NIP-05. Results
-/// are cached per (pubkey, identifier) pair for an hour.
+/// Checks that [identifier] maps to [pubkeyHex] via its domain's
+/// `.well-known/nostr.json`. Results are cached per (pubkey, identifier) pair
+/// for an hour.
 Future<Nip05Status> verifyNip05({
   required String identifier,
   required String pubkeyHex,

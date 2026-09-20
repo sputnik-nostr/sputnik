@@ -9,7 +9,8 @@ import 'replaceable_events.dart';
 
 final _pubkeyPattern = RegExp(r'^[0-9a-fA-F]{64}$');
 
-// Newest own contact list seen or published; older copies are not built on.
+/// Newest own contact list seen or published, per pubkey, so a lagging relay's
+/// older copy is never republished over it.
 final _newestOwnContactList = <String, DateTime>{};
 
 @visibleForTesting
@@ -23,8 +24,10 @@ void _noteContactList(String pubkeyHex, DateTime createdAt) {
   }
 }
 
-// Which identity myFollowingNotifier holds data for, and its load future.
+/// The identity [myFollowingNotifier] was last loaded for.
 String? _myFollowingLoadedForPubkeyHex;
+
+/// The load in flight, so concurrent callers share one fetch.
 Future<void>? _myFollowingLoadingFuture;
 
 List<String> _followedPubkeys(NostrEvent event) {
@@ -40,7 +43,7 @@ class RelayContactsRepository {
 
   final RelayClient client;
 
-  // The pubkeys a person follows, read from their own kind:3 contact list.
+  /// The pubkeys a person follows, read from their own kind:3 contact list.
   Future<List<String>> fetchFollowing(
     String pubkeyHex,
     Set<String> relayUrls, {
@@ -49,7 +52,7 @@ class RelayContactsRepository {
       await _fetchFollowingOrNull(pubkeyHex, relayUrls, force: force) ??
       const <String>[];
 
-  // Null when nothing was found and some relay may still hold a list.
+  /// Null when nothing was found and some relay may still hold a list.
   Future<List<String>?> _fetchFollowingOrNull(
     String pubkeyHex,
     Set<String> relayUrls, {
@@ -80,8 +83,8 @@ class RelayContactsRepository {
     return following;
   }
 
-  // The pubkeys of people whose own contact list currently includes this
-  // pubkey.
+  /// The pubkeys of people whose own contact list currently includes this
+  /// pubkey.
   Future<List<String>> fetchFollowers(
     String pubkeyHex,
     Set<String> relayUrls, {
@@ -137,7 +140,7 @@ class RelayContactsRepository {
     return followers;
   }
 
-  // Populates myFollowingNotifier for the active identity, once per identity.
+  /// Populates myFollowingNotifier for the active identity, once per identity.
   Future<void> ensureMyFollowingLoaded(Set<String> relayUrls) {
     final myPubkeyHex = activeIdentityPubkeyNotifier.value;
     if (myPubkeyHex == null) {
@@ -191,8 +194,8 @@ class RelayContactsRepository {
     );
   }
 
-  // Applies follow (true) / unfollow (false) changes to the relays' list,
-  // which NIP-02 has us republish in full each time.
+  /// Applies follow (true) / unfollow (false) changes to the relays' list,
+  /// which NIP-02 has us republish in full each time.
   Future<({Map<String, RelayPublishResult> results, Set<String> following})>
   applyFollowChanges({
     required String seckeyHex,

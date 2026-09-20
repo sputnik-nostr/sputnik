@@ -9,8 +9,7 @@ import 'home_screen.dart';
 import 'notifications_screen.dart';
 import 'search_screen.dart';
 
-// A single letter (or icon) to stand in for an avatar image, based on
-// whichever identity is active - "?" when none is.
+/// Avatar fallback letter for the active identity, or "?" with no identity.
 String _activeIdentityInitial() {
   final pubkeyHex = activeIdentityPubkeyNotifier.value;
   if (pubkeyHex == null) return '?';

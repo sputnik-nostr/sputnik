@@ -5,7 +5,7 @@ import '../models/identity.dart';
 import '../nostr/nostr.dart';
 import '../services/follow_sync.dart';
 
-// Shared by the profile screen and user list rows.
+/// Follows or unfollows [targetPubkeyHex] as the active identity.
 class FollowButton extends StatelessWidget {
   const FollowButton({
     super.key,
@@ -17,7 +17,7 @@ class FollowButton extends StatelessWidget {
   final String targetPubkeyHex;
   final RelayClient relayClient;
 
-  // List-row-sized rendering instead of a full-size button.
+  /// List-row-sized rendering instead of a full-size button.
   final bool dense;
 
   void _toggle() {
