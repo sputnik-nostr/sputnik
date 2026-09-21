@@ -1,3 +1,6 @@
+import '../blossom.dart';
+import '../blurhash.dart';
+
 enum MediaType { image, video }
 
 /// An image or video attached to a note, from its URL and any NIP-92 tag.
@@ -10,6 +13,8 @@ class NostrMedia {
     this.alt,
     this.sha256,
     this.fallbackUrls = const [],
+    this.blurhash,
+    this.posterUrl,
   });
 
   factory NostrMedia.fromJson(Map<String, dynamic> json) {
@@ -21,6 +26,8 @@ class NostrMedia {
     final alt = json['alt'];
     final sha256 = json['sha256'];
     final fallbacks = json['fallbacks'];
+    final blurhash = json['blurhash'];
+    final poster = json['poster'];
     return NostrMedia(
       url: json['url'] as String,
       type: MediaType.values.firstWhere(
@@ -36,6 +43,12 @@ class NostrMedia {
           for (final url in fallbacks)
             if (url is String) url,
       ],
+      blurhash: blurhash is String && isValidBlurhash(blurhash)
+          ? blurhash
+          : null,
+      posterUrl: poster is String && isFetchableUrl(Uri.tryParse(poster))
+          ? poster
+          : null,
     );
   }
 
@@ -53,6 +66,12 @@ class NostrMedia {
   /// Other places the same bytes are said to be, tried if [url] fails.
   final List<String> fallbackUrls;
 
+  /// A tiny blurred stand-in that needs no download, when the note has one.
+  final String? blurhash;
+
+  /// A preview image for a video, shown once images are allowed to load.
+  final String? posterUrl;
+
   /// Width over height, when both are known.
   double? get aspectRatio {
     final width = this.width;
@@ -68,6 +87,8 @@ class NostrMedia {
     if (alt != null) 'alt': alt,
     if (sha256 != null) 'sha256': sha256,
     if (fallbackUrls.isNotEmpty) 'fallbacks': fallbackUrls,
+    if (blurhash != null) 'blurhash': blurhash,
+    if (posterUrl != null) 'poster': posterUrl,
   };
 }
 

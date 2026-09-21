@@ -45,12 +45,15 @@
 - [ ] Hide notes with a content warning (NIP-36) behind a tap, including their media
 - [ ] Add a content warning when composing a note
 - [ ] Show audio in notes
-- [ ] Show video posters and blurhash placeholders (`image`, `thumb`, `blurhash`)
-- [ ] Play only one video at a time
-- [ ] Swipe between the images in a note in the viewer
-- [ ] Save an image or copy its link from the viewer
+- [x] Show video posters and blurhash placeholders (`image`, `thumb`, `blurhash`)
+- [x] Play only one video at a time
+- [x] Show a note's images and videos side by side in a row that scrolls sideways
+- [x] Swipe between the images in a note in the viewer
+- [x] Save an image or copy its link from the viewer
+- [ ] Pause a video that has scrolled out of view
+- [ ] Let the viewer swipe to the next image while zoomed in (paging is locked while zoomed)
 - [ ] Verify video fullscreen, seeking, and portrait layout
-- [ ] Test media on Android (the video lockdown options, the prebuilt `media_kit` libraries)
+- [ ] Test media on Android (the video lockdown options, the prebuilt `media_kit` libraries, saving to the gallery)
 - [ ] Check the hash rule against real hosts (e.g. nostr.build) so no existing notes break
 - [ ] Load profile pictures and banners with the same size cap, redirect, and hash rules
 - [ ] Bundle libmpv in the Linux AppImage, and document that Linux needs it

@@ -1,4 +1,5 @@
 import 'blossom.dart';
+import 'blurhash.dart';
 import 'http_urls.dart';
 import 'models/nostr_media.dart';
 
@@ -52,6 +53,16 @@ MediaType? _typeOf(Uri uri, String? mimeType) {
   return _videoExtensions.contains(extension) ? MediaType.video : null;
 }
 
+/// The preview image a video's imeta names, from its `image` or `thumb`.
+String? _posterOf(Map<String, List<String>>? fields) {
+  for (final key in const ['image', 'thumb']) {
+    for (final url in fields?[key] ?? const <String>[]) {
+      if (isFetchableUrl(Uri.tryParse(url))) return url;
+    }
+  }
+  return null;
+}
+
 /// The HTTPS images and videos in [content], with NIP-92 imeta from [tags].
 List<NostrMedia> noteMedia(String content, List<List<String>> tags) {
   final imeta = _imetaByUrl(tags);
@@ -76,6 +87,7 @@ List<NostrMedia> noteMedia(String content, List<List<String>> tags) {
     final sized = width != null && height != null && width > 0 && height > 0;
     final alt = fields?['alt']?.first;
     final declaredHash = fields?['x']?.first.toLowerCase();
+    final blurhash = fields?['blurhash']?.first;
 
     media.add(
       NostrMedia(
@@ -94,6 +106,10 @@ List<NostrMedia> noteMedia(String content, List<List<String>> tags) {
             if (isFetchableUrl(Uri.tryParse(fallback)) && fallback != url)
               fallback,
         ].take(maxFallbackUrls).toList(),
+        blurhash: blurhash != null && isValidBlurhash(blurhash)
+            ? blurhash
+            : null,
+        posterUrl: type == MediaType.video ? _posterOf(fields) : null,
       ),
     );
   }

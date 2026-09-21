@@ -4,6 +4,9 @@ import 'package:sputnik/nostr/models/nostr_media.dart';
 import 'package:sputnik/nostr/models/nostr_post.dart';
 import 'package:sputnik/nostr/nip92.dart';
 
+/// A real 4x3 BlurHash, 28 characters.
+const _blurhash = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj';
+
 void main() {
   const image = 'https://cdn.example.com/a.jpg';
 
@@ -162,6 +165,45 @@ void main() {
     });
   });
 
+  group('previews', () {
+    const video = 'https://cdn.example.com/clip.mp4';
+
+    test('reads a blurhash, and a poster for videos only', () {
+      final withPoster = noteMedia(video, [
+        [
+          'imeta',
+          'url $video',
+          'blurhash $_blurhash',
+          'thumb https://cdn.example.com/thumb.jpg',
+          'image https://cdn.example.com/preview.jpg',
+        ],
+      ]).single;
+
+      expect(withPoster.blurhash, _blurhash);
+      expect(withPoster.posterUrl, 'https://cdn.example.com/preview.jpg');
+
+      final picture = noteMedia(image, [
+        ['imeta', 'url $image', 'blurhash $_blurhash', 'image $image'],
+      ]).single;
+      expect(picture.blurhash, _blurhash);
+      expect(picture.posterUrl, isNull);
+    });
+
+    test('drops a malformed blurhash and an unsafe poster', () {
+      final media = noteMedia(video, [
+        [
+          'imeta',
+          'url $video',
+          'blurhash not-a-blurhash',
+          'image http://x.y/p',
+        ],
+      ]).single;
+
+      expect(media.blurhash, isNull);
+      expect(media.posterUrl, isNull);
+    });
+  });
+
   group('hashes and fallbacks', () {
     final hash = 'cd' * 32;
 
@@ -239,6 +281,8 @@ void main() {
         alt: 'clip',
         sha256: 'ab' * 32,
         fallbackUrls: const ['https://b.example/x.mp4'],
+        blurhash: _blurhash,
+        posterUrl: 'https://b.example/poster.jpg',
       );
 
       final restored = NostrMedia.fromJson(media.toJson());
@@ -250,6 +294,8 @@ void main() {
       expect(restored.alt, 'clip');
       expect(restored.sha256, media.sha256);
       expect(restored.fallbackUrls, media.fallbackUrls);
+      expect(restored.blurhash, _blurhash);
+      expect(restored.posterUrl, 'https://b.example/poster.jpg');
     });
 
     test('an entry saved before videos existed is an image', () {

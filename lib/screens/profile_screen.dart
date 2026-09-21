@@ -107,7 +107,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ImageViewerScreen(source: MediaSource(url: imageUrl)),
+        builder: (_) =>
+            ImageViewerScreen(sources: [MediaSource(url: imageUrl)]),
       ),
     );
   }

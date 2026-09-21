@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_blurhash/flutter_blurhash.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sputnik/main.dart';
 import 'package:sputnik/models/note.dart';
 import 'package:sputnik/nostr/models/nostr_media.dart';
+import 'package:sputnik/screens/image_viewer_screen.dart';
 import 'package:sputnik/screens/post_screen.dart';
 import 'package:sputnik/widgets/linkified_text.dart';
+import 'package:sputnik/widgets/media_frame.dart';
 import 'package:sputnik/widgets/note_content.dart';
 import 'package:sputnik/widgets/note_tile.dart';
 
@@ -139,6 +142,92 @@ void main() {
 
     final size = tester.getSize(find.byType(AspectRatio));
     expect(size.width / size.height, closeTo(2, 0.01));
+  });
+
+  testWidgets('several images scroll sideways while a lone one does not', (
+    tester,
+  ) async {
+    final second = '${url}b.png';
+    bool sideways(Widget w) =>
+        w is SingleChildScrollView && w.scrollDirection == Axis.horizontal;
+
+    await tester.pumpWidget(_host(_note(url, [NostrMedia(url: url)])));
+    expect(find.byWidgetPredicate(sideways), findsNothing);
+
+    await tester.pumpWidget(
+      _host(
+        _note('$url $second', [NostrMedia(url: url), NostrMedia(url: second)]),
+      ),
+    );
+    expect(find.byWidgetPredicate(sideways), findsOneWidget);
+  });
+
+  testWidgets(
+    'tapping an image opens the viewer on it, among the note images',
+    (tester) async {
+      loadNoteImagesNotifier.value = true;
+      final second = '${url}b.png';
+      await tester.pumpWidget(
+        _host(
+          _note('$url $second', [
+            NostrMedia(url: url),
+            NostrMedia(url: second),
+          ]),
+        ),
+      );
+
+      await tester.tap(find.byType(NetworkMediaImage).last);
+      // The viewer's spinner never stops, so the route is pumped for a while.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      final viewer = tester.widget<ImageViewerScreen>(
+        find.byType(ImageViewerScreen),
+      );
+      expect(viewer.initialIndex, 1);
+      expect(viewer.sources.map((s) => s.url), [url, second]);
+    },
+  );
+
+  testWidgets(
+    'on a narrow feed the next image peeks in, so the row shows it scrolls',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final second = '${url}b.png';
+      final note = _note('$url $second', [
+        NostrMedia(url: url),
+        NostrMedia(url: second),
+      ]);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ListView(children: [NoteTile(note: note)]),
+          ),
+        ),
+      );
+
+      final frames = find.byType(MediaFrame);
+      // The first tile must not fill (or overflow) the row on its own.
+      expect(tester.getRect(frames.at(0)).right, lessThan(400));
+      expect(tester.getRect(frames.at(1)).left, lessThan(400));
+    },
+  );
+
+  testWidgets('a blurhash stands in before the image loads, with no download', (
+    tester,
+  ) async {
+    final media = NostrMedia(
+      url: url,
+      blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
+    );
+    await tester.pumpWidget(_host(_note(url, [media])));
+
+    expect(find.byType(BlurHash), findsOneWidget);
+    expect(find.text('Tap to load'), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
   });
 
   testWidgets('tapping an image in a feed row does not open the post', (

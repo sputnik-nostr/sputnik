@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_blurhash/flutter_blurhash.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sputnik/main.dart';
@@ -183,6 +184,79 @@ void main() {
       expect(source.sha256, 'ab' * 32);
       expect(source.fallbackUrls, ['https://mirror.example.com/clip.mp4']);
       expect(source.serverLookup, isNotNull);
+    });
+  });
+
+  group('previews and playing order', () {
+    Widget two() => MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: Column(
+            children: [
+              for (final url in [_url, 'https://cdn.example.com/other.mp4'])
+                NoteVideoTile(
+                  media: NostrMedia(url: url, type: MediaType.video),
+                  authorPubkey: 'a' * 64,
+                  frameHeight: 150,
+                  store: store,
+                  playerBuilder: (context, file) =>
+                      Text('PLAYING ${file.path}'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    testWidgets('starting one video stops the one that was playing', (
+      tester,
+    ) async {
+      await tester.pumpWidget(two());
+      await tester.tap(find.text('Tap to play').first);
+      await tester.pump();
+      store.pending[0].complete(File('/tmp/a.mp4'));
+      await tester.pump();
+      expect(find.text('PLAYING /tmp/a.mp4'), findsOneWidget);
+
+      await tester.tap(find.text('Tap to play'));
+      await tester.pump();
+
+      expect(find.textContaining('PLAYING'), findsNothing);
+      expect(find.text('Tap to play'), findsOneWidget);
+      expect(find.textContaining('Downloading'), findsOneWidget);
+    });
+
+    testWidgets('it also cancels a download still in progress', (tester) async {
+      await tester.pumpWidget(two());
+      await tester.tap(find.text('Tap to play').first);
+      await tester.pump();
+
+      await tester.tap(find.text('Tap to play'));
+      await tester.pump();
+
+      expect(store.cancellers[0]!.cancelled, isTrue);
+      expect(store.cancellers[1]!.cancelled, isFalse);
+    });
+
+    testWidgets('a poster loads only when images are allowed to', (
+      tester,
+    ) async {
+      final media = NostrMedia(
+        url: _url,
+        type: MediaType.video,
+        blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
+        posterUrl: 'https://cdn.example.com/poster.jpg',
+      );
+      await tester.pumpWidget(_tile(store, media: media));
+
+      // The blurhash needs no download, so it is there either way.
+      expect(find.byType(BlurHash), findsOneWidget);
+      expect(find.byType(Image), findsNothing);
+
+      loadNoteImagesNotifier.value = true;
+      await tester.pump();
+
+      expect(find.byType(Image), findsOneWidget);
     });
   });
 
