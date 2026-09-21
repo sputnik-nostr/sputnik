@@ -260,7 +260,7 @@ class SettingsStore {
 
   static Future<bool> loadLoadMedia() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_loadMediaKey) ?? true;
+    return prefs.getBool(_loadMediaKey) ?? false;
   }
 
   static Future<void> saveLoadMedia(bool value) async {

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../main.dart';
+import '../services/media_loader.dart';
 
 /// A circular avatar whose image fades in over [fallback] (e.g. initials).
 ///
@@ -82,14 +83,14 @@ class _FadeInAvatarState extends State<FadeInAvatar> {
             ValueListenableBuilder<bool>(
               valueListenable: loadMediaNotifier,
               builder: (context, loadMedia, _) {
-                final url = widget.imageUrl;
+                final url = fetchableUrlOrNull(widget.imageUrl);
                 if (url == null || !loadMedia) {
                   _markLoaded(false);
                   return const SizedBox.shrink();
                 }
                 return Image(
                   image: ResizeImage(
-                    NetworkImage(url),
+                    BoundedNetworkImage(profileImageSource(url)),
                     width: decodeExtent,
                     height: decodeExtent,
                     policy: ResizeImagePolicy.fit,

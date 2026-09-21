@@ -57,7 +57,9 @@
 - [ ] Verify video fullscreen, seeking, and portrait layout
 - [ ] Test media on Android (the video lockdown options, the prebuilt `media_kit` libraries, saving to the gallery)
 - [ ] Check the hash rule against real hosts (e.g. nostr.build) so no existing notes break
-- [ ] Load profile pictures and banners with the same size cap, redirect, and hash rules
+- [x] Load profile pictures and banners with the same size cap, redirect, and hash rules (HTTPS only)
+- [x] Load profile pictures and banners only once you turn it on (off by default)
+- [x] Reuse connections for images through one shared client that keeps the address checks
 - [ ] Bundle libmpv in the Linux AppImage, and document that Linux needs it
 
 ## Other things:
@@ -69,7 +71,9 @@
 - [x] Let editing a profile cover more fields than name/bio (picture, banner, NIP-05, website)
 - [x] Publish your own relay list (NIP-65) and use it to set your relays
 - [x] Edit your own payment targets
+- [x] Keep the relay data cache in the app's own folder, and let Clear cached data wipe all of it
 - [x] Add payment targets support for Zano and Firo
+- [ ] Encrypt the relay data cache (it holds follow lists), keyed from secure storage
 - [ ] Add desktop support for macOS
 - [ ] Route posts by relay lists (outbox model), instead of only the selected relays
 - [ ] Add an option to hide/show client ID string

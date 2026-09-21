@@ -108,7 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       context,
       MaterialPageRoute(
         builder: (_) =>
-            ImageViewerScreen(sources: [MediaSource(url: imageUrl)]),
+            ImageViewerScreen(sources: [profileImageSource(imageUrl)]),
       ),
     );
   }
@@ -317,8 +317,8 @@ class _ProfileScreenState extends State<ProfileScreen>
               (ownNotes.isNotEmpty
                   ? ownNotes.first.displayName
                   : shortPubkey(pubkeyHex));
-          final pictureUrl = metadata?.picture;
-          final bannerUrl = metadata?.banner;
+          final pictureUrl = fetchableUrlOrNull(metadata?.picture);
+          final bannerUrl = fetchableUrlOrNull(metadata?.banner);
           final bio = metadata?.about;
           final hasBio = bio != null && bio.trim().isNotEmpty;
           final nip05 = metadata?.nip05;
@@ -366,7 +366,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                                           loadMediaNotifier.value)
                                         Image(
                                           image: ResizeImage(
-                                            NetworkImage(bannerUrl),
+                                            BoundedNetworkImage(
+                                              profileImageSource(bannerUrl),
+                                            ),
                                             width: _bannerMaxDecodeExtent,
                                             height: _bannerMaxDecodeExtent,
                                             policy: ResizeImagePolicy.fit,

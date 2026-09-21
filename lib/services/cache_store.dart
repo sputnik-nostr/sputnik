@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../nostr/models/nostr_metadata.dart';
 import '../nostr/models/nostr_payment_target.dart';
@@ -21,9 +24,15 @@ class CacheStore {
 
   static bool _ready = false;
 
-  static Future<void> init() async {
+  /// Not the documents folder, which is user-visible and often synced.
+  static Future<Directory> _cacheDirectory() async {
+    final support = await getApplicationSupportDirectory();
+    return Directory('${support.path}/relay_cache').create(recursive: true);
+  }
+
+  static Future<void> init({@visibleForTesting Directory? directory}) async {
     try {
-      await Hive.initFlutter();
+      Hive.init((directory ?? await _cacheDirectory()).path);
       final boxes = await Future.wait([
         Hive.openBox<Map>('profiles'),
         Hive.openBox<Map>('contacts'),
@@ -95,9 +104,14 @@ class CacheStore {
     });
   }
 
-  static Future<void> clearProfiles() async {
+  /// Empties every box, including the follow lists that hint at who was viewed.
+  static Future<void> clearAll() async {
     if (!_ready) return;
-    await _profiles.clear();
+    await Future.wait([
+      _profiles.clear(),
+      _contacts.clear(),
+      _paymentTargets.clear(),
+    ]);
   }
 
   static List<String>? getFollowing(String pubkeyHex) =>

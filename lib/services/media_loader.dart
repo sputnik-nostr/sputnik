@@ -21,12 +21,43 @@ const videoTimeout = Duration(minutes: 10);
 const _maxRedirects = 3;
 const _connectTimeout = Duration(seconds: 10);
 const _stallTimeout = Duration(seconds: 15);
+const _maxRedirectBodyBytes = 64 * 1024;
 
 typedef HttpClientFactory = HttpClient Function();
+
+/// [url] if it is one we would fetch, else null.
+String? fetchableUrlOrNull(String? url) =>
+    url != null && isFetchableUrl(Uri.tryParse(url)) ? url : null;
+
+/// A profile picture or banner, held to the hash a Blossom URL names.
+MediaSource profileImageSource(String url) =>
+    MediaSource(url: url, sha256: blossomHash(Uri.parse(url)));
 
 /// An HttpClient that refuses non-public addresses.
 HttpClient guardedHttpClient() =>
     HttpClient()..connectionFactory = guardedConnectionFactory;
+
+/// Bounds the connections one host can hold open on the shared client.
+const _maxConnectionsPerHost = 6;
+
+HttpClient Function() _sharedClientBuilder = guardedHttpClient;
+HttpClient? _sharedClient;
+
+/// One guarded client for every image, so a feed reuses connections.
+///
+/// [downloadMedia] never closes it: a download only aborts its own request.
+HttpClient sharedImageClient() {
+  return _sharedClient ??= _sharedClientBuilder()
+    ..connectionTimeout = _connectTimeout
+    ..maxConnectionsPerHost = _maxConnectionsPerHost;
+}
+
+@visibleForTesting
+void replaceSharedImageClient(HttpClient Function()? builder) {
+  _sharedClient?.close(force: true);
+  _sharedClient = null;
+  _sharedClientBuilder = builder ?? guardedHttpClient;
+}
 
 class DownloadCancelled implements Exception {
   const DownloadCancelled();
@@ -85,15 +116,73 @@ Future<void> downloadMedia(
   HttpClientFactory clientFactory = guardedHttpClient,
 }) async {
   final client = clientFactory()..connectionTimeout = _connectTimeout;
-  final deadline = Timer(timeout, () => client.close(force: true));
-  canceller?._abort = () => client.close(force: true);
+  final ownsClient = !identical(client, _sharedClient);
+
+  HttpClientRequest? request;
+  StreamSubscription<List<int>>? body;
+  Completer<void>? bodyDone;
+  var aborted = false;
+
+  // Aborts only this download, so a shared client keeps serving the others.
+  void abort() {
+    aborted = true;
+    request?.abort();
+    body?.cancel();
+    final done = bodyDone;
+    if (done != null && !done.isCompleted) {
+      done.completeError(const HttpException('Download aborted'));
+    }
+    if (ownsClient) client.close(force: true);
+  }
+
+  Future<void> readBody(
+    HttpClientResponse response,
+    void Function(List<int> chunk) onData,
+  ) {
+    final done = bodyDone = Completer<void>();
+    late final StreamSubscription<List<int>> subscription;
+    subscription = body = response
+        .timeout(_stallTimeout)
+        .listen(
+          (chunk) {
+            try {
+              onData(chunk);
+            } catch (error, stack) {
+              subscription.cancel();
+              if (!done.isCompleted) done.completeError(error, stack);
+            }
+          },
+          onError: (Object error, StackTrace stack) {
+            if (!done.isCompleted) done.completeError(error, stack);
+          },
+          onDone: () {
+            if (!done.isCompleted) done.complete();
+          },
+          cancelOnError: true,
+        );
+    return done.future;
+  }
+
+  // An unread body would keep a shared connection busy.
+  Future<Never> refuse(HttpClientResponse response, HttpException error) async {
+    response.listen(null).cancel().ignore();
+    throw error;
+  }
+
+  final deadline = Timer(timeout, abort);
+  canceller?._abort = abort;
   try {
     var current = uri;
     for (var hops = 0; ; hops++) {
       if (canceller?.cancelled ?? false) throw const DownloadCancelled();
-      final request = await client.getUrl(current);
-      request.followRedirects = false;
-      final response = await request.close();
+      final pending = await client.getUrl(current);
+      request = pending;
+      if (aborted) {
+        pending.abort();
+        throw HttpException('Download aborted', uri: current);
+      }
+      pending.followRedirects = false;
+      final response = await pending.close();
 
       if (response.isRedirect) {
         final next = hops < _maxRedirects
@@ -102,18 +191,32 @@ Future<void> downloadMedia(
                 response.headers.value(HttpHeaders.locationHeader),
               )
             : null;
-        if (next == null) throw HttpException('Blocked redirect', uri: current);
-        await response.drain<void>();
+        if (next == null) {
+          await refuse(
+            response,
+            HttpException('Blocked redirect', uri: current),
+          );
+        }
+        var redirectBytes = 0;
+        await readBody(response, (chunk) {
+          redirectBytes += chunk.length;
+          if (redirectBytes > _maxRedirectBodyBytes) {
+            throw HttpException('Redirect body too large', uri: current);
+          }
+        });
         current = next;
         continue;
       }
 
       if (response.statusCode != HttpStatus.ok) {
-        throw HttpException('HTTP ${response.statusCode}', uri: current);
+        await refuse(
+          response,
+          HttpException('HTTP ${response.statusCode}', uri: current),
+        );
       }
       final total = response.contentLength >= 0 ? response.contentLength : null;
       if (total != null && total > maxBytes) {
-        throw HttpException('File too large', uri: current);
+        await refuse(response, HttpException('File too large', uri: current));
       }
 
       final digest = _DigestSink();
@@ -121,7 +224,7 @@ Future<void> downloadMedia(
           ? null
           : crypto.sha256.startChunkedConversion(digest);
       var received = 0;
-      await for (final chunk in response.timeout(_stallTimeout)) {
+      await readBody(response, (chunk) {
         received += chunk.length;
         if (received > maxBytes) {
           throw HttpException('File too large', uri: current);
@@ -129,7 +232,7 @@ Future<void> downloadMedia(
         hasher?.add(chunk);
         onChunk(chunk);
         onProgress?.call(received, total);
-      }
+      });
 
       if (hasher != null) {
         hasher.close();
@@ -144,7 +247,9 @@ Future<void> downloadMedia(
     rethrow;
   } finally {
     deadline.cancel();
-    client.close(force: true);
+    // A body cut short must not leave a shared connection reading it.
+    body?.cancel().ignore();
+    if (ownsClient) client.close(force: true);
   }
 }
 
@@ -153,7 +258,7 @@ Future<Uint8List> fetchImageBytes(
   Uri uri, {
   int maxBytes = maxImageBytes,
   String? sha256,
-  HttpClientFactory clientFactory = guardedHttpClient,
+  HttpClientFactory clientFactory = sharedImageClient,
 }) async {
   final bytes = BytesBuilder(copy: false);
   await downloadMedia(
@@ -234,7 +339,7 @@ class MediaSource {
 class BoundedNetworkImage extends ImageProvider<BoundedNetworkImage> {
   const BoundedNetworkImage(
     this.source, {
-    this.clientFactory = guardedHttpClient,
+    this.clientFactory = sharedImageClient,
   });
 
   final MediaSource source;

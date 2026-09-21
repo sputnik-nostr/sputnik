@@ -2,16 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sputnik/main.dart';
+import 'package:sputnik/services/media_loader.dart';
 import 'package:sputnik/widgets/fade_in_avatar.dart';
 
 void main() {
-  Future<void> pumpAvatar(WidgetTester tester) async {
+  Future<void> pumpAvatar(
+    WidgetTester tester, {
+    String imageUrl = 'https://example.com/pic.png',
+  }) async {
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
         home: FadeInAvatar(
-          imageUrl: 'https://example.com/pic.png',
+          imageUrl: imageUrl,
           backgroundColor: Colors.blue,
-          fallback: Text('A'),
+          fallback: const Text('A'),
         ),
       ),
     );
@@ -44,5 +48,22 @@ void main() {
     await tester.pump();
 
     expect(find.byType(Image), findsNothing);
+  });
+
+  testWidgets('loads through the size-capped provider', (tester) async {
+    loadMediaNotifier.value = true;
+    await pumpAvatar(tester);
+
+    final image = tester.widget<Image>(find.byType(Image)).image;
+    expect(image, isA<ResizeImage>());
+    expect((image as ResizeImage).imageProvider, isA<BoundedNetworkImage>());
+  });
+
+  testWidgets('never fetches a plain http picture', (tester) async {
+    loadMediaNotifier.value = true;
+    await pumpAvatar(tester, imageUrl: 'http://example.com/pic.png');
+
+    expect(find.byType(Image), findsNothing);
+    expect(find.text('A'), findsOneWidget);
   });
 }

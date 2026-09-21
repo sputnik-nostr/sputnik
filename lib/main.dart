@@ -48,7 +48,7 @@ final ValueNotifier<List<Identity>> identitiesNotifier = ValueNotifier(
 
 final ValueNotifier<String?> activeIdentityPubkeyNotifier = ValueNotifier(null);
 
-final ValueNotifier<bool> loadMediaNotifier = ValueNotifier(true);
+final ValueNotifier<bool> loadMediaNotifier = ValueNotifier(false);
 
 final ValueNotifier<bool> loadNoteImagesNotifier = ValueNotifier(false);
 

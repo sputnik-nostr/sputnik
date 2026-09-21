@@ -262,6 +262,144 @@ void main() {
     });
   });
 
+  group('shared image client', () {
+    setUp(() => replaceSharedImageClient(_realClient));
+    tearDown(() => replaceSharedImageClient(null));
+
+    test('is one client, however often it is asked for', () {
+      expect(identical(sharedImageClient(), sharedImageClient()), isTrue);
+    });
+
+    test('reuses one connection across downloads', () async {
+      final ports = <int>{};
+      serve((request) {
+        ports.add(request.connectionInfo!.remotePort);
+        request.response
+          ..add([1, 2, 3])
+          ..close();
+      });
+
+      for (var i = 0; i < 3; i++) {
+        await fetchImageBytes(base, clientFactory: sharedImageClient);
+      }
+
+      expect(ports, hasLength(1));
+    });
+
+    test('a cancelled download leaves the others running', () async {
+      serve((request) {
+        if (request.uri.path == '/slow') {
+          // Headers and one byte, then nothing.
+          request.response
+            ..contentLength = 100
+            ..add([0])
+            ..flush();
+        } else {
+          request.response
+            ..add([7, 8, 9])
+            ..close();
+        }
+      });
+      final canceller = DownloadCanceller();
+      final slow = downloadMedia(
+        base.resolve('/slow'),
+        maxBytes: 1000,
+        onChunk: (_) {},
+        canceller: canceller,
+        clientFactory: sharedImageClient,
+      );
+      final slowResult = expectLater(slow, throwsA(isA<DownloadCancelled>()));
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      final fast = fetchImageBytes(
+        base.resolve('/fast'),
+        clientFactory: sharedImageClient,
+      );
+      canceller.cancel();
+
+      expect(await fast, [7, 8, 9]);
+      await slowResult;
+      expect(
+        await fetchImageBytes(
+          base.resolve('/fast'),
+          clientFactory: sharedImageClient,
+        ),
+        [7, 8, 9],
+      );
+    });
+
+    test('the deadline stops a host that goes silent', () async {
+      serve((request) {
+        request.response
+          ..contentLength = 100
+          ..add([0])
+          ..flush();
+      });
+
+      await expectLater(
+        downloadMedia(
+          base,
+          maxBytes: 1000,
+          onChunk: (_) {},
+          timeout: const Duration(milliseconds: 300),
+          clientFactory: sharedImageClient,
+        ),
+        throwsA(isA<HttpException>()),
+      );
+    });
+
+    test('refused responses do not hold connections open', () async {
+      serve((request) {
+        if (request.uri.path == '/big') {
+          request.response
+            ..statusCode = HttpStatus.notFound
+            ..add(Uint8List(512 * 1024))
+            ..close();
+        } else {
+          request.response
+            ..add([1])
+            ..close();
+        }
+      });
+
+      // More than the shared client's per-host connection limit.
+      for (var i = 0; i < 10; i++) {
+        await expectLater(
+          fetchImageBytes(
+            base.resolve('/big'),
+            clientFactory: sharedImageClient,
+          ),
+          throwsA(isA<HttpException>()),
+        );
+      }
+
+      expect(
+        await fetchImageBytes(
+          base.resolve('/ok'),
+          clientFactory: sharedImageClient,
+        ).timeout(const Duration(seconds: 5)),
+        [1],
+      );
+    });
+
+    test('a redirect body that never ends is cut off', () async {
+      serve((request) async {
+        request.response
+          ..statusCode = HttpStatus.found
+          ..headers.set(HttpHeaders.locationHeader, '/next');
+        for (var i = 0; i < 100; i++) {
+          request.response.add(Uint8List(8 * 1024));
+        }
+        await request.response.close();
+      });
+
+      await expectLater(
+        fetchImageBytes(base, clientFactory: sharedImageClient),
+        throwsA(isA<HttpException>()),
+      );
+    });
+  });
+
   group('MediaSource.fetch', () {
     final hash = 'ab' * 32;
     final primary = 'https://one.example/$hash.png';
@@ -471,6 +609,32 @@ void main() {
       expect(redirectTarget(https, 'file:///etc/passwd'), isNull);
       expect(redirectTarget(https, 'https:///y.png'), isNull);
       expect(redirectTarget(https, 'https://u:p@b.example/y.png'), isNull);
+    });
+  });
+
+  group('fetchableUrlOrNull', () {
+    test('keeps an https URL', () {
+      expect(fetchableUrlOrNull('https://a.example/x.png'), isNotNull);
+    });
+
+    test('refuses plain http, other schemes, credentials and nothing', () {
+      expect(fetchableUrlOrNull('http://a.example/x.png'), isNull);
+      expect(fetchableUrlOrNull('file:///etc/passwd'), isNull);
+      expect(fetchableUrlOrNull('https://u:p@a.example/x.png'), isNull);
+      expect(fetchableUrlOrNull('not a url'), isNull);
+      expect(fetchableUrlOrNull(null), isNull);
+    });
+  });
+
+  group('profileImageSource', () {
+    test('holds a Blossom URL to the hash it names', () {
+      final hash = 'ab' * 32;
+
+      expect(profileImageSource('https://cdn.example/$hash.png').sha256, hash);
+    });
+
+    test('names no hash for an ordinary URL', () {
+      expect(profileImageSource('https://cdn.example/me.png').sha256, isNull);
     });
   });
 

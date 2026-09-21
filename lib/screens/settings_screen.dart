@@ -15,7 +15,7 @@ Future<void> _confirmClearCache(BuildContext context) async {
     builder: (context) => AlertDialog(
       title: const Text('Clear cached data?'),
       content: const Text(
-        'This removes cached profile names, pictures, and banners. '
+        'This removes cached profiles, follow lists, and payment targets. '
         'They will be re-fetched from relays as needed.',
       ),
       actions: [
@@ -32,7 +32,7 @@ Future<void> _confirmClearCache(BuildContext context) async {
   );
   if (confirmed != true) return;
 
-  await CacheStore.clearProfiles();
+  await CacheStore.clearAll();
   profileCacheNotifier.value = {};
 
   if (context.mounted) {
@@ -68,7 +68,7 @@ Future<void> _confirmResetPreferences(BuildContext context) async {
   themeModeNotifier.value = ThemeMode.system;
   seedColorNotifier.value = AppSeedColor.blue;
   selectedRelaysNotifier.value = defaultRelays.toSet();
-  loadMediaNotifier.value = true;
+  loadMediaNotifier.value = false;
   loadNoteImagesNotifier.value = false;
   hiddenPaymentTargetTypesNotifier.value = const {};
 
@@ -236,7 +236,9 @@ class SettingsScreen extends StatelessWidget {
                 key: const Key('clearCacheCard'),
                 leading: const Icon(Icons.delete_outline),
                 title: const Text('Clear cached data'),
-                subtitle: const Text('Cached profile info'),
+                subtitle: const Text(
+                  'Profiles, follow lists, and payment targets',
+                ),
                 onTap: () => _confirmClearCache(context),
               ),
               ListTile(

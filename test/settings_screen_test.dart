@@ -76,7 +76,7 @@ void main() {
     themeModeNotifier.value = ThemeMode.dark;
     seedColorNotifier.value = AppSeedColor.red;
     selectedRelaysNotifier.value = {'wss://custom.example'};
-    loadMediaNotifier.value = false;
+    loadMediaNotifier.value = true;
     loadNoteImagesNotifier.value = true;
     hiddenPaymentTargetTypesNotifier.value = {'monero'};
     identitiesNotifier.value = [
@@ -101,7 +101,7 @@ void main() {
     expect(themeModeNotifier.value, ThemeMode.system);
     expect(seedColorNotifier.value, AppSeedColor.blue);
     expect(selectedRelaysNotifier.value, defaultRelays.toSet());
-    expect(loadMediaNotifier.value, isTrue);
+    expect(loadMediaNotifier.value, isFalse);
     expect(loadNoteImagesNotifier.value, isFalse);
     expect(hiddenPaymentTargetTypesNotifier.value, isEmpty);
     expect(identitiesNotifier.value, hasLength(1));

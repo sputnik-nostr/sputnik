@@ -133,18 +133,18 @@ void main() {
     expect(await SettingsStore.loadPrivateKey('a' * 64), 'current-secret');
   });
 
-  test('load media defaults to on', () async {
+  test('load media defaults to off, the private choice', () async {
     SharedPreferences.setMockInitialValues({});
 
-    expect(await SettingsStore.loadLoadMedia(), isTrue);
+    expect(await SettingsStore.loadLoadMedia(), isFalse);
   });
 
   test('load media persists once saved', () async {
     SharedPreferences.setMockInitialValues({});
 
-    await SettingsStore.saveLoadMedia(false);
+    await SettingsStore.saveLoadMedia(true);
 
-    expect(await SettingsStore.loadLoadMedia(), isFalse);
+    expect(await SettingsStore.loadLoadMedia(), isTrue);
   });
 
   test('note images default to tap to load, the private choice', () async {
