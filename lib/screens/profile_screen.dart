@@ -12,6 +12,7 @@ import '../widgets/compact_tab_bar.dart';
 import '../widgets/count_label.dart';
 import '../widgets/fade_in_avatar.dart';
 import '../widgets/follow_button.dart';
+import '../services/media_loader.dart';
 import '../services/post_cursor.dart';
 import '../widgets/linkified_text.dart';
 import '../widgets/load_more_footer.dart';
@@ -105,7 +106,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   void _openImage(BuildContext context, String imageUrl) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => ImageViewerScreen(imageUrl: imageUrl)),
+      MaterialPageRoute(
+        builder: (_) => ImageViewerScreen(source: MediaSource(url: imageUrl)),
+      ),
     );
   }
 

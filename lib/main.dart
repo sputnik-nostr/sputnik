@@ -13,6 +13,7 @@ import 'services/cache_store.dart';
 import 'services/feed_loader.dart';
 import 'services/settings_store.dart';
 import 'services/ssrf_guard.dart';
+import 'services/video_store.dart';
 
 final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier(
   ThemeMode.system,
@@ -49,6 +50,8 @@ final ValueNotifier<String?> activeIdentityPubkeyNotifier = ValueNotifier(null);
 
 final ValueNotifier<bool> loadMediaNotifier = ValueNotifier(true);
 
+final ValueNotifier<bool> loadNoteImagesNotifier = ValueNotifier(false);
+
 /// Payment target types (e.g. "monero") to hide on every profile.
 final ValueNotifier<Set<String>> hiddenPaymentTargetTypesNotifier =
     ValueNotifier(const {});
@@ -63,6 +66,8 @@ Future<void> main() async {
 
   // Blocks SSRF via attacker-controlled URLs (e.g. profile pictures).
   HttpOverrides.global = SsrfGuardedHttpOverrides();
+
+  VideoStore.instance.sweepStale().ignore();
 
   final cacheInit = CacheStore.init();
   final themeModeBound = bindPersisted(
@@ -100,6 +105,11 @@ Future<void> main() async {
     SettingsStore.loadLoadMedia,
     SettingsStore.saveLoadMedia,
   );
+  final loadNoteImagesBound = bindPersisted(
+    loadNoteImagesNotifier,
+    SettingsStore.loadLoadNoteImages,
+    SettingsStore.saveLoadNoteImages,
+  );
   final hiddenPaymentTargetTypesBound = bindPersisted(
     hiddenPaymentTargetTypesNotifier,
     SettingsStore.loadHiddenPaymentTargetTypes,
@@ -114,6 +124,7 @@ Future<void> main() async {
   await identitiesBound;
   await activeIdentityPubkeyBound;
   await loadMediaBound;
+  await loadNoteImagesBound;
   await hiddenPaymentTargetTypesBound;
 
   await bindPersisted(

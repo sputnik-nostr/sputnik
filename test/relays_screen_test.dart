@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sputnik/main.dart';
+import 'package:sputnik/screens/settings_screen.dart';
 
 void main() {
   setUp(() {
@@ -16,7 +17,16 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('settingsCard')));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('relaysCard')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('relaysCard')),
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(SettingsScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('relaysCard')));
     await tester.pumpAndSettle();

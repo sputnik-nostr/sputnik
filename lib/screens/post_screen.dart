@@ -11,7 +11,7 @@ import '../theme/app_text_styles.dart';
 import '../widgets/bookmark_button.dart';
 import '../widgets/count_label.dart';
 import '../widgets/fade_in_avatar.dart';
-import '../widgets/linkified_text.dart';
+import '../widgets/note_content.dart';
 import '../widgets/note_tile.dart';
 import 'profile_screen.dart';
 import 'users_list_screen.dart';
@@ -372,7 +372,7 @@ class _PostHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              LinkifiedText(note.content, style: theme.textTheme.bodyMedium),
+              NoteContent(note: note, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 16),
               Text(formatAbsoluteTime(note.createdAt), style: theme.metadata),
             ],

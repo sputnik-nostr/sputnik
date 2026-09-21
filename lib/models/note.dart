@@ -1,4 +1,15 @@
+import '../nostr/models/nostr_media.dart';
 import 'time_format.dart';
+
+/// Skips malformed entries, since bookmarks outlive the code that wrote them.
+List<NostrMedia> _mediaFromJson(Object? raw) {
+  if (raw is! List) return const [];
+  return [
+    for (final item in raw)
+      if (item is Map<String, dynamic> && item['url'] is String)
+        NostrMedia.fromJson(item),
+  ];
+}
 
 /// A text note as shown in the UI, with author profile data and counts.
 class Note {
@@ -15,6 +26,7 @@ class Note {
     this.repostCount = 0,
     this.likeCount = 0,
     this.isReply = false,
+    this.media = const [],
   });
 
   factory Note.fromJson(Map<String, dynamic> json) {
@@ -34,6 +46,7 @@ class Note {
       repostCount: json['repostCount'] as int? ?? 0,
       likeCount: json['likeCount'] as int? ?? 0,
       isReply: json['isReply'] as bool? ?? false,
+      media: _mediaFromJson(json['media']),
     );
   }
 
@@ -49,6 +62,7 @@ class Note {
   final int repostCount;
   final int likeCount;
   final bool isReply;
+  final List<NostrMedia> media;
 
   Note copyWith({
     String? displayName,
@@ -70,6 +84,7 @@ class Note {
       repostCount: repostCount ?? this.repostCount,
       likeCount: likeCount ?? this.likeCount,
       isReply: isReply,
+      media: media,
     );
   }
 
@@ -86,6 +101,7 @@ class Note {
       'repostCount': repostCount,
       'likeCount': likeCount,
       if (isReply) 'isReply': true,
+      if (media.isNotEmpty) 'media': [for (final m in media) m.toJson()],
     };
   }
 }

@@ -1,10 +1,9 @@
 import 'package:flutter/gestures.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../main.dart';
 import '../models/note_mapper.dart';
+import '../nostr/http_urls.dart';
 import '../nostr/models/nostr_metadata.dart';
 import '../nostr/nip19.dart';
 import '../nostr/relay_client.dart';
@@ -12,38 +11,14 @@ import '../nostr/relay_post_repository.dart';
 import '../nostr/relay_profile_repository.dart';
 import '../screens/post_screen.dart';
 import '../screens/profile_screen.dart';
+import 'open_url.dart';
 
-/// Matches http(s) URLs, nostr: URIs, and bare npub/nprofile/note/nevent.
+/// Matches HTTP(S) URLs, nostr: URIs, and bare npub/nprofile/note/nevent.
 final _linkPattern = RegExp(
-  r'(https?://[^\s<>"]+)|(nostr:\w+)|(\bn(?:pub|profile|ote|event)1[02-9ac-hj-np-z]+)',
+  '(${httpUrlPattern.pattern})'
+  r'|(nostr:\w+)|(\bn(?:pub|profile|ote|event)1[02-9ac-hj-np-z]+)',
   caseSensitive: false,
 );
-
-const _urlTrailingPunctuation = '.,;:!?\'*';
-const _urlClosers = {')': '(', ']': '[', '}': '{'};
-
-/// Sentence punctuation and unmatched closers after a URL belong to the text.
-String _trimUrlEnd(String url) {
-  var end = url.length;
-  while (end > 0) {
-    final last = url[end - 1];
-    final opener = _urlClosers[last];
-    final trailing =
-        _urlTrailingPunctuation.contains(last) ||
-        (opener != null && _count(url, end, last) > _count(url, end, opener));
-    if (!trailing) break;
-    end--;
-  }
-  return url.substring(0, end);
-}
-
-int _count(String text, int end, String char) {
-  var count = 0;
-  for (var i = 0; i < end; i++) {
-    if (text[i] == char) count++;
-  }
-  return count;
-}
 
 bool _hasHost(String url) => Uri.tryParse(url)?.host.isNotEmpty ?? false;
 
@@ -115,7 +90,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
       );
     }
 
-    final trimmed = _trimUrlEnd(url);
+    final trimmed = trimUrlEnd(url);
     final end = match.start + trimmed.length;
     return _Link(
       match.start,
@@ -235,7 +210,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
       final recognizer = _recognizerFor(
         key,
         () => httpUrl != null
-            ? _openHttpUrl(context, httpUrl)
+            ? openExternalUrl(context, httpUrl)
             : _openNostrUri(context, nostrTarget!),
       );
 
@@ -271,32 +246,6 @@ class _LinkifiedTextState extends State<LinkifiedText> {
 
     // Plain taps still reach each link span's recognizer.
     return SelectionArea(child: text);
-  }
-
-  Future<void> _openHttpUrl(BuildContext context, String url) async {
-    final Uri uri;
-    try {
-      uri = Uri.parse(url);
-    } on FormatException {
-      _reportUnopenable(context);
-      return;
-    }
-
-    var opened = false;
-    try {
-      opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } on PlatformException {
-      opened = false;
-    } on MissingPluginException {
-      opened = false;
-    }
-    if (!opened && context.mounted) _reportUnopenable(context);
-  }
-
-  void _reportUnopenable(BuildContext context) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Could not open this link')));
   }
 
   Future<void> _openNostrUri(

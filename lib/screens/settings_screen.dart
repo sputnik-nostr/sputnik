@@ -69,12 +69,36 @@ Future<void> _confirmResetPreferences(BuildContext context) async {
   seedColorNotifier.value = AppSeedColor.blue;
   selectedRelaysNotifier.value = defaultRelays.toSet();
   loadMediaNotifier.value = true;
+  loadNoteImagesNotifier.value = false;
   hiddenPaymentTargetTypesNotifier.value = const {};
 
   if (context.mounted) {
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('Preferences reset')));
   }
+}
+
+InputDecorationTheme _dropdownDecoration(BuildContext context) {
+  return InputDecorationTheme(
+    filled: true,
+    fillColor: WidgetStateColor.resolveWith((states) {
+      final colorScheme = Theme.of(context).colorScheme;
+      final base = colorScheme.surfaceContainerHighest;
+      if (states.contains(WidgetState.hovered)) {
+        return Color.alphaBlend(
+          colorScheme.onSurface.withValues(alpha: 0.08),
+          base,
+        );
+      }
+      return base;
+    }),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide.none,
+    ),
+    isDense: true,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+  );
 }
 
 class SettingsScreen extends StatelessWidget {
@@ -97,26 +121,7 @@ class SettingsScreen extends StatelessWidget {
                   requestFocusOnTap: false,
                   width: 160,
                   textStyle: Theme.of(context).textTheme.bodyMedium,
-                  inputDecorationTheme: InputDecorationTheme(
-                    filled: true,
-                    fillColor: WidgetStateColor.resolveWith((states) {
-                      final colorScheme = Theme.of(context).colorScheme;
-                      final base = colorScheme.surfaceContainerHighest;
-                      if (states.contains(WidgetState.hovered)) {
-                        return Color.alphaBlend(
-                          colorScheme.onSurface.withValues(alpha: 0.08),
-                          base,
-                        );
-                      }
-                      return base;
-                    }),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  ),
+                  inputDecorationTheme: _dropdownDecoration(context),
                   onSelected: (mode) {
                     if (mode != null) themeModeNotifier.value = mode;
                   },
@@ -177,12 +182,28 @@ class SettingsScreen extends StatelessWidget {
                   return SwitchListTile(
                     key: const Key('loadMediaSwitch'),
                     secondary: const Icon(Icons.image_outlined),
-                    title: const Text('Load media automatically'),
+                    title: const Text('Load profile images automatically'),
                     subtitle: const Text(
                       "Can reveal your IP to a profile's image host.",
                     ),
                     value: loadMedia,
                     onChanged: (value) => loadMediaNotifier.value = value,
+                  );
+                },
+              ),
+              ValueListenableBuilder<bool>(
+                valueListenable: loadNoteImagesNotifier,
+                builder: (context, loadNoteImages, _) {
+                  return SwitchListTile(
+                    key: const Key('loadNoteImagesSwitch'),
+                    secondary: const Icon(Icons.photo_library_outlined),
+                    title: const Text('Load images in notes automatically'),
+                    subtitle: const Text(
+                      'Can reveal your IP to an image host. '
+                      'Videos always wait for a tap.',
+                    ),
+                    value: loadNoteImages,
+                    onChanged: (value) => loadNoteImagesNotifier.value = value,
                   );
                 },
               ),

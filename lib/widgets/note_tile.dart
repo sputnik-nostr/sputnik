@@ -8,7 +8,7 @@ import '../screens/profile_screen.dart';
 import '../theme/app_text_styles.dart';
 import 'bookmark_button.dart';
 import 'fade_in_avatar.dart';
-import 'linkified_text.dart';
+import 'note_content.dart';
 
 /// A feed row for [note]; tapping it opens the post.
 class NoteTile extends StatelessWidget {
@@ -67,8 +67,8 @@ class NoteTile extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  LinkifiedText(
-                    note.content,
+                  NoteContent(
+                    note: note,
                     style: theme.textTheme.bodyMedium,
                     selectable: false,
                   ),

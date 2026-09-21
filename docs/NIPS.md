@@ -12,18 +12,21 @@ A list of Nostr NIPs, detailing which ones we plan to implement (or not).
 | `21` | `nostr:` URI scheme                                  | Partial (no `naddr`)        |
 | `27` | Text Note References                                 | Implemented (read only)     |
 | `65` | Relay List Metadata                                  | Partial (no outbox routing) |
+| `92` | Media Attachments Metadata (`imeta`)                 | Partial (read only)         |
 | `A3` | payto: Payment Targets                               | Implemented (read + write)  |
+| `B7` | Blossom                                              | Partial (read only)         |
 
 ## Longer-term:
 
-| NIP  | Description                | Status           |
-| :--- | :------------------------- | :--------------- |
-| `09` | Event Deletion Request     | Support planned  |
-| `11` | Relay Information Document | Support planned  |
-| `14` | Subject tag in Text events | Support planned  |
-| `18` | Reposts                    | Read-only counts |
-| `23` | Long-form Content          | Considering      |
-| `25` | Reactions                  | Read-only counts |
+| NIP  | Description                         | Status           |
+| :--- | :---------------------------------- | :--------------- |
+| `09` | Event Deletion Request              | Support planned  |
+| `11` | Relay Information Document          | Support planned  |
+| `14` | Subject tag in Text events          | Support planned  |
+| `18` | Reposts                             | Read-only counts |
+| `23` | Long-form Content                   | Considering      |
+| `25` | Reactions                           | Read-only counts |
+| `36` | Sensitive Content / Content Warning | Support planned  |
 
 ## Not planned
 

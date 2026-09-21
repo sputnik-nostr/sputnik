@@ -11,6 +11,7 @@ import 'package:sputnik/screens/settings_screen.dart';
 void main() {
   setUp(() {
     loadMediaNotifier.value = false;
+    loadNoteImagesNotifier.value = false;
     hiddenPaymentTargetTypesNotifier.value = const {};
     identitiesNotifier.value = const [];
   });
@@ -28,6 +29,22 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(loadMediaNotifier.value, isTrue);
+    expect(tester.widget<SwitchListTile>(switchFinder).value, isTrue);
+  });
+
+  testWidgets('the note images switch reflects and updates its notifier', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: SettingsScreen()));
+    await tester.pumpAndSettle();
+
+    final switchFinder = find.byKey(const Key('loadNoteImagesSwitch'));
+    expect(tester.widget<SwitchListTile>(switchFinder).value, isFalse);
+
+    await tester.tap(switchFinder);
+    await tester.pumpAndSettle();
+
+    expect(loadNoteImagesNotifier.value, isTrue);
     expect(tester.widget<SwitchListTile>(switchFinder).value, isTrue);
   });
 
@@ -60,6 +77,7 @@ void main() {
     seedColorNotifier.value = AppSeedColor.red;
     selectedRelaysNotifier.value = {'wss://custom.example'};
     loadMediaNotifier.value = false;
+    loadNoteImagesNotifier.value = true;
     hiddenPaymentTargetTypesNotifier.value = {'monero'};
     identitiesNotifier.value = [
       Identity(pubkeyHex: 'a' * 64, createdAt: DateTime.now()),
@@ -68,6 +86,13 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: SettingsScreen()));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('resetPreferencesCard')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(find.byKey(const Key('resetPreferencesCard')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('resetPreferencesCard')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Reset'));
@@ -77,6 +102,7 @@ void main() {
     expect(seedColorNotifier.value, AppSeedColor.blue);
     expect(selectedRelaysNotifier.value, defaultRelays.toSet());
     expect(loadMediaNotifier.value, isTrue);
+    expect(loadNoteImagesNotifier.value, isFalse);
     expect(hiddenPaymentTargetTypesNotifier.value, isEmpty);
     expect(identitiesNotifier.value, hasLength(1));
   });

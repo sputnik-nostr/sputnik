@@ -32,6 +32,7 @@ Note noteFromNostrPost(NostrPost post, {NostrMetadata? authorMetadata}) {
     repostCount: post.repostCount,
     likeCount: post.likeCount,
     isReply: post.isReply,
+    media: post.media,
   );
 }
 

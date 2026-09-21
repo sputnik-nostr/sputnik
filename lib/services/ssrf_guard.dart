@@ -87,7 +87,7 @@ Future<ConnectionTask<Socket>> guardedConnectionFactory(
   final rawTask = await Socket.startConnect(address, effectivePort(url));
   if (url.scheme != 'https') return rawTask;
 
-  // connectionFactory doesn't wrap https in TLS itself.
+  // connectionFactory doesn't wrap HTTPS in TLS itself.
   final rawSocket = await rawTask.socket;
   final secureSocket = SecureSocket.secure(rawSocket, host: url.host);
   return ConnectionTask.fromSocket(secureSocket, rawTask.cancel);

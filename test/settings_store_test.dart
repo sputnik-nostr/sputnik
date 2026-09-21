@@ -147,6 +147,20 @@ void main() {
     expect(await SettingsStore.loadLoadMedia(), isFalse);
   });
 
+  test('note images default to tap to load, the private choice', () async {
+    SharedPreferences.setMockInitialValues({});
+
+    expect(await SettingsStore.loadLoadNoteImages(), isFalse);
+  });
+
+  test('note image loading persists once saved', () async {
+    SharedPreferences.setMockInitialValues({});
+
+    await SettingsStore.saveLoadNoteImages(true);
+
+    expect(await SettingsStore.loadLoadNoteImages(), isTrue);
+  });
+
   test('hidden payment target types default to none hidden', () async {
     SharedPreferences.setMockInitialValues({});
 

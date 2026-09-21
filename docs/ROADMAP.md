@@ -20,7 +20,7 @@
 - [x] Show a cited note or nevent as a short link that opens the post
 - [x] Infinite scroll on the home feeds and profiles (up to 1000 posts loaded per list)
 - [x] Show relay lists on profiles
-- [ ] Add support for Blossom and other media types
+- [ ] Add support for Blossom and other media types (see below)
 - [ ] Add recovery seed phrase support
 
 ## Posting and interaction (current state)
@@ -31,6 +31,29 @@
 - [ ] Repost a note (repost counts are shown, but read-only)
 - [ ] React to a note, e.g. a like (like counts are shown, but read-only)
 - [ ] Real notifications (the Notifications tab is still a placeholder)
+
+## Media (current state)
+
+- [x] Show images in notes (tap to load by default)
+- [x] Show videos in notes (always tap to play)
+- [x] Check media against its SHA-256 and fall back to the author's Blossom servers
+- [ ] Attach images and videos when composing a note (with `imeta` tags)
+- [ ] Upload media to Blossom servers
+- [ ] Edit your own Blossom server list (kind 10063)
+- [ ] Strip location and other metadata (EXIF) from images before uploading
+- [ ] Show upload progress, and let an upload be cancelled
+- [ ] Hide notes with a content warning (NIP-36) behind a tap, including their media
+- [ ] Add a content warning when composing a note
+- [ ] Show audio in notes
+- [ ] Show video posters and blurhash placeholders (`image`, `thumb`, `blurhash`)
+- [ ] Play only one video at a time
+- [ ] Swipe between the images in a note in the viewer
+- [ ] Save an image or copy its link from the viewer
+- [ ] Verify video fullscreen, seeking, and portrait layout
+- [ ] Test media on Android (the video lockdown options, the prebuilt `media_kit` libraries)
+- [ ] Check the hash rule against real hosts (e.g. nostr.build) so no existing notes break
+- [ ] Load profile pictures and banners with the same size cap, redirect, and hash rules
+- [ ] Bundle libmpv in the Linux AppImage, and document that Linux needs it
 
 ## Other things:
 
