@@ -7,12 +7,15 @@ import '../main.dart';
 import '../models/note.dart';
 import '../nostr/http_urls.dart';
 import '../nostr/models/nostr_media.dart';
+import '../nostr/nip27.dart';
+import '../nostr/relay_client.dart';
 import '../screens/image_viewer_screen.dart';
 import '../services/blossom_servers.dart';
 import 'linkified_text.dart';
 import 'media_frame.dart';
 import 'note_video.dart';
 import 'open_url.dart';
+import 'quoted_note.dart';
 
 /// URLs tapped this session, so a tile scrolled back into view stays loaded.
 final _approved = <String>{};
@@ -24,31 +27,68 @@ const _rowHeight = 200.0;
 /// Each tile takes at most this much of the row, so the next one peeks in.
 const _rowTileShare = 0.8;
 
-/// A note's text and its images and videos, per [loadNoteImagesNotifier].
+/// Bounds the lookups a single note can trigger.
+const _maxQuotes = 3;
+
+/// A run of a note's text, or a cited note shown in its place.
+typedef _Part = ({String? text, NoteReference? quote});
+
+/// Splits [content] around its first few cited notes; the rest stay links.
+List<_Part> _partsOf(String content) {
+  final seen = <String>{};
+  final quotes = [
+    for (final reference in noteReferences(content))
+      if (seen.length < _maxQuotes && seen.add(reference.eventIdHex)) reference,
+  ];
+  if (quotes.isEmpty) return [(text: content, quote: null)];
+
+  final parts = <_Part>[];
+  var start = 0;
+  for (final quote in quotes) {
+    final text = content.substring(start, quote.start).trim();
+    if (text.isNotEmpty) parts.add((text: text, quote: null));
+    parts.add((text: null, quote: quote));
+    start = quote.end;
+  }
+  final rest = content.substring(start).trim();
+  if (rest.isNotEmpty) parts.add((text: rest, quote: null));
+  return parts;
+}
+
+/// A note's text, cited notes, and media, per [loadNoteImagesNotifier].
 class NoteContent extends StatelessWidget {
   const NoteContent({
     super.key,
     required this.note,
     this.style,
     this.selectable = true,
+    this.relayClient = const RelayClient(),
   });
 
   final Note note;
   final TextStyle? style;
   final bool selectable;
+  final RelayClient relayClient;
 
   @override
   Widget build(BuildContext context) {
+    final parts = _partsOf(note.content);
+    final hasQuotes = parts.any((part) => part.quote != null);
+
     if (note.media.isEmpty) {
-      return LinkifiedText(note.content, style: style, selectable: selectable);
+      return hasQuotes
+          ? _body(parts, const [])
+          : LinkifiedText(
+              note.content,
+              style: style,
+              selectable: selectable,
+              relayClient: relayClient,
+            );
     }
 
     return ValueListenableBuilder<bool>(
       valueListenable: loadNoteImagesNotifier,
       builder: (context, autoLoad, _) {
-        final text = withoutUrls(note.content, {
-          for (final media in note.media) media.url,
-        });
         final images = [
           for (final media in note.media)
             if (media.type == MediaType.image) media,
@@ -76,27 +116,62 @@ class NoteContent extends StatelessWidget {
           };
         }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (text.isNotEmpty)
-              LinkifiedText(text, style: style, selectable: selectable),
-            Padding(
-              padding: EdgeInsets.only(top: text.isEmpty ? 0 : 8),
-              child: note.media.length == 1
-                  ? tile(note.media.single)
-                  : _ScrollingRow(
-                      count: note.media.length,
-                      itemBuilder: (index, maxWidth) => tile(
-                        note.media[index],
-                        height: _rowHeight,
-                        maxWidth: maxWidth,
-                      ),
-                    ),
-            ),
-          ],
-        );
+        return _body(parts, [
+          note.media.length == 1
+              ? tile(note.media.single)
+              : _ScrollingRow(
+                  count: note.media.length,
+                  itemBuilder: (index, maxWidth) => tile(
+                    note.media[index],
+                    height: _rowHeight,
+                    maxWidth: maxWidth,
+                  ),
+                ),
+        ]);
       },
+    );
+  }
+
+  /// The [parts] in order, then [media].
+  Widget _body(List<_Part> parts, List<Widget> media) {
+    final urls = {for (final item in note.media) item.url};
+    final children = <Widget>[];
+    for (final part in parts) {
+      final quote = part.quote;
+      if (quote != null) {
+        children.add(
+          QuotedNote(
+            eventIdHex: quote.eventIdHex,
+            reference: note.content.substring(quote.start, quote.end),
+            selectable: selectable,
+            relayClient: relayClient,
+          ),
+        );
+        continue;
+      }
+      final text = urls.isEmpty ? part.text! : withoutUrls(part.text!, urls);
+      if (text.isNotEmpty) {
+        children.add(
+          LinkifiedText(
+            text,
+            style: style,
+            selectable: selectable,
+            relayClient: relayClient,
+          ),
+        );
+      }
+    }
+    children.addAll(media);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < children.length; i++)
+          Padding(
+            padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
+            child: children[i],
+          ),
+      ],
     );
   }
 }

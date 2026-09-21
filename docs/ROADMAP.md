@@ -18,6 +18,7 @@
 - [x] Keep replies out of the home feeds (they stay on profiles and in threads)
 - [x] Show a cited npub or nprofile as the person's name, linking to their profile
 - [x] Show a cited note or nevent as a short link that opens the post
+- [x] Show a cited note or nevent as a preview card in the text (quotes)
 - [x] Infinite scroll on the home feeds and profiles (up to 1000 posts loaded per list)
 - [x] Show relay lists on profiles
 - [ ] Add support for Blossom and other media types (see below)
@@ -29,6 +30,7 @@
 - [x] Follow/unfollow (instant UI, published in the background)
 - [x] Reply to a post (with the full thread: ancestors and nested replies)
 - [ ] Repost a note (repost counts are shown, but read-only)
+- [ ] Quote a note when composing (`q` tag and `nostr:nevent` in the text)
 - [ ] React to a note, e.g. a like (like counts are shown, but read-only)
 - [ ] Real notifications (the Notifications tab is still a placeholder)
 

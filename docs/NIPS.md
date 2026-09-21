@@ -18,15 +18,15 @@ A list of Nostr NIPs, detailing which ones we plan to implement (or not).
 
 ## Longer-term:
 
-| NIP  | Description                         | Status           |
-| :--- | :---------------------------------- | :--------------- |
-| `09` | Event Deletion Request              | Support planned  |
-| `11` | Relay Information Document          | Support planned  |
-| `14` | Subject tag in Text events          | Support planned  |
-| `18` | Reposts                             | Read-only counts |
-| `23` | Long-form Content                   | Considering      |
-| `25` | Reactions                           | Read-only counts |
-| `36` | Sensitive Content / Content Warning | Support planned  |
+| NIP  | Description                         | Status                   |
+| :--- | :---------------------------------- | :----------------------- |
+| `09` | Event Deletion Request              | Support planned          |
+| `11` | Relay Information Document          | Support planned          |
+| `14` | Subject tag in Text events          | Support planned          |
+| `18` | Reposts                             | Read-only counts, quotes |
+| `23` | Long-form Content                   | Considering              |
+| `25` | Reactions                           | Read-only counts         |
+| `36` | Sensitive Content / Content Warning | Support planned          |
 
 ## Not planned
 

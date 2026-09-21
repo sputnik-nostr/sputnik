@@ -10,10 +10,18 @@ final _pubkeyPattern = RegExp(r'^[0-9a-fA-F]{64}$');
 bool _hasNip10Marker(List<String> tag) =>
     tag.length >= 4 && _nip10Markers.contains(tag[3]);
 
-List<List<String>> _eTags(NostrEvent event) => [
-  for (final tag in event.tags)
-    if (tag.length > 1 && tag[0] == 'e') tag,
-];
+/// The `e` tags that can make [event] a reply; a quoted unmarked one is not.
+List<List<String>> _eTags(NostrEvent event) {
+  final quoted = {
+    for (final tag in event.tags)
+      if (tag.length > 1 && tag[0] == 'q') tag[1].toLowerCase(),
+  };
+  return [
+    for (final tag in event.tags)
+      if (tag.length > 1 && tag[0] == 'e')
+        if (_hasNip10Marker(tag) || !quoted.contains(tag[1].toLowerCase())) tag,
+  ];
+}
 
 /// The id of the note [event] directly replies to, or null if it isn't a reply.
 ///

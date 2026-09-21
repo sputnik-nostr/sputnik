@@ -15,8 +15,7 @@ import 'open_url.dart';
 
 /// Matches HTTP(S) URLs, nostr: URIs, and bare npub/nprofile/note/nevent.
 final _linkPattern = RegExp(
-  '(${httpUrlPattern.pattern})'
-  r'|(nostr:\w+)|(\bn(?:pub|profile|ote|event)1[02-9ac-hj-np-z]+)',
+  '(${httpUrlPattern.pattern})|($nostrEntityPattern)',
   caseSensitive: false,
 );
 
@@ -46,6 +45,7 @@ class LinkifiedText extends StatefulWidget {
     super.key,
     this.style,
     this.selectable = true,
+    this.maxLines,
     this.relayClient = const RelayClient(),
   });
 
@@ -54,6 +54,9 @@ class LinkifiedText extends StatefulWidget {
 
   /// Off inside tappable rows, where a selection area would swallow the taps.
   final bool selectable;
+
+  /// Ends the text with an ellipsis past this many lines.
+  final int? maxLines;
 
   final RelayClient relayClient;
 
@@ -80,7 +83,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
   _Link _linkFor(RegExpMatch match) {
     final url = match.group(1);
     if (url == null) {
-      final entity = match.group(2) ?? match.group(3)!;
+      final entity = match.group(2)!;
       return _Link(
         match.start,
         match.end,
@@ -241,7 +244,11 @@ class _LinkifiedTextState extends State<LinkifiedText> {
       if (!live.contains(key)) _recognizers.remove(key)?.dispose();
     }
 
-    final text = Text.rich(TextSpan(style: widget.style, children: spans));
+    final text = Text.rich(
+      TextSpan(style: widget.style, children: spans),
+      maxLines: widget.maxLines,
+      overflow: widget.maxLines == null ? null : TextOverflow.ellipsis,
+    );
     if (!widget.selectable) return text;
 
     // Plain taps still reach each link span's recognizer.

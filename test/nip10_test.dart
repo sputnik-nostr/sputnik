@@ -102,6 +102,54 @@ void main() {
     });
   });
 
+  group('quotes', () {
+    test('an unmarked e tag that a q tag cites is not a reply', () {
+      final quote = _note([
+        ['e', cited],
+        ['q', cited, '', 'aa' * 32],
+      ]);
+
+      expect(replyParentId(quote), isNull);
+      expect(threadRootId(quote), isNull);
+    });
+
+    test('a quote in a reply leaves the real parent alone', () {
+      final reply = _note([
+        ['e', root, '', 'root'],
+        ['e', parent, '', 'reply'],
+        ['e', cited],
+        ['q', cited],
+      ]);
+
+      expect(replyParentId(reply), parent);
+      expect(threadRootId(reply), root);
+    });
+
+    test('a marker still makes a cited e tag a reply', () {
+      expect(
+        replyParentId(
+          _note([
+            ['e', parent, '', 'reply'],
+            ['q', parent],
+          ]),
+        ),
+        parent,
+      );
+    });
+
+    test('a q tag for another note changes nothing', () {
+      expect(
+        replyParentId(
+          _note([
+            ['e', parent],
+            ['q', cited],
+          ]),
+        ),
+        parent,
+      );
+    });
+  });
+
   group('threadRootId', () {
     test('is null for a note that is not a reply', () {
       expect(threadRootId(_note(const [])), isNull);

@@ -96,6 +96,10 @@ String truncateNpub(String npub) =>
 String shortPubkey(String pubkeyHex, [int length = 8]) =>
     pubkeyHex.length <= length ? pubkeyHex : pubkeyHex.substring(0, length);
 
+/// Matches a `nostr:` URI, or a bare npub, nprofile, note or nevent.
+const nostrEntityPattern =
+    r'nostr:\w+|\bn(?:pub|profile|ote|event)1[02-9ac-hj-np-z]+';
+
 typedef NostrUriTarget = ({String? pubkeyHex, String? eventIdHex});
 
 /// Decodes an npub, nprofile, note or nevent, with or without `nostr:`.
