@@ -37,6 +37,11 @@
 - [x] Show images in notes (tap to load by default)
 - [x] Show videos in notes (always tap to play)
 - [x] Check media against its SHA-256 and fall back to the author's Blossom servers
+- [x] Show video posters and blurhash placeholders (`image`, `thumb`, `blurhash`)
+- [x] Play only one video at a time
+- [x] Show a note's images and videos side by side in a row that scrolls sideways
+- [x] Swipe between the images in a note in the viewer
+- [x] Save an image or copy its link from the viewer
 - [ ] Attach images and videos when composing a note (with `imeta` tags)
 - [ ] Upload media to Blossom servers
 - [ ] Edit your own Blossom server list (kind 10063)
@@ -45,11 +50,6 @@
 - [ ] Hide notes with a content warning (NIP-36) behind a tap, including their media
 - [ ] Add a content warning when composing a note
 - [ ] Show audio in notes
-- [x] Show video posters and blurhash placeholders (`image`, `thumb`, `blurhash`)
-- [x] Play only one video at a time
-- [x] Show a note's images and videos side by side in a row that scrolls sideways
-- [x] Swipe between the images in a note in the viewer
-- [x] Save an image or copy its link from the viewer
 - [ ] Pause a video that has scrolled out of view
 - [ ] Let the viewer swipe to the next image while zoomed in (paging is locked while zoomed)
 - [ ] Verify video fullscreen, seeking, and portrait layout
@@ -68,9 +68,7 @@
 - [x] Publish your own relay list (NIP-65) and use it to set your relays
 - [x] Edit your own payment targets
 - [x] Add payment targets support for Zano and Firo
-- [ ] Make sure crypto logic is secure
 - [ ] Add desktop support for macOS
-- [ ] Rewrite doc comments
 - [ ] Route posts by relay lists (outbox model), instead of only the selected relays
 - [ ] Add an option to hide/show client ID string
 - [ ] Have some visual indication that there are more payment target chips to scroll to
