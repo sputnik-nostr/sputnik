@@ -133,6 +133,22 @@ void main() {
     expect(await SettingsStore.loadPrivateKey('a' * 64), 'current-secret');
   });
 
+  test('removes the keys old versions left behind, and only those', () async {
+    SharedPreferences.setMockInitialValues({
+      'profile_cache': '{"a":1}',
+      'bookmarked_ids': ['x'],
+      'current_user_profile': '{}',
+      'note_media_mode': 'always',
+      'theme_mode': 'dark',
+      'load_media': true,
+    });
+
+    await SettingsStore.removeObsoleteKeys();
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getKeys(), unorderedEquals(['theme_mode', 'load_media']));
+  });
+
   test('load media defaults to off, the private choice', () async {
     SharedPreferences.setMockInitialValues({});
 

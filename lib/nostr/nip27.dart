@@ -3,7 +3,7 @@ import 'nip19.dart';
 
 typedef NoteReference = ({int start, int end, String eventIdHex});
 
-/// Matches URLs too, so a note id inside one is not taken for a reference.
+/// Matches URLs too, so a note ID inside one is not taken for a reference.
 final _referencePattern = RegExp(
   '(${httpUrlPattern.pattern})|($nostrEntityPattern)',
   caseSensitive: false,

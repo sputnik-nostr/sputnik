@@ -57,7 +57,7 @@ String nsecFromHex(String seckeyHex) {
   );
 }
 
-/// Encodes a hex event id into the canonical `note` format.
+/// Encodes a hex event ID into the canonical `note` format.
 String noteFromHex(String eventIdHex) {
   return bech32Encode(
     'note',
@@ -65,14 +65,14 @@ String noteFromHex(String eventIdHex) {
   );
 }
 
-/// Decodes a `note`-formatted event id into its raw hex form.
+/// Decodes a `note`-formatted event ID into its raw hex form.
 String? hexFromNote(String note) => _hexFromBareEntity(note, 'note', 32);
 
 /// Decodes an `nprofile` into its pubkey hex, ignoring relay hints.
 String? hexFromNprofile(String nprofile) =>
     _hexFromTlvSpecial(nprofile, 'nprofile');
 
-/// Decodes an `nevent` into its event id hex, ignoring its other fields.
+/// Decodes an `nevent` into its event ID hex, ignoring its other fields.
 String? hexFromNevent(String nevent) => _hexFromTlvSpecial(nevent, 'nevent');
 
 /// Elides the middle of [value] with "..." to fit [totalLength], keeping the

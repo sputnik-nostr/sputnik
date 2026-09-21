@@ -28,7 +28,7 @@ class RelayClient {
   /// How long each call waits for relay responses before giving up.
   final Duration timeout;
 
-  /// Events matching [filter] from every relay, deduplicated by id.
+  /// Events matching [filter] from every relay, deduplicated by ID.
   Future<List<NostrEvent>> query(Set<String> relayUrls, NostrFilter filter) {
     return RelayConnectionPool.instance.query(
       relayUrls,

@@ -38,7 +38,7 @@ class ParsedRelayMessage {
 
   final NostrEvent? event;
 
-  /// Only set for OK messages, where [subscriptionId] is the event id being
+  /// Only set for OK messages, where [subscriptionId] is the event ID being
   /// acknowledged.
   final bool? accepted;
   final String? message;

@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_seed_color.dart';
 import '../models/identity.dart';
-import '../models/note.dart';
 import '../models/relay.dart';
 
 /// Storage seam so tests can fake [SettingsStore.secretStore].
@@ -79,7 +78,6 @@ class SettingsStore {
 
   static const _themeModeKey = 'theme_mode';
   static const _seedColorKey = 'seed_color';
-  static const _bookmarkedNotesKey = 'bookmarked_notes';
   static const _selectedRelaysKey = 'selected_relays';
   static const _customRelaysKey = 'custom_relays';
   static const _identitiesKey = 'identities';
@@ -89,9 +87,25 @@ class SettingsStore {
   static const _loadNoteImagesKey = 'load_note_images';
   static const _hiddenPaymentTargetTypesKey = 'hidden_payment_target_types';
 
+  /// Keys earlier versions wrote and nothing reads now.
+  static const _obsoleteKeys = [
+    'profile_cache',
+    'bookmarked_ids',
+    'current_user_profile',
+    'note_media_mode',
+  ];
+
   /// Backs the identity index and each identity's private key.
   @visibleForTesting
   static SecretStore secretStore = const _SecureSecretStore();
+
+  /// Drops leftovers such as the plaintext profile cache from before Hive.
+  static Future<void> removeObsoleteKeys() async {
+    final prefs = await SharedPreferences.getInstance();
+    for (final key in _obsoleteKeys) {
+      await prefs.remove(key);
+    }
+  }
 
   static Future<ThemeMode> loadThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
@@ -123,31 +137,6 @@ class SettingsStore {
   static Future<void> saveSeedColor(AppSeedColor color) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_seedColorKey, color.name);
-  }
-
-  static Future<Map<String, Note>> loadBookmarkedNotes() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_bookmarkedNotesKey);
-    if (raw == null) return {};
-
-    try {
-      final decoded = jsonDecode(raw) as Map<String, dynamic>;
-      return {
-        for (final entry in decoded.entries)
-          entry.key: Note.fromJson(entry.value as Map<String, dynamic>),
-      };
-    } catch (_) {
-      // Cached bookmark data is malformed; start with an empty set.
-      return {};
-    }
-  }
-
-  static Future<void> saveBookmarkedNotes(Map<String, Note> notes) async {
-    final prefs = await SharedPreferences.getInstance();
-    final encoded = {
-      for (final entry in notes.entries) entry.key: entry.value.toJson(),
-    };
-    await prefs.setString(_bookmarkedNotesKey, jsonEncode(encoded));
   }
 
   static Future<Set<String>> loadSelectedRelays(Set<String> knownRelays) async {

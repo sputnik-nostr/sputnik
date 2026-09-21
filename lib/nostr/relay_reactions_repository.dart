@@ -21,7 +21,7 @@ String? _lastTaggedEventId(NostrEvent event) {
 bool _isLikeReaction(String content) => content.isEmpty || content == '+';
 
 /// The pubkeys of authors of events (kind 6 reposts, kind 7 likes) that tag
-/// one of the given post ids, grouped by which post id they tagged.
+/// one of the given post IDs, grouped by which post ID they tagged.
 Map<String, List<String>> _authorsByTaggedPost(
   List<NostrEvent> events,
   Set<String> postIds,
@@ -48,7 +48,7 @@ class RelayReactionsRepository {
 
   /// Fetches likes and reposts for many posts in a single pair of relay
   /// queries (one for kind 7, one for kind 6), rather than one query per
-  /// post. Every requested id is present in the result, defaulting to no
+  /// post. Every requested ID is present in the result, defaulting to no
   /// reactions when none were found.
   Future<Map<String, PostReactions>> fetchReactions(
     List<String> postIds,

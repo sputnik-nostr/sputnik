@@ -43,7 +43,7 @@ List<List<String>> _tagsFromJson(Object? raw) {
 final _needsEscape = RegExp(r'[\x00-\x1f"\\]');
 
 /// NIP-01 escapes only these; [jsonEncode] would also escape other control
-/// characters, which changes the id hash.
+/// characters, which changes the ID hash.
 const _nip01Escapes = {
   0x08: r'\b',
   0x09: r'\t',
@@ -76,7 +76,7 @@ String _encodeJson(Object? value) => switch (value) {
   _ => jsonEncode(value),
 };
 
-/// The NIP-01 id-hash input: `[0, pubkey, created_at, kind, tags, content]`.
+/// The NIP-01 ID-hash input: `[0, pubkey, created_at, kind, tags, content]`.
 /// Shared by verification and signing so the two can't drift apart.
 Uint8List _canonicalSerialization({
   required String pubkey,
@@ -89,7 +89,7 @@ Uint8List _canonicalSerialization({
 }
 
 /// Whether [id] is the hash of [json] and [sig] a valid signature of it by
-/// [pubkey]. Uses the raw JSON values, since the id covers what the author
+/// [pubkey]. Uses the raw JSON values, since the ID covers what the author
 /// signed, not the sanitized text stored on [NostrEvent].
 bool _isAuthentic(
   Map<String, dynamic> json,
@@ -115,7 +115,7 @@ bool _isAuthentic(
 }
 
 /// A NIP-01 event. [NostrEvent.fromJson] throws [FormatException] unless the
-/// id and signature check out.
+/// ID and signature check out.
 class NostrEvent {
   const NostrEvent({
     required this.id,
@@ -132,7 +132,7 @@ class NostrEvent {
     final pubkey = (json['pubkey'] as String).toLowerCase();
     final sig = (json['sig'] as String).toLowerCase();
     if (!_isHex(id, 32) || !_isHex(pubkey, 32) || !_isHex(sig, 64)) {
-      throw const FormatException('Malformed event id, pubkey, or sig');
+      throw const FormatException('Malformed event ID, pubkey, or sig');
     }
     final tags = _tagsFromJson(json['tags']);
     if (!_isAuthentic(json, id, pubkey, sig)) {
@@ -171,7 +171,7 @@ class NostrEvent {
   };
 }
 
-/// Newest first, with ties broken by id so the order is deterministic.
+/// Newest first, with ties broken by ID so the order is deterministic.
 int compareNewestFirst(NostrEvent a, NostrEvent b) {
   final byTime = b.createdAt.compareTo(a.createdAt);
   return byTime != 0 ? byTime : a.id.compareTo(b.id);

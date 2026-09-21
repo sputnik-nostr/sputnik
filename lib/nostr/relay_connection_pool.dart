@@ -47,7 +47,7 @@ class RelayPublishResult {
   final String? message;
 }
 
-/// More than one publish() can be in flight for the same event id (e.g. a
+/// More than one publish() can be in flight for the same event ID (e.g. a
 /// double-submit); resolve()/failAll() complete all of them rather than one
 /// overwriting another's slot.
 class PublishWaiters {
@@ -90,7 +90,7 @@ class RelayQueryResult {
     required this.queriedRelays,
   });
 
-  /// Events from all queried relays, deduplicated by id.
+  /// Events from all queried relays, deduplicated by ID.
   final List<NostrEvent> events;
 
   /// Relays that finished with EOSE, not ones that failed or timed out.

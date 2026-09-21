@@ -9,6 +9,7 @@ import 'models/note.dart';
 import 'models/relay.dart';
 import 'nostr/nostr.dart';
 import 'screens/root_screen.dart';
+import 'services/bookmark_store.dart';
 import 'services/cache_store.dart';
 import 'services/feed_loader.dart';
 import 'services/settings_store.dart';
@@ -68,6 +69,7 @@ Future<void> main() async {
   HttpOverrides.global = SsrfGuardedHttpOverrides();
 
   VideoStore.instance.sweepStale().ignore();
+  SettingsStore.removeObsoleteKeys().ignore();
 
   final cacheInit = CacheStore.init();
   final themeModeBound = bindPersisted(
@@ -82,8 +84,8 @@ Future<void> main() async {
   );
   final bookmarkedNotesBound = bindPersisted(
     bookmarkedNotesNotifier,
-    SettingsStore.loadBookmarkedNotes,
-    SettingsStore.saveBookmarkedNotes,
+    BookmarkStore.load,
+    BookmarkStore.save,
   );
   final customRelaysBound = bindPersisted(
     customRelaysNotifier,

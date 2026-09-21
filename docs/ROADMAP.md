@@ -73,7 +73,8 @@
 - [x] Edit your own payment targets
 - [x] Keep the relay data cache in the app's own folder, and let Clear cached data wipe all of it
 - [x] Add payment targets support for Zano and Firo
-- [ ] Encrypt the relay data cache (it holds follow lists), keyed from secure storage
+- [x] Keep bookmarks in their own store, one entry per bookmark, and clear out settings left by old versions
+- [ ] Encrypt the relay data cache and the bookmarks (they show what you read), keyed from secure storage
 - [ ] Add desktop support for macOS
 - [ ] Route posts by relay lists (outbox model), instead of only the selected relays
 - [ ] Add an option to hide/show client ID string

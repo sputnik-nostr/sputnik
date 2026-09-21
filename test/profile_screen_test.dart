@@ -118,7 +118,7 @@ void main() {
   group('posts and replies tabs', () {
     final pubkeyHex = 'b' * 64;
 
-    // Notes are shown newest first, so an id's age makes the order predictable.
+    // Notes are shown newest first, so an ID's age makes the order predictable.
     Note note(String id, String content, {required bool isReply}) => Note(
       id: id,
       pubkey: pubkeyHex,

@@ -172,7 +172,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
         : '@${name.substring(0, _maxMentionNameLength - 3)}...';
   }
 
-  /// A note id is long and unreadable; keep just enough to tell them apart.
+  /// A note ID is long and unreadable; keep just enough to tell them apart.
   String _eventLabel(String matchedText) {
     final entity = matchedText.startsWith('nostr:')
         ? matchedText.substring('nostr:'.length)
