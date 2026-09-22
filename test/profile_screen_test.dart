@@ -491,5 +491,37 @@ void main() {
         resetFollowSync();
       },
     );
+
+    testWidgets(
+      'with confirm-before-reacting on, tapping Follow asks first and does '
+      'not publish until confirmed',
+      (tester) async {
+        confirmBeforeReactingNotifier.value = true;
+        addTearDown(() => confirmBeforeReactingNotifier.value = false);
+
+        final fakeClient = _FakeRelayClient();
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ProfileScreen(
+              pubkeyHex: targetPubkeyHex,
+              relayClient: fakeClient,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('followButton')));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Follow this person?'), findsOneWidget);
+        expect(find.text('Follow'), findsWidgets);
+
+        await tester.tap(find.text('Follow').last);
+        await _settleFollowSync(tester);
+
+        expect(find.text('Following'), findsOneWidget);
+        expect(fakeClient.lastPublished, isNotNull);
+      },
+    );
   });
 }

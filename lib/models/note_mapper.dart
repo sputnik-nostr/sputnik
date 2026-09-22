@@ -1,24 +1,36 @@
+import '../main.dart';
 import '../nostr/nostr.dart';
 import 'note.dart';
 import 'time_format.dart';
 
-/// Sets like and repost counts from [reactionsByPostId], where present.
+/// Sets like/repost counts, and whether [myPubkeyHex] is among them, from
+/// [reactionsByPostId], where present.
 List<Note> applyReactionCounts(
   List<Note> notes,
-  Map<String, PostReactions> reactionsByPostId,
-) {
+  Map<String, PostReactions> reactionsByPostId, {
+  String? myPubkeyHex,
+}) {
+  final me = myPubkeyHex?.toLowerCase();
   return notes.map((note) {
     final reactions = reactionsByPostId[note.id];
     if (reactions == null) return note;
     return note.copyWith(
       likeCount: reactions.likeCount,
       repostCount: reactions.repostCount,
+      likedByMe: me != null && reactions.likerPubkeys.contains(me),
+      repostedByMe: me != null && reactions.reposterPubkeys.contains(me),
     );
   }).toList();
 }
 
-/// Prefers the profile name in [authorMetadata] over the post's placeholder.
-Note noteFromNostrPost(NostrPost post, {NostrMetadata? authorMetadata}) {
+/// Prefers the profile name in [authorMetadata] over the post's placeholder,
+/// and [repostedByMetadata] for whoever reposted it, if [post] is a repost.
+Note noteFromNostrPost(
+  NostrPost post, {
+  NostrMetadata? authorMetadata,
+  NostrMetadata? repostedByMetadata,
+}) {
+  final repostedByPubkey = post.repostedByPubkey;
   return Note(
     id: post.id,
     pubkey: post.author.pubkey,
@@ -33,10 +45,15 @@ Note noteFromNostrPost(NostrPost post, {NostrMetadata? authorMetadata}) {
     likeCount: post.likeCount,
     isReply: post.isReply,
     media: post.media,
+    repostedByPubkey: repostedByPubkey,
+    repostedByDisplayName: repostedByPubkey == null
+        ? null
+        : (repostedByMetadata?.resolvedName ?? shortPubkey(repostedByPubkey)),
+    repostedAt: post.repostedAt,
   );
 }
 
-/// Maps [posts], looking up each author in [profilesByPubkey].
+/// Maps [posts], looking up each author and reposter in [profilesByPubkey].
 List<Note> notesFromPosts(
   List<NostrPost> posts,
   Map<String, NostrMetadata> profilesByPubkey,
@@ -46,29 +63,42 @@ List<Note> notesFromPosts(
         (post) => noteFromNostrPost(
           post,
           authorMetadata: profilesByPubkey[post.author.pubkey],
+          repostedByMetadata: post.repostedByPubkey == null
+              ? null
+              : profilesByPubkey[post.repostedByPubkey],
         ),
       )
       .toList();
 }
 
-/// Fetches author profiles and reaction counts for [posts] concurrently, then
-/// maps them to notes. [knownMetadata] skips the profile fetch.
+/// Fetches profiles and reaction counts for [posts], then maps them to
+/// notes. [knownMetadata] skips the fetch for pubkeys it already covers.
 Future<List<Note>> hydratePosts(
   List<NostrPost> posts,
   Set<String> relayUrls, {
   Map<String, NostrMetadata>? knownMetadata,
 }) async {
-  final profilesFuture = knownMetadata != null
-      ? Future.value(knownMetadata)
-      : const RelayProfileRepository().fetchProfiles(
-          posts.map((post) => post.author.pubkey).toSet(),
-          relayUrls,
-        );
+  final known = knownMetadata ?? const <String, NostrMetadata>{};
+  final needed = {
+    for (final post in posts) post.author.pubkey,
+    for (final post in posts)
+      if (post.repostedByPubkey != null) post.repostedByPubkey!,
+  }..removeAll(known.keys);
+
+  final profilesFuture = needed.isEmpty
+      ? Future.value(known)
+      : const RelayProfileRepository()
+            .fetchProfiles(needed, relayUrls)
+            .then((fetched) => {...known, ...fetched});
   final reactionsFuture = const RelayReactionsRepository().fetchReactions(
     posts.map((post) => post.id).toList(),
     relayUrls,
   );
 
   final notes = notesFromPosts(posts, await profilesFuture);
-  return applyReactionCounts(notes, await reactionsFuture);
+  return applyReactionCounts(
+    notes,
+    await reactionsFuture,
+    myPubkeyHex: activeIdentityPubkeyNotifier.value,
+  );
 }

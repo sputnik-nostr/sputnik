@@ -80,6 +80,23 @@ class _ProfileScreenState extends State<ProfileScreen>
       limit: _profileEventLimit,
     ).fetchPage(authors: [_resolvedPubkeyHex!], until: until),
   );
+
+  /// Reposts this profile has made, paged separately since they're a
+  /// different kind of relay query.
+  late final PostCursor _repostCursor = PostCursor((until) async {
+    final relayUrls = selectedRelaysNotifier.value;
+    final reposts = await RelayPostRepository(
+      relayUrls: relayUrls,
+      client: widget.relayClient,
+      limit: _profileEventLimit,
+    ).fetchReposts([_resolvedPubkeyHex!], relayUrls, until: until);
+    final next = reposts.length >= _profileEventLimit
+        ? reposts
+              .map((post) => post.repostedAt!)
+              .reduce((a, b) => a.isBefore(b) ? a : b)
+        : null;
+    return PostPage(reposts, next);
+  });
   List<String>? _following;
   List<String>? _followers;
   List<NostrPaymentTarget>? _paymentTargets;
@@ -140,10 +157,14 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Future<void> _loadAuthorPosts(String pubkeyHex) async {
     final relayUrls = selectedRelaysNotifier.value;
-    final posts = await _cursor.first();
+    final fetched = await Future.wait([_cursor.first(), _repostCursor.first()]);
     if (!mounted) return;
 
-    final notes = await _hydrate(posts, pubkeyHex, relayUrls);
+    final notes = await _hydrate(
+      [...fetched[0], ...fetched[1]],
+      pubkeyHex,
+      relayUrls,
+    );
     if (!mounted) return;
 
     setState(() {
@@ -156,7 +177,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     final pubkeyHex = _resolvedPubkeyHex;
     if (pubkeyHex == null) return;
     final relayUrls = selectedRelaysNotifier.value;
-    final posts = await _cursor.more();
+    final fetched = await Future.wait([_cursor.more(), _repostCursor.more()]);
+    final posts = [...fetched[0], ...fetched[1]];
     if (!mounted || posts.isEmpty) return;
 
     final notes = await _hydrate(posts, pubkeyHex, relayUrls);
@@ -291,11 +313,12 @@ class _ProfileScreenState extends State<ProfileScreen>
             for (final note in (_fetchedNotes ?? const [])) note.id: note,
           };
           // Notes fetched before this profile's metadata landed carry stale
-          // author data, so re-apply whatever is cached now.
+          // author data, so re-apply whatever is cached now. A repost entry
+          // keeps the original (foreign) author's data untouched.
           final ownNotes =
               ownNotesById.values
                   .map(
-                    (note) => metadata == null
+                    (note) => metadata == null || note.pubkey != pubkeyHex
                         ? note
                         : note.copyWith(
                             displayName: metadata.resolvedName,
@@ -303,7 +326,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                   )
                   .toList()
-                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+                ..sort(
+                  (a, b) => (b.repostedAt ?? b.createdAt).compareTo(
+                    a.repostedAt ?? a.createdAt,
+                  ),
+                );
           final posts = [
             for (final note in ownNotes)
               if (!note.isReply) note,
@@ -687,9 +714,10 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _notesTab(String storageKey, List<Note> notes, String emptyLabel) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: _cursor.hasMore,
-      builder: (context, hasMore, _) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_cursor.hasMore, _repostCursor.hasMore]),
+      builder: (context, _) {
+        final hasMore = _cursor.hasMore.value || _repostCursor.hasMore.value;
         // A new key per page, so the next one is asked for if still in view.
         Widget footer() => LoadMoreFooter(
           key: ValueKey(_fetchedNotes?.length),

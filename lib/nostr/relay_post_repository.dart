@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'models/nostr_post.dart';
@@ -120,6 +122,73 @@ class RelayPostRepository {
       next = until.subtract(const Duration(seconds: 1));
     }
     return PostPage(kept.map(nostrPostFromEvent).toList(), next);
+  }
+
+  /// Fetches up to [limit] reposts (kind 6) by [authors], resolving each to
+  /// the kind 1 note it points at. Drops any whose note can't be resolved.
+  Future<List<NostrPost>> fetchReposts(
+    List<String> authors,
+    Set<String> relayUrls, {
+    DateTime? until,
+  }) async {
+    if (authors.isEmpty) return const [];
+    final wanted = {for (final author in authors) author.toLowerCase()};
+
+    final eventsByChunk = await Future.wait(
+      chunkedAuthors(wanted.toList()).map(
+        (chunk) => client.query(
+          relayUrls,
+          NostrFilter(
+            kinds: const [6],
+            authors: chunk,
+            until: until,
+            limit: limit,
+          ),
+        ),
+      ),
+    );
+    final reposts =
+        eventsByChunk
+            .expand((events) => events)
+            .where((event) => event.kind == 6 && wanted.contains(event.pubkey))
+            .toList()
+          ..sort(compareNewestFirst);
+
+    final resolved = await Future.wait(
+      reposts.take(limit).map((repost) async {
+        final original = await _resolveRepostTarget(repost, relayUrls);
+        if (original == null) return null;
+        return NostrPost.repost(
+          nostrPostFromEvent(original),
+          byPubkey: repost.pubkey,
+          at: repost.createdAt,
+        );
+      }),
+    );
+    return [for (final post in resolved) ?post];
+  }
+
+  /// The kind 1 note [repost] points at.
+  Future<NostrEvent?> _resolveRepostTarget(
+    NostrEvent repost,
+    Set<String> relayUrls,
+  ) async {
+    if (repost.content.isNotEmpty) {
+      try {
+        final embedded = NostrEvent.fromJson(
+          jsonDecode(repost.content) as Map<String, dynamic>,
+        );
+        if (embedded.kind == 1) return embedded;
+      } catch (_) {
+        // Not usable as embedded content; fall back to fetching it below.
+      }
+    }
+
+    String? targetId;
+    for (final tag in repost.tags) {
+      if (tag.length > 1 && tag[0] == 'e') targetId = tag[1];
+    }
+    return targetId == null ? null : fetchEventById(targetId);
   }
 }
 

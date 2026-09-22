@@ -5,6 +5,35 @@ import '../models/identity.dart';
 import '../nostr/nostr.dart';
 import '../services/follow_sync.dart';
 
+Future<bool> _confirmFollowChange(
+  BuildContext context, {
+  required bool follow,
+}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(follow ? 'Follow this person?' : 'Unfollow this person?'),
+      content: Text(
+        follow
+            ? 'This publishes your updated follow list to your relays.'
+            : 'This removes them from your follow list, published to your '
+                  'relays.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(follow ? 'Follow' : 'Unfollow'),
+        ),
+      ],
+    ),
+  );
+  return confirmed ?? false;
+}
+
 /// Follows or unfollows [targetPubkeyHex] as the active identity.
 class FollowButton extends StatelessWidget {
   const FollowButton({
@@ -20,16 +49,28 @@ class FollowButton extends StatelessWidget {
   /// List-row-sized rendering instead of a full-size button.
   final bool dense;
 
-  void _toggle() {
+  Future<void> _toggle(BuildContext context) async {
     final myPubkeyHex = activeIdentityPubkeyNotifier.value;
     if (myPubkeyHex == null) return;
     final identity = identityWithPubkey(identitiesNotifier.value, myPubkeyHex);
     if (identity == null) return;
 
     final target = targetPubkeyHex.toLowerCase();
+    final currentlyFollowing =
+        myFollowingNotifier.value?.contains(target) ?? false;
+    final follow = !currentlyFollowing;
+
+    if (confirmBeforeReactingNotifier.value) {
+      final confirmed = await _confirmFollowChange(context, follow: follow);
+      if (!confirmed || !context.mounted) return;
+    }
+
     final updated = Set<String>.of(myFollowingNotifier.value ?? const {});
-    final follow = !updated.remove(target);
-    if (follow) updated.add(target);
+    if (follow) {
+      updated.add(target);
+    } else {
+      updated.remove(target);
+    }
     myFollowingNotifier.value = updated;
 
     scheduleFollowingSync(target, follow: follow, relayClient: relayClient);
@@ -53,13 +94,13 @@ class FollowButton extends StatelessWidget {
         return isFollowing
             ? OutlinedButton(
                 key: const Key('followButton'),
-                onPressed: _toggle,
+                onPressed: () => _toggle(context),
                 style: style,
                 child: const Text('Following'),
               )
             : FilledButton(
                 key: const Key('followButton'),
-                onPressed: _toggle,
+                onPressed: () => _toggle(context),
                 style: style,
                 child: const Text('Follow'),
               );

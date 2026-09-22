@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'models/post_reactions.dart';
@@ -88,5 +90,98 @@ class RelayReactionsRepository {
           reposterPubkeys: repostersByPost[postId.toLowerCase()] ?? const [],
         ),
     };
+  }
+
+  /// Publishes a NIP-25 like (kind 7, content "+") for [target].
+  Future<Map<String, RelayPublishResult>> publishLike({
+    required String seckeyHex,
+    required String myPubkeyHex,
+    required NostrEvent target,
+    required Set<String> relayUrls,
+  }) {
+    final event = signEvent(
+      seckeyHex: seckeyHex,
+      pubkeyHex: myPubkeyHex,
+      kind: 7,
+      tags: [
+        ['e', target.id, ''],
+        ['p', target.pubkey, ''],
+        ['k', '${target.kind}'],
+      ],
+      content: '+',
+    );
+    return client.publish(event, relayUrls);
+  }
+
+  /// Publishes a NIP-18 repost (kind 6) of [target], content the reposted
+  /// note's stringified JSON.
+  Future<Map<String, RelayPublishResult>> publishRepost({
+    required String seckeyHex,
+    required String myPubkeyHex,
+    required NostrEvent target,
+    required Set<String> relayUrls,
+  }) {
+    final event = signEvent(
+      seckeyHex: seckeyHex,
+      pubkeyHex: myPubkeyHex,
+      kind: 6,
+      tags: [
+        ['e', target.id, ''],
+        ['p', target.pubkey, ''],
+      ],
+      content: jsonEncode(target.toJson()),
+    );
+    return client.publish(event, relayUrls);
+  }
+
+  /// The newest kind [kind] event by [myPubkeyHex] targeting [noteId], if
+  /// any -- what [publishRetraction] would delete.
+  Future<NostrEvent?> fetchOwnReaction({
+    required String myPubkeyHex,
+    required String noteId,
+    required int kind,
+    required Set<String> relayUrls,
+  }) async {
+    final events = await client.query(
+      relayUrls,
+      NostrFilter(
+        kinds: [kind],
+        authors: [myPubkeyHex],
+        tags: {
+          'e': [noteId],
+        },
+      ),
+    );
+
+    final wantedNote = noteId.toLowerCase();
+    final wantedAuthor = myPubkeyHex.toLowerCase();
+    final mine = events.where((event) {
+      if (event.kind != kind || event.pubkey != wantedAuthor) return false;
+      if (kind == 7 && !_isLikeReaction(event.content)) return false;
+      return _lastTaggedEventId(event) == wantedNote;
+    }).toList()..sort(compareNewestFirst);
+
+    return mine.isEmpty ? null : mine.first;
+  }
+
+  /// Publishes a NIP-09 deletion request for [target]; removal is never
+  /// guaranteed, since other relays or clients may already have a copy.
+  Future<Map<String, RelayPublishResult>> publishRetraction({
+    required String seckeyHex,
+    required String myPubkeyHex,
+    required NostrEvent target,
+    required Set<String> relayUrls,
+  }) {
+    final event = signEvent(
+      seckeyHex: seckeyHex,
+      pubkeyHex: myPubkeyHex,
+      kind: 5,
+      tags: [
+        ['e', target.id],
+        ['k', '${target.kind}'],
+      ],
+      content: '',
+    );
+    return client.publish(event, relayUrls);
   }
 }

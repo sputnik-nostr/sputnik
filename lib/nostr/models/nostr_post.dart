@@ -44,7 +44,31 @@ class NostrPost {
     this.likeCount = 0,
     this.isReply = false,
     this.media = const [],
+    this.repostedByPubkey,
+    this.repostedAt,
   });
+
+  /// [original], reposted by [byPubkey] at [at] (a NIP-18 pointer, not a
+  /// new note, so every other field still describes [original]).
+  factory NostrPost.repost(
+    NostrPost original, {
+    required String byPubkey,
+    required DateTime at,
+  }) {
+    return NostrPost(
+      id: original.id,
+      author: original.author,
+      content: original.content,
+      createdAt: original.createdAt,
+      replyCount: original.replyCount,
+      repostCount: original.repostCount,
+      likeCount: original.likeCount,
+      isReply: original.isReply,
+      media: original.media,
+      repostedByPubkey: byPubkey,
+      repostedAt: at,
+    );
+  }
 
   final String id;
   final NostrAuthor author;
@@ -55,4 +79,8 @@ class NostrPost {
   final int likeCount;
   final bool isReply;
   final List<NostrMedia> media;
+
+  /// Who reposted this, and when, if this entry is a repost (kind 6).
+  final String? repostedByPubkey;
+  final DateTime? repostedAt;
 }

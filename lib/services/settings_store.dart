@@ -86,6 +86,7 @@ class SettingsStore {
   static const _loadMediaKey = 'load_media';
   static const _loadNoteImagesKey = 'load_note_images';
   static const _hiddenPaymentTargetTypesKey = 'hidden_payment_target_types';
+  static const _confirmBeforeReactingKey = 'confirm_before_reacting';
 
   /// Keys earlier versions wrote and nothing reads now.
   static const _obsoleteKeys = [
@@ -265,6 +266,16 @@ class SettingsStore {
   static Future<void> saveLoadNoteImages(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_loadNoteImagesKey, value);
+  }
+
+  static Future<bool> loadConfirmBeforeReacting() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_confirmBeforeReactingKey) ?? false;
+  }
+
+  static Future<void> saveConfirmBeforeReacting(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_confirmBeforeReactingKey, value);
   }
 
   static Future<Set<String>> loadHiddenPaymentTargetTypes() async {

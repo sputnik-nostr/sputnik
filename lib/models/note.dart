@@ -26,7 +26,12 @@ class Note {
     this.repostCount = 0,
     this.likeCount = 0,
     this.isReply = false,
+    this.likedByMe = false,
+    this.repostedByMe = false,
     this.media = const [],
+    this.repostedByPubkey,
+    this.repostedByDisplayName,
+    this.repostedAt,
   });
 
   factory Note.fromJson(Map<String, dynamic> json) {
@@ -46,7 +51,14 @@ class Note {
       repostCount: json['repostCount'] as int? ?? 0,
       likeCount: json['likeCount'] as int? ?? 0,
       isReply: json['isReply'] as bool? ?? false,
+      likedByMe: json['likedByMe'] as bool? ?? false,
+      repostedByMe: json['repostedByMe'] as bool? ?? false,
       media: _mediaFromJson(json['media']),
+      repostedByPubkey: json['repostedByPubkey'] as String?,
+      repostedByDisplayName: json['repostedByDisplayName'] as String?,
+      repostedAt: (json['repostedAt'] as int?) == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(json['repostedAt'] as int),
     );
   }
 
@@ -62,7 +74,18 @@ class Note {
   final int repostCount;
   final int likeCount;
   final bool isReply;
+
+  /// Whether the active identity already liked/reposted this, per the
+  /// relays' reaction data.
+  final bool likedByMe;
+  final bool repostedByMe;
   final List<NostrMedia> media;
+
+  /// Who reposted this note, and when, if this entry is here as a repost
+  /// rather than the note itself; [postedAt] still reflects the original.
+  final String? repostedByPubkey;
+  final String? repostedByDisplayName;
+  final DateTime? repostedAt;
 
   Note copyWith({
     String? displayName,
@@ -70,6 +93,8 @@ class Note {
     int? replyCount,
     int? repostCount,
     int? likeCount,
+    bool? likedByMe,
+    bool? repostedByMe,
   }) {
     return Note(
       id: id,
@@ -84,7 +109,12 @@ class Note {
       repostCount: repostCount ?? this.repostCount,
       likeCount: likeCount ?? this.likeCount,
       isReply: isReply,
+      likedByMe: likedByMe ?? this.likedByMe,
+      repostedByMe: repostedByMe ?? this.repostedByMe,
       media: media,
+      repostedByPubkey: repostedByPubkey,
+      repostedByDisplayName: repostedByDisplayName,
+      repostedAt: repostedAt,
     );
   }
 
@@ -101,7 +131,13 @@ class Note {
       'repostCount': repostCount,
       'likeCount': likeCount,
       if (isReply) 'isReply': true,
+      if (likedByMe) 'likedByMe': true,
+      if (repostedByMe) 'repostedByMe': true,
       if (media.isNotEmpty) 'media': [for (final m in media) m.toJson()],
+      if (repostedByPubkey != null) 'repostedByPubkey': repostedByPubkey,
+      if (repostedByDisplayName != null)
+        'repostedByDisplayName': repostedByDisplayName,
+      if (repostedAt != null) 'repostedAt': repostedAt!.millisecondsSinceEpoch,
     };
   }
 }

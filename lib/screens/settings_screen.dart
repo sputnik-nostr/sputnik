@@ -48,8 +48,9 @@ Future<void> _confirmResetPreferences(BuildContext context) async {
       title: const Text('Reset preferences?'),
       content: const Text(
         'This resets the theme, theme color, relay selection, media '
-        'loading, and payment target visibility back to their defaults. '
-        'Identities and bookmarks are not affected.',
+        'loading, payment target visibility, and reaction confirmation '
+        'back to their defaults. Identities and bookmarks are not '
+        'affected.',
       ),
       actions: [
         TextButton(
@@ -71,6 +72,7 @@ Future<void> _confirmResetPreferences(BuildContext context) async {
   loadMediaNotifier.value = false;
   loadNoteImagesNotifier.value = false;
   hiddenPaymentTargetTypesNotifier.value = const {};
+  confirmBeforeReactingNotifier.value = false;
 
   if (context.mounted) {
     ScaffoldMessenger.of(context)
@@ -204,6 +206,22 @@ class SettingsScreen extends StatelessWidget {
                     ),
                     value: loadNoteImages,
                     onChanged: (value) => loadNoteImagesNotifier.value = value,
+                  );
+                },
+              ),
+              ValueListenableBuilder<bool>(
+                valueListenable: confirmBeforeReactingNotifier,
+                builder: (context, confirmBeforeReacting, _) {
+                  return SwitchListTile(
+                    key: const Key('confirmBeforeReactingSwitch'),
+                    secondary: const Icon(Icons.help_outline),
+                    title: const Text('Confirm before reacting or following'),
+                    subtitle: const Text(
+                      'Posting and reposting always ask first regardless.',
+                    ),
+                    value: confirmBeforeReacting,
+                    onChanged: (value) =>
+                        confirmBeforeReactingNotifier.value = value,
                   );
                 },
               ),

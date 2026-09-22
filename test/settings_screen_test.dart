@@ -14,6 +14,7 @@ void main() {
     loadNoteImagesNotifier.value = false;
     hiddenPaymentTargetTypesNotifier.value = const {};
     identitiesNotifier.value = const [];
+    confirmBeforeReactingNotifier.value = false;
   });
 
   testWidgets('the media switch reflects and updates loadMediaNotifier', (
@@ -48,6 +49,23 @@ void main() {
     expect(tester.widget<SwitchListTile>(switchFinder).value, isTrue);
   });
 
+  testWidgets(
+    'the confirm-before-reacting switch reflects and updates its notifier',
+    (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: SettingsScreen()));
+      await tester.pumpAndSettle();
+
+      final switchFinder = find.byKey(const Key('confirmBeforeReactingSwitch'));
+      expect(tester.widget<SwitchListTile>(switchFinder).value, isFalse);
+
+      await tester.tap(switchFinder);
+      await tester.pumpAndSettle();
+
+      expect(confirmBeforeReactingNotifier.value, isTrue);
+      expect(tester.widget<SwitchListTile>(switchFinder).value, isTrue);
+    },
+  );
+
   testWidgets('the payment addresses card shows how many types are hidden', (
     tester,
   ) async {
@@ -79,6 +97,7 @@ void main() {
     loadMediaNotifier.value = true;
     loadNoteImagesNotifier.value = true;
     hiddenPaymentTargetTypesNotifier.value = {'monero'};
+    confirmBeforeReactingNotifier.value = true;
     identitiesNotifier.value = [
       Identity(pubkeyHex: 'a' * 64, createdAt: DateTime.now()),
     ];
@@ -104,6 +123,7 @@ void main() {
     expect(loadMediaNotifier.value, isFalse);
     expect(loadNoteImagesNotifier.value, isFalse);
     expect(hiddenPaymentTargetTypesNotifier.value, isEmpty);
+    expect(confirmBeforeReactingNotifier.value, isFalse);
     expect(identitiesNotifier.value, hasLength(1));
   });
 }

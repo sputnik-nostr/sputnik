@@ -53,6 +53,10 @@ final ValueNotifier<bool> loadMediaNotifier = ValueNotifier(false);
 
 final ValueNotifier<bool> loadNoteImagesNotifier = ValueNotifier(false);
 
+/// Whether liking or following asks for confirmation first; posting and
+/// reposting always do.
+final ValueNotifier<bool> confirmBeforeReactingNotifier = ValueNotifier(false);
+
 /// Payment target types (e.g. "monero") to hide on every profile.
 final ValueNotifier<Set<String>> hiddenPaymentTargetTypesNotifier =
     ValueNotifier(const {});
@@ -117,6 +121,11 @@ Future<void> main() async {
     SettingsStore.loadHiddenPaymentTargetTypes,
     SettingsStore.saveHiddenPaymentTargetTypes,
   );
+  final confirmBeforeReactingBound = bindPersisted(
+    confirmBeforeReactingNotifier,
+    SettingsStore.loadConfirmBeforeReacting,
+    SettingsStore.saveConfirmBeforeReacting,
+  );
 
   await cacheInit;
   await themeModeBound;
@@ -128,6 +137,7 @@ Future<void> main() async {
   await loadMediaBound;
   await loadNoteImagesBound;
   await hiddenPaymentTargetTypesBound;
+  await confirmBeforeReactingBound;
 
   await bindPersisted(
     selectedRelaysNotifier,

@@ -13,6 +13,7 @@ import '../widgets/count_label.dart';
 import '../widgets/fade_in_avatar.dart';
 import '../widgets/note_content.dart';
 import '../widgets/note_tile.dart';
+import '../widgets/reaction_buttons.dart';
 import 'profile_screen.dart';
 import 'users_list_screen.dart';
 
@@ -327,6 +328,11 @@ class _PostHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final npub = npubFromHex(note.pubkey);
+    final myPubkeyHex = activeIdentityPubkeyNotifier.value?.toLowerCase();
+    final reactionNote = note.copyWith(
+      likedByMe: likerPubkeys?.contains(myPubkeyHex) ?? note.likedByMe,
+      repostedByMe: reposterPubkeys?.contains(myPubkeyHex) ?? note.repostedByMe,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -413,6 +419,8 @@ class _PostHeader extends StatelessWidget {
                 tooltip: 'Reply',
                 onPressed: onReply,
               ),
+              RepostButton(note: reactionNote, showCount: false, size: 20),
+              LikeButton(note: reactionNote, showCount: false, size: 20),
               BookmarkButton(note: note, size: 20),
             ],
           ),
