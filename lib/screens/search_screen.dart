@@ -35,7 +35,7 @@ class _SearchScreenState extends State<SearchScreen> {
           padding: const EdgeInsets.all(16),
           child: SearchBar(
             controller: _controller,
-            hintText: 'Search notes and people',
+            hintText: 'Search for notes and users',
             leading: const Icon(Icons.search),
             trailing: _query.isEmpty
                 ? null

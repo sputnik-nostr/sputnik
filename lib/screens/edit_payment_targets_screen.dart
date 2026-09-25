@@ -8,12 +8,14 @@ import '../services/cache_store.dart';
 import '../services/settings_store.dart';
 import '../widgets/payment_target_chip.dart';
 
+/// Maximum number of payment targets.
 const _maxPaymentTargets = 20;
 
 String? _validateAddress(String? value) {
   final trimmed = value?.trim() ?? '';
   if (trimmed.isEmpty) return 'Enter an address';
-  if (trimmed.contains(RegExp(r'\s'))) return 'An address has no spaces';
+  if (trimmed.contains(RegExp(r'\s')))
+    return 'An address should not contain spaces';
   return null;
 }
 
@@ -130,7 +132,7 @@ class _EditPaymentTargetsScreenState extends State<EditPaymentTargetsScreen> {
           _baseConclusive
               ? 'This publishes your payment targets to $relayCount relay(s).'
               : 'This publishes your payment targets to $relayCount relay(s). '
-                    'Some relays did not answer, so your current targets '
+                    'Some relays did not respond, so your current targets '
                     'could not be checked and may be overwritten.',
         ),
         actions: [
@@ -267,7 +269,7 @@ class _EditPaymentTargetsScreenState extends State<EditPaymentTargetsScreen> {
                           const SizedBox(width: 12),
                           const Expanded(
                             child: Text(
-                              'Some relays did not answer, so your published '
+                              'Some relays did not respond, so your published '
                               'targets could not be checked.',
                             ),
                           ),

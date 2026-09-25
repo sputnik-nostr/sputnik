@@ -25,7 +25,7 @@ Widget _plaintextWarningIcon(BuildContext context) {
 Future<void> _addRelay(BuildContext context) async {
   if (customRelaysNotifier.value.length >= maxCustomRelays) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('You can add up to $maxCustomRelays relays')),
+      SnackBar(content: Text('You can only add up to $maxCustomRelays relays')),
     );
     return;
   }
@@ -268,7 +268,7 @@ class _MyRelayListState extends State<_MyRelayList> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '$skipped relay(s) were skipped because you can add up to '
+            '$skipped relay(s) were skipped because you can only add up to '
             '$maxCustomRelays custom relays',
           ),
         ),
@@ -289,7 +289,7 @@ class _MyRelayListState extends State<_MyRelayList> {
 
     final notes = [
       if (_own?.conclusive == false)
-        'Some relays did not answer, so your current list could not be '
+        'Some relays did not respond, so your current list could not be '
             'checked.',
       if (removed.isNotEmpty)
         '${removed.length} relay(s) in your published list will be removed.',
@@ -400,7 +400,7 @@ class _MyRelayListState extends State<_MyRelayList> {
               color: theme.colorScheme.error,
             ),
             title: const Text(
-              'Some relays did not answer, so your published list could not '
+              'Some relays did not respond, so your published list could not '
               'be checked',
             ),
             trailing: TextButton(

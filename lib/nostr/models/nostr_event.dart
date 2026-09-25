@@ -42,8 +42,9 @@ List<List<String>> _tagsFromJson(Object? raw) {
 
 final _needsEscape = RegExp(r'[\x00-\x1f"\\]');
 
-/// NIP-01 escapes only these; [jsonEncode] would also escape other control
-/// characters, which changes the ID hash.
+/// Characters that should be escaped in the `content` field, according to
+/// NIP-01. [jsonEncode] would also escape other control characters, which
+/// changes the event's hash (the `id` field).
 const _nip01Escapes = {
   0x08: r'\b',
   0x09: r'\t',

@@ -25,7 +25,7 @@ String? _validateUrl(String? value) {
 String? _validateNip05(String? value) {
   final trimmed = value?.trim() ?? '';
   if (trimmed.isEmpty || parseNip05(trimmed) != null) return null;
-  return 'Enter an address like name@example.com';
+  return 'Enter an address, such as name@example.com';
 }
 
 class EditProfileScreen extends StatefulWidget {
@@ -127,7 +127,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _baseConclusive
               ? 'This publishes your profile to $relayCount relay(s).'
               : 'This publishes your profile to $relayCount relay(s). Some '
-                    'relays did not answer, so your current profile could not '
+                    'relays did not respond, so your current profile could not '
                     'be checked and fields you set elsewhere may be '
                     'overwritten.',
         ),
@@ -268,7 +268,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 const SizedBox(width: 12),
                                 const Expanded(
                                   child: Text(
-                                    'Some relays did not answer, so your published '
+                                    'Some relays did not respond, so your published '
                                     'profile could not be checked.',
                                   ),
                                 ),

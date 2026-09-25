@@ -35,7 +35,7 @@ class _UserRelaysScreenState extends State<UserRelaysScreen> {
     if (!addCustomRelay(relay)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('You can add up to $maxCustomRelays relays'),
+          content: Text('You can only add up to $maxCustomRelays relays'),
         ),
       );
     }

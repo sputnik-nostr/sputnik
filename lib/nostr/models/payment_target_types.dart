@@ -1,4 +1,4 @@
-/// Display and URI details for one NIP-A3 payment target type.
+/// Display and URI details for a NIP-A3 payment target type.
 class PaymentTargetTypeInfo {
   const PaymentTargetTypeInfo({
     required this.displayName,
@@ -13,7 +13,7 @@ class PaymentTargetTypeInfo {
   /// Shown next to the address (e.g. a chip badge, or a settings subtitle).
   final String? ticker;
 
-  /// A short hint for types whose name alone doesn't say what they are.
+  /// A short hint for types whose names are generally not self-describing.
   final String? description;
 
   /// Whether launchUri should use `<type>:<address>` instead of

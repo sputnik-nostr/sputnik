@@ -1,6 +1,6 @@
-# sputnik
+# Sputnik
 
-A minimal, cross-platform Nostr client. WIP.
+A minimal, cross-platform Nostr client.
 
 ## Features
 
