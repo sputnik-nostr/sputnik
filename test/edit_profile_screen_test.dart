@@ -204,7 +204,10 @@ void main() {
     await tester.tap(find.byKey(const Key('saveProfileButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Enter an address like name@example.com'), findsOneWidget);
+    expect(
+      find.text('Enter an address, such as name@example.com'),
+      findsOneWidget,
+    );
     expect(client.published, isEmpty);
   });
 

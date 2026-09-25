@@ -14,8 +14,9 @@ const _maxPaymentTargets = 20;
 String? _validateAddress(String? value) {
   final trimmed = value?.trim() ?? '';
   if (trimmed.isEmpty) return 'Enter an address';
-  if (trimmed.contains(RegExp(r'\s')))
+  if (trimmed.contains(RegExp(r'\s'))) {
     return 'An address should not contain spaces';
+  }
   return null;
 }
 

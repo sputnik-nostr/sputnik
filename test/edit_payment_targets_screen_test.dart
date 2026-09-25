@@ -121,7 +121,7 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('savePaymentTargetsButton')));
     await tester.pumpAndSettle();
-    expect(find.text('An address has no spaces'), findsOneWidget);
+    expect(find.text('An address should not contain spaces'), findsOneWidget);
     expect(client.published, isEmpty);
   });
 
