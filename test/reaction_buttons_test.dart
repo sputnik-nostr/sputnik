@@ -5,6 +5,7 @@ import 'package:sputnik/main.dart';
 import 'package:sputnik/models/identity.dart';
 import 'package:sputnik/models/note.dart';
 import 'package:sputnik/nostr/nostr.dart';
+import 'package:sputnik/screens/compose_screen.dart';
 import 'package:sputnik/services/settings_store.dart';
 import 'package:sputnik/widgets/reaction_buttons.dart';
 
@@ -293,6 +294,25 @@ void main() {
         ['e', repostEventId],
         ['k', '6'],
       ]);
+    },
+  );
+
+  testWidgets(
+    'holding down repost opens the quote composer instead of reposting',
+    (tester) async {
+      final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
+      await pumpButton(
+        tester,
+        RepostButton(note: note, relayClient: fakeClient),
+      );
+
+      await tester.longPress(find.byIcon(Icons.repeat));
+      await tester.pumpAndSettle();
+
+      expect(fakeClient.publishCount, 0);
+      expect(find.byType(ComposeScreen), findsOneWidget);
+      expect(find.text('Bob'), findsOneWidget);
+      expect(find.text('hello'), findsOneWidget);
     },
   );
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../main.dart';
 import '../models/note.dart';
 import '../nostr/nostr.dart';
 import '../screens/compose_screen.dart';
@@ -7,6 +8,7 @@ import '../screens/post_screen.dart';
 import '../screens/profile_screen.dart';
 import '../theme/app_text_styles.dart';
 import 'bookmark_button.dart';
+import 'delete_button.dart';
 import 'fade_in_avatar.dart';
 import 'note_content.dart';
 import 'reaction_buttons.dart';
@@ -29,6 +31,9 @@ class NoteTile extends StatelessWidget {
     final theme = Theme.of(context);
 
     final repostedByPubkey = note.repostedByPubkey;
+    final isOwnNote =
+        note.pubkey.toLowerCase() ==
+        activeIdentityPubkeyNotifier.value?.toLowerCase();
 
     return InkWell(
       onTap: () => _openPost(context),
@@ -118,6 +123,10 @@ class NoteTile extends StatelessWidget {
                             LikeButton(note: note),
                             const SizedBox(width: 20),
                             BookmarkButton(note: note),
+                            if (isOwnNote) ...[
+                              const SizedBox(width: 20),
+                              DeleteButton(note: note),
+                            ],
                           ],
                         ),
                       ),

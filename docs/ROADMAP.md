@@ -30,8 +30,9 @@
 - [x] Follow/unfollow (instant UI, published in the background)
 - [x] Reply to a post (with the full thread: ancestors and nested replies)
 - [x] Repost a note
-- [ ] Quote a note when composing (`q` tag and `nostr:nevent` in the text)
+- [x] Quote a note when composing (`q` tag and `nostr:nevent` in the text)
 - [x] React to a note, e.g. a like
+- [x] Delete your own note or reply (NIP-09)
 - [ ] Real notifications (the Notifications tab is still a placeholder)
 
 ## Media (current state)

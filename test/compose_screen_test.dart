@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sputnik/main.dart';
 import 'package:sputnik/models/identity.dart';
+import 'package:sputnik/models/note.dart';
 import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/screens/compose_screen.dart';
 import 'package:sputnik/services/settings_store.dart';
@@ -74,6 +75,31 @@ void main() {
               context,
               MaterialPageRoute(
                 builder: (_) => ComposeScreen(relayClient: relayClient),
+              ),
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openQuoteComposeScreen(
+    WidgetTester tester,
+    RelayClient relayClient,
+    Note quoting,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    ComposeScreen(quoting: quoting, relayClient: relayClient),
               ),
             ),
             child: const Text('open'),
@@ -204,5 +230,83 @@ void main() {
     expect(fakeClient.lastPublished, isNotNull);
     expect(find.byType(ComposeScreen), findsOneWidget);
     expect(find.text('blocked: spam'), findsOneWidget);
+  });
+
+  final quoted = Note(
+    id: 'aa' * 32,
+    pubkey: 'bb' * 32,
+    displayName: 'Alice',
+    handle: 'alice',
+    content: 'quoted note',
+    postedAt: 'now',
+    createdAt: DateTime.now(),
+  );
+
+  testWidgets(
+    'quoting a note shows a preview of it and enables the post button with '
+    'no comment required',
+    (tester) async {
+      final fakeClient = _FakeRelayClient(RelayPublishOutcome.accepted);
+      await openQuoteComposeScreen(tester, fakeClient, quoted);
+
+      expect(find.text('Alice'), findsOneWidget);
+      expect(find.text('quoted note'), findsOneWidget);
+
+      final postButton = tester.widget<FilledButton>(
+        find.byKey(const Key('composePostButton')),
+      );
+      expect(postButton.onPressed, isNotNull);
+    },
+  );
+
+  testWidgets(
+    'confirming a quote with no comment publishes a q tag and just the note '
+    'reference as content',
+    (tester) async {
+      final fakeClient = _FakeRelayClient(RelayPublishOutcome.accepted);
+      await openQuoteComposeScreen(tester, fakeClient, quoted);
+
+      await tester.tap(find.byKey(const Key('composePostButton')));
+      await tester.pumpAndSettle();
+      expect(find.text('Post quote to relays?'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('confirmPostButton')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.textContaining('Quote posted to'), findsOneWidget);
+
+      final published = fakeClient.lastPublished!;
+      expect(published.kind, 1);
+      expect(published.tags, [
+        ['q', quoted.id, '', quoted.pubkey],
+      ]);
+      expect(
+        published.content,
+        'nostr:${neventFromHex(quoted.id, authorPubkeyHex: quoted.pubkey)}',
+      );
+    },
+  );
+
+  testWidgets('confirming a quote with a comment prepends it before the note '
+      'reference', (tester) async {
+    final fakeClient = _FakeRelayClient(RelayPublishOutcome.accepted);
+    await openQuoteComposeScreen(tester, fakeClient, quoted);
+
+    await tester.enterText(
+      find.byKey(const Key('composeTextField')),
+      'nice post',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('composePostButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('confirmPostButton')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final published = fakeClient.lastPublished!;
+    expect(
+      published.content,
+      'nice post\n\nnostr:${neventFromHex(quoted.id, authorPubkeyHex: quoted.pubkey)}',
+    );
   });
 }

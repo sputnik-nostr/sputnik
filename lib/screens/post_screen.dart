@@ -10,6 +10,7 @@ import '../nostr/nostr.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/bookmark_button.dart';
 import '../widgets/count_label.dart';
+import '../widgets/delete_button.dart';
 import '../widgets/fade_in_avatar.dart';
 import '../widgets/note_content.dart';
 import '../widgets/note_tile.dart';
@@ -224,10 +225,12 @@ class _PostScreenState extends State<PostScreen> {
                       ),
                     _PostHeader(
                       note: widget.note,
+                      relayClient: widget.relayClient,
                       replyCount: thread?.directReplyCount,
                       likerPubkeys: thread?.likerPubkeys,
                       reposterPubkeys: thread?.reposterPubkeys,
                       onReply: () => _reply(widget.note),
+                      onDeleted: () => Navigator.pop(context),
                     ),
                     const Divider(height: 1),
                   ],
@@ -299,14 +302,20 @@ class _NestedReply extends StatelessWidget {
 class _PostHeader extends StatelessWidget {
   const _PostHeader({
     required this.note,
+    required this.relayClient,
     required this.replyCount,
     required this.likerPubkeys,
     required this.reposterPubkeys,
     required this.onReply,
+    required this.onDeleted,
   });
 
   final Note note;
+  final RelayClient relayClient;
   final VoidCallback onReply;
+
+  /// Called once this note itself has been deleted.
+  final VoidCallback onDeleted;
   final int? replyCount;
   final List<String>? likerPubkeys;
   final List<String>? reposterPubkeys;
@@ -419,9 +428,26 @@ class _PostHeader extends StatelessWidget {
                 tooltip: 'Reply',
                 onPressed: onReply,
               ),
-              RepostButton(note: reactionNote, showCount: false, size: 20),
-              LikeButton(note: reactionNote, showCount: false, size: 20),
+              RepostButton(
+                note: reactionNote,
+                relayClient: relayClient,
+                showCount: false,
+                size: 20,
+              ),
+              LikeButton(
+                note: reactionNote,
+                relayClient: relayClient,
+                showCount: false,
+                size: 20,
+              ),
               BookmarkButton(note: note, size: 20),
+              if (note.pubkey.toLowerCase() == myPubkeyHex)
+                DeleteButton(
+                  note: note,
+                  relayClient: relayClient,
+                  size: 20,
+                  onDeleted: onDeleted,
+                ),
             ],
           ),
         ),

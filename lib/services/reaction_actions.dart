@@ -273,3 +273,35 @@ Future<bool> unrepostNote(
         'guaranteed -- other relays or clients may still show it.',
   );
 }
+
+/// Drops [noteId] from the cached feeds, so a deleted note stops showing.
+void _removeNoteFromFeeds(String noteId) {
+  notesNotifier.value = notesNotifier.value
+      ?.where((cached) => cached.id != noteId)
+      .toList();
+  followingNotesNotifier.value = followingNotesNotifier.value
+      ?.where((cached) => cached.id != noteId)
+      .toList();
+}
+
+/// Publishes a NIP-09 deletion request for [note] itself. Always confirms
+/// first, since deleting your own note is not easily undone.
+Future<bool> deleteNote(
+  BuildContext context,
+  Note note, {
+  RelayClient relayClient = const RelayClient(),
+}) async {
+  final succeeded = await _publishReaction(
+    context,
+    note,
+    relayClient: relayClient,
+    alwaysConfirm: true,
+    dialogTitle: 'Delete this note?',
+    dialogBody:
+        'This asks your relays to delete the note. Removal is not '
+        'guaranteed; other relays or clients may still show it.',
+    publish: RelayReactionsRepository(client: relayClient).publishRetraction,
+  );
+  if (succeeded) _removeNoteFromFeeds(note.id);
+  return succeeded;
+}

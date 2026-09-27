@@ -56,4 +56,40 @@ void main() {
       });
     }
   }
+
+  group('delete button', () {
+    tearDown(() => activeIdentityPubkeyNotifier.value = null);
+
+    testWidgets('shows for the active identity\'s own notes', (tester) async {
+      activeIdentityPubkeyNotifier.value = note.pubkey;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: NoteTile(note: note)),
+        ),
+      );
+
+      expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+    });
+
+    testWidgets('is hidden for someone else\'s notes', (tester) async {
+      activeIdentityPubkeyNotifier.value = 'c' * 64;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: NoteTile(note: note)),
+        ),
+      );
+
+      expect(find.byIcon(Icons.delete_outline), findsNothing);
+    });
+
+    testWidgets('is hidden with no active identity', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: NoteTile(note: note)),
+        ),
+      );
+
+      expect(find.byIcon(Icons.delete_outline), findsNothing);
+    });
+  });
 }

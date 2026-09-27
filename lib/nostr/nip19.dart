@@ -75,6 +75,17 @@ String? hexFromNprofile(String nprofile) =>
 /// Decodes an `nevent` into its event ID hex, ignoring its other fields.
 String? hexFromNevent(String nevent) => _hexFromTlvSpecial(nevent, 'nevent');
 
+/// Encodes a hex event ID, and optionally its author, into an `nevent`.
+String neventFromHex(String eventIdHex, {String? authorPubkeyHex}) {
+  final bytes = [
+    0,
+    _tlvSpecialByteLength,
+    ...hexDecode(eventIdHex),
+    if (authorPubkeyHex != null) ...[2, 32, ...hexDecode(authorPubkeyHex)],
+  ];
+  return bech32Encode('nevent', convertBits(bytes, 8, 5, pad: true));
+}
+
 /// Elides the middle of [value] with "..." to fit [totalLength], keeping the
 /// last [suffixLength] characters.
 String truncateMiddle(

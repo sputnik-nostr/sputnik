@@ -14,12 +14,16 @@ class ComposeScreen extends StatefulWidget {
     super.key,
     this.relayClient = const RelayClient(),
     this.replyTo,
+    this.quoting,
   });
 
   final RelayClient relayClient;
 
   /// The note being replied to, or null for a new top-level note.
   final Note? replyTo;
+
+  /// The note being quoted, or null. Mutually exclusive with [replyTo].
+  final Note? quoting;
 
   @override
   State<ComposeScreen> createState() => _ComposeScreenState();
@@ -58,15 +62,29 @@ class _ComposeScreenState extends State<ComposeScreen> {
 
   Future<bool> _confirmPost(int relayCount) async {
     final isReply = widget.replyTo != null;
-    final noun = isReply ? 'reply' : 'note';
+    final isQuote = widget.quoting != null;
+    final noun = isReply
+        ? 'reply'
+        : isQuote
+        ? 'quote'
+        : 'note';
+    final title = isReply
+        ? 'Post reply to relays?'
+        : isQuote
+        ? 'Post quote to relays?'
+        : 'Post to relays?';
+    final plural = isReply
+        ? 'Replies'
+        : isQuote
+        ? 'Quotes'
+        : 'Notes';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isReply ? 'Post reply to relays?' : 'Post to relays?'),
+        title: Text(title),
         content: Text(
-          'This publishes your $noun to $relayCount relay(s). '
-          '${isReply ? 'Replies' : 'Notes'} on Nostr are public and cannot '
-          'be reliably deleted afterward.',
+          'This publishes your $noun to $relayCount relay(s). $plural on '
+          'Nostr are public and cannot be reliably deleted afterward.',
         ),
         actions: [
           TextButton(
@@ -105,6 +123,9 @@ class _ComposeScreenState extends State<ComposeScreen> {
     final messenger = ScaffoldMessenger.of(context);
 
     List<List<String>> tags = const [];
+    var content = _controller.text.trim();
+
+    final quoting = widget.quoting;
     if (widget.replyTo != null) {
       final parent =
           await _parentFuture ??
@@ -119,6 +140,14 @@ class _ComposeScreenState extends State<ComposeScreen> {
         return;
       }
       tags = replyTags(parent);
+    } else if (quoting != null) {
+      // NIP-18: mentions of quoted events must be converted into a q tag.
+      tags = [
+        ['q', quoting.id, '', quoting.pubkey],
+      ];
+      final reference =
+          'nostr:${neventFromHex(quoting.id, authorPubkeyHex: quoting.pubkey)}';
+      content = content.isEmpty ? reference : '$content\n\n$reference';
     }
 
     // Only touch secure storage once the user has actually confirmed.
@@ -140,7 +169,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
         pubkeyHex: identity.pubkeyHex,
         kind: 1,
         tags: tags,
-        content: _controller.text.trim(),
+        content: content,
       );
     } catch (e) {
       messenger.showSnackBar(
@@ -157,15 +186,12 @@ class _ComposeScreenState extends State<ComposeScreen> {
         .length;
 
     if (accepted > 0) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            widget.replyTo != null
-                ? 'Reply posted to $accepted/${results.length} relays'
-                : 'Posted to $accepted/${results.length} relays',
-          ),
-        ),
-      );
+      final label = widget.replyTo != null
+          ? 'Reply posted to $accepted/${results.length} relays'
+          : quoting != null
+          ? 'Quote posted to $accepted/${results.length} relays'
+          : 'Posted to $accepted/${results.length} relays';
+      messenger.showSnackBar(SnackBar(content: Text(label)));
       Navigator.pop(context, event);
     } else {
       String? reason;
@@ -187,6 +213,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final replyTo = widget.replyTo;
+    final quoting = widget.quoting;
     final pubkeyHex = activeIdentityPubkeyNotifier.value;
     final metadata = pubkeyHex == null
         ? null
@@ -220,7 +247,10 @@ class _ComposeScreenState extends State<ComposeScreen> {
                   )
                 : FilledButton(
                     key: const Key('composePostButton'),
-                    onPressed: pubkeyHex != null && _hasText ? _post : null,
+                    onPressed:
+                        pubkeyHex != null && (_hasText || quoting != null)
+                        ? _post
+                        : null,
                     child: Text(replyTo == null ? 'Post' : 'Reply'),
                   ),
           ),
@@ -262,18 +292,36 @@ class _ComposeScreenState extends State<ComposeScreen> {
                   cursorHeight:
                       (theme.textTheme.bodyLarge?.fontSize ?? 16) * 1.2,
                   decoration: InputDecoration.collapsed(
-                    hintText: replyTo == null
-                        ? 'Post a note'
-                        : 'Post your reply',
+                    hintText: replyTo != null
+                        ? 'Post your reply'
+                        : quoting != null
+                        ? 'Add a comment'
+                        : 'Post a note',
                   ),
                 ),
               ),
             ],
           ),
+          if (quoting != null) _QuoteContext(note: quoting),
         ],
       ),
     );
   }
+}
+
+/// Opens the composer to quote [note] and returns the published note, if any.
+Future<NostrEvent?> openQuoteComposer(
+  BuildContext context,
+  Note note, {
+  RelayClient relayClient = const RelayClient(),
+}) {
+  return Navigator.push<NostrEvent>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => ComposeScreen(quoting: note, relayClient: relayClient),
+      fullscreenDialog: true,
+    ),
+  );
 }
 
 class _ReplyContext extends StatelessWidget {
@@ -313,6 +361,63 @@ class _ReplyContext extends StatelessWidget {
           const SizedBox(height: 12),
           const Divider(height: 1),
         ],
+      ),
+    );
+  }
+}
+
+/// A preview of the note being quoted, shown as it will render once posted.
+class _QuoteContext extends StatelessWidget {
+  const _QuoteContext({required this.note});
+
+  final Note note;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Card.outlined(
+        clipBehavior: Clip.antiAlias,
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  FadeInAvatar(
+                    radius: 10,
+                    imageUrl: note.pictureUrl,
+                    backgroundColor: theme.colorScheme.primaryContainer,
+                    fallback: Text(
+                      avatarInitial(note.displayName),
+                      style: theme.avatarFallback.copyWith(fontSize: 11),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      note.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.avatarName,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                note.content,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

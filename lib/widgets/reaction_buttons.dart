@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/note.dart';
 import '../nostr/nostr.dart';
+import '../screens/compose_screen.dart';
 import '../services/reaction_actions.dart';
 import '../theme/app_text_styles.dart';
 
@@ -130,6 +131,9 @@ class _RepostButtonState extends State<RepostButton> {
     });
   }
 
+  Future<void> _quote() =>
+      openQuoteComposer(context, widget.note, relayClient: widget.relayClient);
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -153,9 +157,10 @@ class _RepostButtonState extends State<RepostButton> {
     );
 
     return Tooltip(
-      message: reposted ? 'Reposted' : 'Repost',
+      message: '${reposted ? 'Reposted' : 'Repost'} (hold to quote)',
       child: InkResponse(
         onTap: _pending ? null : _tap,
+        onLongPress: _pending ? null : _quote,
         radius: 20,
         child: Padding(padding: const EdgeInsets.all(4), child: content),
       ),

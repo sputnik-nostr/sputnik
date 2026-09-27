@@ -7,9 +7,9 @@ A list of Nostr NIPs, detailing which ones we plan to implement (or not).
 | `01` | Basic protocol flow description                      | Implemented (read + post)                   |
 | `02` | Follow List                                          | Implemented (read + write)                  |
 | `05` | Mapping Nostr keys to DNS-based internet identifiers | Implemented (verification)                  |
-| `09` | Event Deletion Request                               | Implemented (own reactions/reposts only)    |
+| `09` | Event Deletion Request                               | Implemented (own notes, reactions, reposts) |
 | `10` | Text Notes and Threads                               | Implemented (read + reply)                  |
-| `18` | Reposts                                              | Implemented (repost only, quotes read-only) |
+| `18` | Reposts                                              | Implemented (read + write)                  |
 | `19` | bech32-encoded entities                              | Partial (no `naddr`)                        |
 | `21` | `nostr:` URI scheme                                  | Partial (no `naddr`)                        |
 | `25` | Reactions                                            | Implemented (read + write)                  |

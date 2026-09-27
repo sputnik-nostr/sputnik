@@ -87,6 +87,16 @@ void main() {
     expect(hexFromNevent(nevent), hex1);
   });
 
+  test('encodes and decodes a hex event id as nevent', () {
+    final nevent = neventFromHex(hex1);
+    expect(hexFromNevent(nevent), hex1);
+  });
+
+  test('encoding an nevent with an author still decodes to the event id', () {
+    final nevent = neventFromHex(hex1, authorPubkeyHex: hex2);
+    expect(hexFromNevent(nevent), hex1);
+  });
+
   test('rejects a TLV special value that is not 32 bytes', () {
     final idBytes = [
       for (var i = 0; i < hex1.length; i += 2)
