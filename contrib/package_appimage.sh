@@ -11,6 +11,21 @@ appdir=build/AppDir
 appimagetool="${APPIMAGETOOL:-appimagetool}"
 version="$(sed -n 's/^version: *\([^+]*\).*/\1/p' pubspec.yaml)"
 
+# Commit time, so rebuilding the same commit gives the same image.
+export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct)}"
+
+# Pinned, since appimagetool otherwise downloads an unverified moving one.
+runtime_version=20251108
+runtime_sha256=2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d
+runtime="build/appimage-runtime-$runtime_version"
+if ! echo "$runtime_sha256  $runtime" | sha256sum -c --status - 2>/dev/null; then
+    mkdir -p build
+    curl -fsSL -o "$runtime.part" \
+        "https://github.com/AppImage/type2-runtime/releases/download/$runtime_version/runtime-x86_64"
+    echo "$runtime_sha256  $runtime.part" | sha256sum -c --quiet -
+    mv "$runtime.part" "$runtime"
+fi
+
 rm -rf "$appdir"
 mkdir -p "$appdir/usr/bin" "$appdir/usr/share/applications" \
     "$appdir/usr/share/metainfo" "$appdir/usr/share/icons/hicolor/1024x1024/apps"
@@ -109,6 +124,10 @@ exec "\$HERE/usr/bin/$app" "\$@"
 EOF
 chmod +x "$appdir/AppRun"
 
+# Neither the build time nor the builder's umask should show in the image.
+chmod -R u+rwX,go+rX,go-w "$appdir"
+find "$appdir" -exec touch -h -d "@$SOURCE_DATE_EPOCH" {} +
+
 # The AppStream ID is not reverse-DNS yet, which appstreamcli rejects.
 ARCH=x86_64 "$appimagetool" --appimage-extract-and-run --no-appstream \
-    "$appdir" "$app-x86_64.AppImage"
+    --runtime-file "$runtime" "$appdir" "$app-x86_64.AppImage"
