@@ -6,7 +6,7 @@ A minimal, cross-platform Nostr client.
 
 - Privacy-focused
 - Not bloated (compared to other clients)
-- Very good performance
+- Reasonably good performance
 - Support for [a reasonable number of NIPs](./docs/NIPS.md)
 - Licensed under MIT
 

@@ -54,7 +54,12 @@ for plugin in "$lib"/lib*_plugin.so; do
     patchelf --set-rpath '$ORIGIN' "$plugin"
 done
 
-mpv_lib="$(cd "$lib" && ls libmpv.so.* | head -n 1)"
+mpv_libs=("$lib"/libmpv.so.*)
+if [[ ! -e ${mpv_libs[0]} ]]; then
+    echo "error: no libmpv.so.* was bundled; is libmpv installed on this machine?" >&2
+    exit 1
+fi
+mpv_lib="${mpv_libs[0]##*/}"
 
 cp assets/icon/icon.png "$appdir/usr/share/icons/hicolor/1024x1024/apps/$app.png"
 ln -s "usr/share/icons/hicolor/1024x1024/apps/$app.png" "$appdir/$app.png"
