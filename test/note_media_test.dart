@@ -6,7 +6,6 @@ Note _note({List<NostrMedia> media = const []}) => Note(
   id: 'a' * 64,
   pubkey: 'b' * 64,
   displayName: 'Name',
-  handle: 'h',
   content: 'hello',
   createdAt: DateTime.fromMillisecondsSinceEpoch(1700000000000),
   media: media,

@@ -1,7 +1,14 @@
 /// Replaces unpaired UTF-16 surrogates with U+FFFD to keep the text valid.
 String sanitizeUtf16(String input) {
-  final buffer = StringBuffer();
-  for (var i = 0; i < input.length; i++) {
+  // Almost every string has no surrogates at all, so skip the copy for those.
+  var first = 0;
+  while (first < input.length && input.codeUnitAt(first) & 0xF800 != 0xD800) {
+    first++;
+  }
+  if (first == input.length) return input;
+
+  final buffer = StringBuffer(input.substring(0, first));
+  for (var i = first; i < input.length; i++) {
     final unit = input.codeUnitAt(i);
     if (unit >= 0xD800 && unit <= 0xDBFF) {
       final next = i + 1 < input.length ? input.codeUnitAt(i + 1) : null;

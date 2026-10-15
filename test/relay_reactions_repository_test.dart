@@ -28,8 +28,42 @@ class _RecordingRelay extends RelayClient {
   }
 }
 
+class _FilterRecordingRelay extends RelayClient {
+  final filters = <NostrFilter>[];
+
+  @override
+  Future<List<NostrEvent>> query(
+    Set<String> relayUrls,
+    NostrFilter filter,
+  ) async {
+    filters.add(filter);
+    return const [];
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('a page of posts is split so one popular post cannot use up the '
+      'reaction limit for the rest', () async {
+    final relay = _FilterRecordingRelay();
+    final postIds = [
+      for (var i = 0; i < 25; i++) i.toRadixString(16).padLeft(64, '0'),
+    ];
+
+    final reactions = await RelayReactionsRepository(client: relay)
+        .fetchReactions(postIds, {'wss://relay.example'});
+
+    expect(reactions.keys, unorderedEquals(postIds));
+    for (final kind in [6, 7]) {
+      final chunks = [
+        for (final filter in relay.filters)
+          if (filter.kinds!.single == kind) filter.tags!['e']!,
+      ];
+      expect(chunks.every((chunk) => chunk.length <= 10), isTrue);
+      expect(chunks.expand((chunk) => chunk), unorderedEquals(postIds));
+    }
+  });
 
   late String me;
   late String seckeyHex;

@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:sputnik/app_state.dart';
 import 'package:sputnik/models/identity.dart';
 import 'package:sputnik/models/note.dart';
 import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/screens/identities_screen.dart';
 import 'package:sputnik/screens/profile_screen.dart';
-import 'package:sputnik/widgets/compact_tab_bar.dart';
-import 'package:sputnik/widgets/count_label.dart';
 import 'package:sputnik/services/follow_sync.dart';
 import 'package:sputnik/services/settings_store.dart';
+import 'package:sputnik/widgets/compact_tab_bar.dart';
+import 'package:sputnik/widgets/count_label.dart';
 
 import 'support/answering_relay_client.dart';
 import 'support/fake_secret_store.dart';
@@ -126,7 +125,6 @@ void main() {
         id: 'c' * 64,
         pubkey: pubkeyHex,
         displayName: 'Bob',
-        handle: 'bob',
         content: 'old note',
         createdAt: now.subtract(const Duration(days: 3)),
         repostedByPubkey: pubkeyHex,
@@ -156,7 +154,6 @@ void main() {
       id: id,
       pubkey: pubkeyHex,
       displayName: 'Bob',
-      handle: 'bob',
       content: content,
       createdAt: DateTime.now().subtract(
         Duration(minutes: int.tryParse(id) ?? 0),

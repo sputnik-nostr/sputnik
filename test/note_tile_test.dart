@@ -15,7 +15,6 @@ void main() {
     id: 'a' * 64,
     pubkey: 'b' * 64,
     displayName: 'Name',
-    handle: 'h',
     content: 'hello world text',
     createdAt: DateTime(2024),
   );

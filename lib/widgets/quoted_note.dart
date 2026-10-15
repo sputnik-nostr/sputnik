@@ -50,7 +50,7 @@ Future<Note?> _load(String id, RelayClient client) async {
     ).fetchPostById(id);
     if (post != null) {
       final metadata = await loadProfile(
-        post.author.pubkey,
+        post.authorPubkey,
         relayUrls,
         client: client,
       );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -135,17 +137,21 @@ class _PostScreenState extends State<PostScreen> {
     );
 
     void applyCounts(ValueNotifier<List<Note>?> notifier) {
-      notifier.value = notifier.value
-          ?.map(
-            (note) => note.id == widget.note.id
-                ? note.copyWith(
-                    likeCount: thread.likeCount,
-                    repostCount: thread.repostCount,
-                    replyCount: thread.directReplyCount,
-                  )
-                : note,
-          )
-          .toList();
+      final notes = notifier.value;
+      // Reassigning rebuilds the whole feed, so only do it when it changes.
+      if (notes == null || !notes.any((note) => note.id == widget.note.id)) {
+        return;
+      }
+      notifier.value = [
+        for (final note in notes)
+          note.id == widget.note.id
+              ? note.copyWith(
+                  likeCount: thread.likeCount,
+                  repostCount: thread.repostCount,
+                  replyCount: thread.directReplyCount,
+                )
+              : note,
+      ];
     }
 
     applyCounts(notesNotifier);
@@ -180,7 +186,7 @@ class _PostScreenState extends State<PostScreen> {
     );
     if (published == null || !mounted) return;
     _publishedReplies.add(published);
-    _refreshThread();
+    unawaited(_refreshThread());
   }
 
   @override

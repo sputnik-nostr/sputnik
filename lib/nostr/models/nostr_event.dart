@@ -7,11 +7,6 @@ import '../hex.dart';
 import '../keys.dart';
 import 'text_sanitizer.dart';
 
-final _hexPattern = RegExp(r'^[0-9a-fA-F]+$');
-
-bool _isHex(String value, int byteLength) =>
-    value.length == byteLength * 2 && _hexPattern.hasMatch(value);
-
 bool _bytesEqual(List<int> a, List<int> b) {
   if (a.length != b.length) return false;
   for (var i = 0; i < a.length; i++) {
@@ -132,7 +127,7 @@ class NostrEvent {
     final id = (json['id'] as String).toLowerCase();
     final pubkey = (json['pubkey'] as String).toLowerCase();
     final sig = (json['sig'] as String).toLowerCase();
-    if (!_isHex(id, 32) || !_isHex(pubkey, 32) || !_isHex(sig, 64)) {
+    if (!isHex(id, 32) || !isHex(pubkey, 32) || !isHex(sig, 64)) {
       throw const FormatException('Malformed event ID, pubkey, or sig');
     }
     final tags = _tagsFromJson(json['tags']);

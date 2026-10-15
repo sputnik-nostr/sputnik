@@ -11,7 +11,6 @@ Note _note(String id, {String content = 'hello'}) => Note(
   id: id,
   pubkey: 'a' * 64,
   displayName: 'Alice',
-  handle: '@alice',
   content: content,
   createdAt: DateTime.fromMillisecondsSinceEpoch(1700000000000),
 );

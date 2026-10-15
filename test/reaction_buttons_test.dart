@@ -85,7 +85,6 @@ void main() {
       id: target.id,
       pubkey: author,
       displayName: 'Bob',
-      handle: 'bob',
       content: 'hello',
       createdAt: target.createdAt,
     );

@@ -33,15 +33,24 @@ class RelayPostRepository {
 
   /// The kind 1 note with [id], or null if no relay returns it.
   Future<NostrEvent?> fetchEventById(String id) async {
+    final wantedId = id.toLowerCase();
+    return (await _fetchEventsByIds({wantedId}, relayUrls))[wantedId];
+  }
+
+  /// The kind 1 notes among [ids] that some relay returns, by ID.
+  Future<Map<String, NostrEvent>> _fetchEventsByIds(
+    Set<String> ids,
+    Set<String> relayUrls,
+  ) async {
+    if (ids.isEmpty) return const {};
     final events = await client.query(
       relayUrls,
-      NostrFilter(ids: [id], kinds: const [1], limit: 1),
+      NostrFilter(ids: ids.toList(), kinds: const [1], limit: ids.length),
     );
-    final wantedId = id.toLowerCase();
-    for (final event in events) {
-      if (event.kind == 1 && event.id == wantedId) return event;
-    }
-    return null;
+    return {
+      for (final event in events)
+        if (event.kind == 1 && ids.contains(event.id)) event.id: event,
+    };
   }
 
   /// Fetches up to [limit] kind 1 notes older than [until], optionally only by
@@ -154,41 +163,49 @@ class RelayPostRepository {
             .toList()
           ..sort(compareNewestFirst);
 
-    final resolved = await Future.wait(
-      reposts.take(limit).map((repost) async {
-        final original = await _resolveRepostTarget(repost, relayUrls);
-        if (original == null) return null;
-        return NostrPost.repost(
-          nostrPostFromEvent(original),
-          byPubkey: repost.pubkey,
-          at: repost.createdAt,
-        );
-      }),
-    );
-    return [for (final post in resolved) ?post];
+    final kept = reposts.take(limit).toList();
+    final embedded = {
+      for (final repost in kept) repost.id: ?_embeddedTarget(repost),
+    };
+    // One query for every target that was not embedded, not one per repost.
+    final fetched = await _fetchEventsByIds({
+      for (final repost in kept)
+        if (!embedded.containsKey(repost.id)) ?_repostTargetId(repost),
+    }, relayUrls);
+
+    return [
+      for (final repost in kept)
+        if (embedded[repost.id] ?? fetched[_repostTargetId(repost)]
+            case final original?)
+          NostrPost.repost(
+            nostrPostFromEvent(original),
+            byPubkey: repost.pubkey,
+            at: repost.createdAt,
+          ),
+    ];
   }
 
-  /// The kind 1 note [repost] points at.
-  Future<NostrEvent?> _resolveRepostTarget(
-    NostrEvent repost,
-    Set<String> relayUrls,
-  ) async {
-    if (repost.content.isNotEmpty) {
-      try {
-        final embedded = NostrEvent.fromJson(
-          jsonDecode(repost.content) as Map<String, dynamic>,
-        );
-        if (embedded.kind == 1) return embedded;
-      } catch (_) {
-        // Not usable as embedded content; fall back to fetching it below.
-      }
+  /// The kind 1 note embedded in [repost]'s content, if it is usable.
+  NostrEvent? _embeddedTarget(NostrEvent repost) {
+    if (repost.content.isEmpty) return null;
+    try {
+      final embedded = NostrEvent.fromJson(
+        jsonDecode(repost.content) as Map<String, dynamic>,
+      );
+      return embedded.kind == 1 ? embedded : null;
+    } catch (_) {
+      // Not usable as embedded content; the target is fetched by ID instead.
+      return null;
     }
+  }
 
+  /// The ID of the note [repost] points at, from its last `e` tag.
+  String? _repostTargetId(NostrEvent repost) {
     String? targetId;
     for (final tag in repost.tags) {
-      if (tag.length > 1 && tag[0] == 'e') targetId = tag[1];
+      if (tag.length > 1 && tag[0] == 'e') targetId = tag[1].toLowerCase();
     }
-    return targetId == null ? null : fetchEventById(targetId);
+    return targetId;
   }
 }
 

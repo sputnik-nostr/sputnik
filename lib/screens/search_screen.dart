@@ -149,7 +149,7 @@ class _NoteResultState extends State<_NoteResult> {
         .fetchPostById(widget.eventIdHex);
     if (post == null) return null;
 
-    final authorMetadata = await loadProfile(post.author.pubkey, relayUrls);
+    final authorMetadata = await loadProfile(post.authorPubkey, relayUrls);
     return noteFromNostrPost(post, authorMetadata: authorMetadata);
   }
 

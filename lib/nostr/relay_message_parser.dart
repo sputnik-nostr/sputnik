@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:isolate';
 
 import 'models/nostr_event.dart';
@@ -110,86 +111,103 @@ void _parserIsolateMain(SendPort mainSendPort) {
   });
 }
 
-/// Parses and verifies relay messages in a background isolate.
+/// Signature checks are CPU-bound, so a few workers let relays be verified in
+/// parallel without taking every core.
+final _workerCount = (Platform.numberOfProcessors - 1).clamp(1, 4);
+
+class _Worker {
+  _Worker(this.sendPort);
+
+  final SendPort sendPort;
+  final pending = <int, Completer<ParsedRelayMessage?>>{};
+  bool exited = false;
+}
+
+/// Parses and verifies relay messages in a pool of background isolates.
 class RelayMessageParser {
   RelayMessageParser._();
 
   static final instance = RelayMessageParser._();
 
-  SendPort? _workerSendPort;
-  Future<void>? _spawning;
+  final _workers = List<Future<_Worker>?>.filled(_workerCount, null);
+  int _nextWorker = 0;
   int _nextRequestId = 0;
-  final _pending = <int, Completer<ParsedRelayMessage?>>{};
 
   /// With [subscriptionIds], an EVENT for any other subscription is dropped.
   Future<ParsedRelayMessage?> parse(
     String raw, {
     Set<String>? subscriptionIds,
   }) async {
-    if (_workerSendPort == null) {
-      final spawning = _spawning ??= _spawn();
-      try {
-        await spawning;
-      } catch (_) {
-        if (identical(_spawning, spawning)) _spawning = null;
-        rethrow;
-      }
+    final slot = _nextWorker++ % _workerCount;
+    final spawning = _workers[slot] ??= _spawn(slot);
+    final _Worker worker;
+    try {
+      worker = await spawning;
+    } catch (_) {
+      if (identical(_workers[slot], spawning)) _workers[slot] = null;
+      rethrow;
     }
+    if (worker.exited) return null;
 
     final id = _nextRequestId++;
     final completer = Completer<ParsedRelayMessage?>();
-    _pending[id] = completer;
-    _workerSendPort!.send(_ParseRequest(id, raw, subscriptionIds));
+    worker.pending[id] = completer;
+    worker.sendPort.send(_ParseRequest(id, raw, subscriptionIds));
     return completer.future;
   }
 
-  Future<void> _spawn() async {
+  Future<_Worker> _spawn(int slot) {
+    final ready = Completer<_Worker>();
     final receivePort = ReceivePort();
     final exitPort = ReceivePort();
-    final sendPortCompleter = Completer<SendPort>();
+    _Worker? worker;
 
-    void discardWorker() {
-      _workerSendPort = null;
-      _spawning = null;
-      for (final completer in _pending.values) {
-        if (!completer.isCompleted) completer.complete(null);
+    void discard() {
+      final current = worker;
+      if (current != null) {
+        current.exited = true;
+        for (final completer in current.pending.values) {
+          if (!completer.isCompleted) completer.complete(null);
+        }
+        current.pending.clear();
       }
-      _pending.clear();
+      if (identical(_workers[slot], ready.future)) _workers[slot] = null;
       receivePort.close();
       exitPort.close();
     }
 
     exitPort.listen((dynamic _) {
-      if (!sendPortCompleter.isCompleted) {
-        sendPortCompleter.completeError(
+      if (!ready.isCompleted) {
+        ready.completeError(
           StateError('parser isolate exited before it was ready'),
         );
       }
-      discardWorker();
+      discard();
     });
-
-    try {
-      await Isolate.spawn(
-        _parserIsolateMain,
-        receivePort.sendPort,
-        onExit: exitPort.sendPort,
-        onError: exitPort.sendPort,
-      );
-    } catch (_) {
-      receivePort.close();
-      exitPort.close();
-      rethrow;
-    }
 
     receivePort.listen((dynamic data) {
       if (data is SendPort) {
-        sendPortCompleter.complete(data);
+        ready.complete(worker = _Worker(data));
         return;
       }
       final response = data as _ParseResponse;
-      _pending.remove(response.id)?.complete(response.message);
+      worker?.pending.remove(response.id)?.complete(response.message);
     });
 
-    _workerSendPort = await sendPortCompleter.future;
+    Isolate.spawn(
+      _parserIsolateMain,
+      receivePort.sendPort,
+      onExit: exitPort.sendPort,
+      onError: exitPort.sendPort,
+    ).then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stack) {
+        receivePort.close();
+        exitPort.close();
+        if (!ready.isCompleted) ready.completeError(error, stack);
+      },
+    );
+
+    return ready.future;
   }
 }

@@ -8,6 +8,7 @@ class _FakeRelayClient extends RelayClient {
 
   final List<NostrEvent> reposts;
   final Map<String, NostrEvent> originalsById;
+  final idQueries = <List<String>>[];
 
   @override
   Future<List<NostrEvent>> query(
@@ -16,8 +17,8 @@ class _FakeRelayClient extends RelayClient {
   ) async {
     if (filter.kinds?.contains(6) == true) return reposts;
     if (filter.kinds?.contains(1) == true && filter.ids != null) {
-      final original = originalsById[filter.ids!.first.toLowerCase()];
-      return original == null ? const [] : [original];
+      idQueries.add(filter.ids!);
+      return [for (final id in filter.ids!) ?originalsById[id.toLowerCase()]];
     }
     return const [];
   }
@@ -108,13 +109,20 @@ void main() {
 
     final embedded = byOriginalId[embeddedOriginal.id]!;
     expect(embedded.content, 'hello from embedded content');
-    expect(embedded.author.pubkey, keypair.publicKeyHex);
+    expect(embedded.authorPubkey, keypair.publicKeyHex);
     expect(embedded.repostedByPubkey, reposterPubkey);
     expect(embedded.repostedAt, repostWithEmbeddedContent.createdAt);
 
     final fallback = byOriginalId[fallbackOriginal.id]!;
     expect(fallback.content, 'hello via fallback fetch');
-    expect(fallback.author.pubkey, otherAuthorPubkey);
+    expect(fallback.authorPubkey, otherAuthorPubkey);
     expect(fallback.repostedByPubkey, reposterPubkey);
+
+    // The two targets that were not embedded are asked for together.
+    expect(client.idQueries, hasLength(1));
+    expect(
+      client.idQueries.single,
+      unorderedEquals([fallbackOriginal.id, 'ff' * 32]),
+    );
   });
 }

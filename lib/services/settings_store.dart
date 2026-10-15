@@ -102,6 +102,17 @@ class SettingsStore {
   @visibleForTesting
   static SecretStore secretStore = const _SecureSecretStore();
 
+  /// A switch that is off unless the user turned it on.
+  static Future<bool> _loadFlag(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(key) ?? false;
+  }
+
+  static Future<void> _saveFlag(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
+  }
+
   /// Drops leftovers such as the plaintext profile cache from before Hive.
   static Future<void> removeObsoleteKeys() async {
     final prefs = await SharedPreferences.getInstance();
@@ -261,45 +272,26 @@ class SettingsStore {
     return secretStore.delete('$_identitySecretPrefix$pubkeyHex');
   }
 
-  static Future<bool> loadLoadMedia() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_loadMediaKey) ?? false;
-  }
+  static Future<bool> loadLoadMedia() => _loadFlag(_loadMediaKey);
 
-  static Future<void> saveLoadMedia(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_loadMediaKey, value);
-  }
+  static Future<void> saveLoadMedia(bool value) =>
+      _saveFlag(_loadMediaKey, value);
 
-  static Future<bool> loadLoadNoteImages() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_loadNoteImagesKey) ?? false;
-  }
+  static Future<bool> loadLoadNoteImages() => _loadFlag(_loadNoteImagesKey);
 
-  static Future<void> saveLoadNoteImages(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_loadNoteImagesKey, value);
-  }
+  static Future<void> saveLoadNoteImages(bool value) =>
+      _saveFlag(_loadNoteImagesKey, value);
 
-  static Future<bool> loadAutoVerifyNip05() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_autoVerifyNip05Key) ?? false;
-  }
+  static Future<bool> loadAutoVerifyNip05() => _loadFlag(_autoVerifyNip05Key);
 
-  static Future<void> saveAutoVerifyNip05(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_autoVerifyNip05Key, value);
-  }
+  static Future<void> saveAutoVerifyNip05(bool value) =>
+      _saveFlag(_autoVerifyNip05Key, value);
 
-  static Future<bool> loadConfirmBeforeReacting() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_confirmBeforeReactingKey) ?? false;
-  }
+  static Future<bool> loadConfirmBeforeReacting() =>
+      _loadFlag(_confirmBeforeReactingKey);
 
-  static Future<void> saveConfirmBeforeReacting(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_confirmBeforeReactingKey, value);
-  }
+  static Future<void> saveConfirmBeforeReacting(bool value) =>
+      _saveFlag(_confirmBeforeReactingKey, value);
 
   static Future<Set<String>> loadHiddenPaymentTargetTypes() async {
     final prefs = await SharedPreferences.getInstance();

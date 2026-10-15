@@ -1,11 +1,10 @@
+import 'hex.dart';
 import 'models/nostr_event.dart';
 
 const _nip10Markers = {'root', 'reply', 'mention'};
 
 /// Caps how many people a reply mentions when the parent lists hundreds.
 const _maxReplyMentions = 50;
-
-final _pubkeyPattern = RegExp(r'^[0-9a-fA-F]{64}$');
 
 bool _hasNip10Marker(List<String> tag) =>
     tag.length >= 4 && _nip10Markers.contains(tag[3]);
@@ -77,7 +76,7 @@ List<List<String>> replyTags(NostrEvent parent) {
   final mentioned = <String>{
     parent.pubkey.toLowerCase(),
     for (final tag in parent.tags)
-      if (tag.length > 1 && tag[0] == 'p' && _pubkeyPattern.hasMatch(tag[1]))
+      if (tag.length > 1 && tag[0] == 'p' && isHex(tag[1], 32))
         tag[1].toLowerCase(),
   };
 

@@ -240,7 +240,6 @@ void main() {
     id: 'aa' * 32,
     pubkey: 'bb' * 32,
     displayName: 'Alice',
-    handle: 'alice',
     content: 'quoted note',
     createdAt: DateTime.now(),
   );

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'relay_connection_pool.dart';
@@ -13,15 +15,14 @@ export 'relay_connection_pool.dart'
 const authorsChunkSize = 100;
 
 /// Splits [authors] into chunks of at most [authorsChunkSize].
-List<List<String>> chunkedAuthors(List<String> authors) {
+List<List<String>> chunkedAuthors(List<String> authors) =>
+    chunked(authors, authorsChunkSize);
+
+/// Splits [values] into consecutive chunks of at most [size].
+List<List<T>> chunked<T>(List<T> values, int size) {
   return [
-    for (var i = 0; i < authors.length; i += authorsChunkSize)
-      authors.sublist(
-        i,
-        i + authorsChunkSize > authors.length
-            ? authors.length
-            : i + authorsChunkSize,
-      ),
+    for (var i = 0; i < values.length; i += size)
+      values.sublist(i, min(i + size, values.length)),
   ];
 }
 

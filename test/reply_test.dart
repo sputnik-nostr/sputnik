@@ -18,7 +18,6 @@ Note _noteOf(NostrEvent event, {String name = 'Someone'}) => Note(
   id: event.id,
   pubkey: event.pubkey,
   displayName: name,
-  handle: name,
   content: event.content,
   createdAt: event.createdAt,
 );

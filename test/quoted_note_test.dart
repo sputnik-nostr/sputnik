@@ -25,7 +25,6 @@ Note _note(String content, {List<NostrMedia> media = const []}) => Note(
   id: 'a' * 64,
   pubkey: 'b' * 64,
   displayName: 'Quoter',
-  handle: 'h',
   content: content,
   createdAt: DateTime(2024),
   media: media,

@@ -35,11 +35,7 @@ class _StubThread extends RelayThreadRepository {
 NostrPost _reply(String id, String body) {
   return NostrPost(
     id: id,
-    author: const NostrAuthor(
-      pubkey: 'cc',
-      displayName: 'someone',
-      handle: 'someone',
-    ),
+    authorPubkey: 'cc',
     content: body,
     createdAt: DateTime(2024),
   );
@@ -57,7 +53,6 @@ void main() {
         id: '1',
         pubkey: 'a' * 64,
         displayName: hostileName,
-        handle: 'npub1...',
         content: 'hello',
         createdAt: DateTime.now(),
       ),
@@ -104,7 +99,6 @@ void main() {
               id: 'root',
               pubkey: 'b' * 64,
               displayName: 'Root',
-              handle: 'root',
               content: 'root post',
               createdAt: DateTime(2024),
             ),

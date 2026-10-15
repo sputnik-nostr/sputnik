@@ -21,7 +21,6 @@ Note _note(String content, List<NostrMedia> media) => Note(
   id: 'a' * 64,
   pubkey: 'b' * 64,
   displayName: 'Name',
-  handle: 'h',
   content: content,
   createdAt: DateTime(2024),
   media: media,

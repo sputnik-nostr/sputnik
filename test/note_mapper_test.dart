@@ -8,11 +8,7 @@ void main() {
 
   final original = NostrPost(
     id: 'cc' * 32,
-    author: NostrAuthor(
-      pubkey: originalAuthorPubkey,
-      displayName: shortPubkey(originalAuthorPubkey),
-      handle: shortPubkey(originalAuthorPubkey),
-    ),
+    authorPubkey: originalAuthorPubkey,
     content: 'the original note',
     createdAt: DateTime(2024, 1, 1),
   );

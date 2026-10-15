@@ -6,18 +6,13 @@ import '../models/note_mapper.dart';
 import '../nostr/http_urls.dart';
 import '../nostr/models/nostr_metadata.dart';
 import '../nostr/nip19.dart';
+import '../nostr/nip27.dart';
 import '../nostr/relay_client.dart';
 import '../nostr/relay_post_repository.dart';
 import '../screens/post_screen.dart';
 import '../screens/profile_screen.dart';
 import '../services/profiles.dart';
 import 'open_url.dart';
-
-/// Matches HTTP(S) URLs, nostr: URIs, and bare npub/nprofile/note/nevent.
-final _linkPattern = RegExp(
-  '(${httpUrlPattern.pattern})|($nostrEntityPattern)',
-  caseSensitive: false,
-);
 
 bool _hasHost(String url) => Uri.tryParse(url)?.host.isNotEmpty ?? false;
 
@@ -76,7 +71,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     if (_parsedText == text) return _links!;
     _parsedText = text;
     return _links = [
-      for (final match in _linkPattern.allMatches(text)) _linkFor(match),
+      for (final match in linkPattern.allMatches(text)) _linkFor(match),
     ];
   }
 
@@ -291,7 +286,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     }
 
     final authorMetadata = await loadProfile(
-      post.author.pubkey,
+      post.authorPubkey,
       relayUrls,
       client: widget.relayClient,
     );

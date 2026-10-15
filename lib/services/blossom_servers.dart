@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../app_state.dart';
@@ -30,7 +32,7 @@ Future<List<String>> blossomServersFor(
       }
       return servers;
     } finally {
-      _inFlight.remove(pubkeyHex);
+      unawaited(_inFlight.remove(pubkeyHex));
     }
   }();
 }

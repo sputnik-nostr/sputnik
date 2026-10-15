@@ -5,8 +5,8 @@ import '../models/relay.dart';
 import '../nostr/nostr.dart';
 import '../services/relay_settings.dart';
 import '../services/ssrf_guard.dart';
-import 'relays_screen.dart';
 import '../widgets/placeholder_tab.dart';
+import 'relays_screen.dart';
 
 /// The relays published in a user's NIP-65 relay list.
 class UserRelaysScreen extends StatefulWidget {

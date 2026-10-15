@@ -14,7 +14,7 @@ Future<List<Note>> hydratePosts(
 }) async {
   final known = knownMetadata ?? const <String, NostrMetadata>{};
   final needed = {
-    for (final post in posts) post.author.pubkey,
+    for (final post in posts) post.authorPubkey,
     for (final post in posts)
       if (post.repostedByPubkey != null) post.repostedByPubkey!,
   }..removeAll(known.keys);

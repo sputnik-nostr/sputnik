@@ -6,8 +6,12 @@ import 'models/nostr_filter.dart';
 import 'models/post_reactions.dart';
 import 'relay_client.dart';
 
-/// Max events requested for each of likes and reposts.
+/// Max events requested for each of likes and reposts, per chunk of posts.
 const _reactionLimit = 500;
+
+/// Posts per reaction query, so one popular post can only use up the
+/// [_reactionLimit] of its own chunk rather than a whole page's.
+const _postsPerReactionQuery = 10;
 
 /// Per NIP-25/NIP-18: with more than one "e" tag, the last one is the
 /// actual target; earlier ones are just citations.
@@ -49,10 +53,10 @@ class RelayReactionsRepository {
 
   final RelayClient client;
 
-  /// Fetches likes and reposts for many posts in a single pair of relay
-  /// queries (one for kind 7, one for kind 6), rather than one query per
-  /// post. Every requested ID is present in the result, defaulting to no
-  /// reactions when none were found.
+  /// Fetches likes and reposts for many posts, a few posts per pair of relay
+  /// queries (one for kind 7, one for kind 6) rather than one pair per post.
+  /// Every requested ID is present in the result, defaulting to no reactions
+  /// when none were found.
   Future<Map<String, PostReactions>> fetchReactions(
     List<String> postIds,
     Set<String> relayUrls,
@@ -60,22 +64,24 @@ class RelayReactionsRepository {
     if (postIds.isEmpty) return {};
     final postIdSet = {for (final id in postIds) id.toLowerCase()};
 
-    final likesFuture = client.query(
-      relayUrls,
-      NostrFilter(
-        kinds: const [7],
-        tags: {'e': postIds},
-        limit: _reactionLimit,
-      ),
-    );
-    final repostsFuture = client.query(
-      relayUrls,
-      NostrFilter(
-        kinds: const [6],
-        tags: {'e': postIds},
-        limit: _reactionLimit,
-      ),
-    );
+    Future<List<NostrEvent>> fetchKind(int kind) async {
+      final chunks = await Future.wait(
+        chunked(postIds, _postsPerReactionQuery).map(
+          (chunk) => client.query(
+            relayUrls,
+            NostrFilter(
+              kinds: [kind],
+              tags: {'e': chunk},
+              limit: _reactionLimit,
+            ),
+          ),
+        ),
+      );
+      return chunks.expand((events) => events).toList();
+    }
+
+    final likesFuture = fetchKind(7);
+    final repostsFuture = fetchKind(6);
 
     final likersByPost = _authorsByTaggedPost(await likesFuture, postIdSet, 7);
     final repostersByPost = _authorsByTaggedPost(

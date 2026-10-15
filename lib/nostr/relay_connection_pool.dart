@@ -257,14 +257,16 @@ class _RelayConnection {
 
   bool get isClosed => _closed;
 
+  /// Parsing starts as each message arrives so the workers can overlap, but
+  /// results are handled in arrival order, so EOSE never beats its events.
   void _handleMessage(dynamic raw) {
     if (raw is! String) return;
 
+    final parsing = RelayMessageParser.instance
+        .parse(raw, subscriptionIds: _handlers.keys.toSet())
+        .catchError((Object _) => null);
     final dispatched = _dispatchQueue.then((_) async {
-      final parsed = await RelayMessageParser.instance.parse(
-        raw,
-        subscriptionIds: _handlers.keys.toSet(),
-      );
+      final parsed = await parsing;
       if (parsed == null) return;
       if (parsed.type == 'OK') {
         _publishWaiters.resolve(

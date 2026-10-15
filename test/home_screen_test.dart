@@ -10,7 +10,6 @@ Note _note(String id, String content) => Note(
   id: id,
   pubkey: 'b' * 64,
   displayName: 'Bob',
-  handle: 'bob',
   content: content,
   createdAt: DateTime.now(),
 );

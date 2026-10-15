@@ -31,15 +31,11 @@ Note noteFromNostrPost(
   final repostedByPubkey = post.repostedByPubkey;
   return Note(
     id: post.id,
-    pubkey: post.author.pubkey,
-    displayName: authorMetadata?.resolvedName ?? post.author.displayName,
-    handle: post.author.handle,
+    pubkey: post.authorPubkey,
+    displayName: authorMetadata?.resolvedName ?? shortPubkey(post.authorPubkey),
     pictureUrl: authorMetadata?.picture,
     content: post.content,
     createdAt: post.createdAt,
-    replyCount: post.replyCount,
-    repostCount: post.repostCount,
-    likeCount: post.likeCount,
     isReply: post.isReply,
     media: post.media,
     repostedByPubkey: repostedByPubkey,
@@ -59,7 +55,7 @@ List<Note> notesFromPosts(
       .map(
         (post) => noteFromNostrPost(
           post,
-          authorMetadata: profilesByPubkey[post.author.pubkey],
+          authorMetadata: profilesByPubkey[post.authorPubkey],
           repostedByMetadata: post.repostedByPubkey == null
               ? null
               : profilesByPubkey[post.repostedByPubkey],

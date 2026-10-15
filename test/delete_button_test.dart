@@ -75,7 +75,6 @@ void main() {
       id: target.id,
       pubkey: identity.pubkeyHex,
       displayName: 'Me',
-      handle: 'me',
       content: 'hello',
       createdAt: target.createdAt,
     );

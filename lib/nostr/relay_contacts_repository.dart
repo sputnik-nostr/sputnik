@@ -1,12 +1,11 @@
 import 'package:flutter/foundation.dart';
 
+import 'hex.dart';
 import 'keys.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'relay_client.dart';
 import 'replaceable_events.dart';
-
-final _pubkeyPattern = RegExp(r'^[0-9a-fA-F]{64}$');
 
 /// Newest own contact list seen or published, per pubkey, so a lagging relay's
 /// older copy is never republished over it.
@@ -26,7 +25,7 @@ void _noteContactList(String pubkeyHex, DateTime createdAt) {
 List<String> _followedPubkeys(NostrEvent event) {
   return [
     for (final tag in event.tags)
-      if (tag.length > 1 && tag[0] == 'p' && _pubkeyPattern.hasMatch(tag[1]))
+      if (tag.length > 1 && tag[0] == 'p' && isHex(tag[1], 32))
         tag[1].toLowerCase(),
   ];
 }
@@ -90,6 +89,7 @@ class RelayContactsRepository {
     };
     if (candidates.isEmpty) return const <String>[];
 
+    // A lagging relay may still tag us from a list its author has replaced.
     final latestEventsByChunk = await Future.wait(
       chunkedAuthors(candidates.toList()).map(
         (chunk) => client.query(

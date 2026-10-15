@@ -16,7 +16,6 @@ Note _noteOf(NostrEvent event) => Note(
   id: event.id,
   pubkey: event.pubkey,
   displayName: 'Me',
-  handle: 'me',
   content: event.content,
   createdAt: event.createdAt,
 );

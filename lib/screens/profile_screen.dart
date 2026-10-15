@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -315,7 +317,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         builder: (_) => EditProfileScreen(relayClient: widget.relayClient),
       ),
     );
-    if (mounted) _loadPaymentTargets(pubkeyHex);
+    if (mounted) unawaited(_loadPaymentTargets(pubkeyHex));
   }
 
   @override

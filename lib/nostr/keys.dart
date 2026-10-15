@@ -3,16 +3,10 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
+import 'hex.dart';
 import 'secp256k1_bindings.dart';
 
 typedef NostrKeyPair = ({String privateKeyHex, String publicKeyHex});
-
-int _hexDigit(int codeUnit) {
-  if (codeUnit >= 0x30 && codeUnit <= 0x39) return codeUnit - 0x30;
-  final lower = codeUnit | 0x20;
-  if (lower >= 0x61 && lower <= 0x66) return lower - 0x61 + 10;
-  return -1;
-}
 
 /// A secp256k1 secret key as bytes, so it can be zeroed once used.
 class SecretKey {
@@ -24,8 +18,8 @@ class SecretKey {
     final bytes = Uint8List(32);
     // Decoded by code unit, so no substrings of the secret are allocated.
     for (var i = 0; i < 32; i++) {
-      final high = _hexDigit(hex.codeUnitAt(i * 2));
-      final low = _hexDigit(hex.codeUnitAt(i * 2 + 1));
+      final high = hexDigitValue(hex.codeUnitAt(i * 2));
+      final low = hexDigitValue(hex.codeUnitAt(i * 2 + 1));
       if (high < 0 || low < 0) {
         bytes.fillRange(0, 32, 0);
         // Deliberately no value in the message: it is a secret.
@@ -52,14 +46,6 @@ class SecretKey {
 
   @override
   String toString() => 'SecretKey(redacted)';
-}
-
-String _hexFromPointer(Pointer<Uint8> bytes, int length) {
-  final buffer = StringBuffer();
-  for (var i = 0; i < length; i++) {
-    buffer.write(bytes[i].toRadixString(16).padLeft(2, '0'));
-  }
-  return buffer.toString();
 }
 
 void _wipe(Pointer<Uint8> buffer, int length) {
@@ -92,7 +78,7 @@ String xonlyPubkeyHex(SecretKey secretKey) {
       throw ArgumentError('invalid secp256k1 secret key');
     }
 
-    return _hexFromPointer(pubkeyOut, 32);
+    return hexEncode(pubkeyOut.asTypedList(32));
   } finally {
     _wipe(seckey, 32);
     calloc.free(seckey);
@@ -115,8 +101,8 @@ NostrKeyPair generateNostrKeyPair() {
     }
 
     return (
-      privateKeyHex: _hexFromPointer(seckeyOut, 32),
-      publicKeyHex: _hexFromPointer(pubkeyOut, 32),
+      privateKeyHex: hexEncode(seckeyOut.asTypedList(32)),
+      publicKeyHex: hexEncode(pubkeyOut.asTypedList(32)),
     );
   } finally {
     _wipe(seckeyOut, 32);

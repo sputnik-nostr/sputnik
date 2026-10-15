@@ -16,7 +16,6 @@ class Note {
     required this.id,
     required this.pubkey,
     required this.displayName,
-    required this.handle,
     required this.content,
     required this.createdAt,
     this.pictureUrl,
@@ -40,7 +39,6 @@ class Note {
       id: json['id'] as String,
       pubkey: json['pubkey'] as String,
       displayName: json['displayName'] as String,
-      handle: json['handle'] as String,
       content: json['content'] as String,
       createdAt: createdAt,
       pictureUrl: json['pictureUrl'] as String?,
@@ -62,7 +60,6 @@ class Note {
   final String id;
   final String pubkey;
   final String displayName;
-  final String handle;
   final String content;
   final DateTime createdAt;
   final String? pictureUrl;
@@ -96,7 +93,6 @@ class Note {
       id: id,
       pubkey: pubkey,
       displayName: displayName ?? this.displayName,
-      handle: handle,
       content: content,
       createdAt: createdAt,
       pictureUrl: pictureUrl ?? this.pictureUrl,
@@ -118,7 +114,6 @@ class Note {
       'id': id,
       'pubkey': pubkey,
       'displayName': displayName,
-      'handle': handle,
       'content': content,
       'createdAt': createdAt.millisecondsSinceEpoch,
       if (pictureUrl != null) 'pictureUrl': pictureUrl,
