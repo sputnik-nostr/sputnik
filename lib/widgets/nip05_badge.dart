@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import '../nostr/nip05.dart';
 import '../theme/app_text_styles.dart';
 
-/// Shows a NIP-05 identifier alongside an icon reflecting its verification
-/// state (unchecked, checking, verified, mismatched, or unreachable).
+/// A NIP-05 identifier with an icon for its verification state.
 class Nip05Badge extends StatelessWidget {
   const Nip05Badge({
     super.key,

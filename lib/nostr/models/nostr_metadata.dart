@@ -92,25 +92,4 @@ class NostrMetadata {
         'legacyMoneroAddress': legacyMoneroAddress,
     };
   }
-
-  NostrMetadata copyWith({
-    String? name,
-    String? displayName,
-    String? about,
-    String? picture,
-    String? banner,
-    String? nip05,
-    String? website,
-  }) {
-    return NostrMetadata(
-      name: name ?? this.name,
-      displayName: displayName ?? this.displayName,
-      about: about ?? this.about,
-      picture: picture ?? this.picture,
-      banner: banner ?? this.banner,
-      nip05: nip05 ?? this.nip05,
-      website: website ?? this.website,
-      legacyMoneroAddress: legacyMoneroAddress,
-    );
-  }
 }

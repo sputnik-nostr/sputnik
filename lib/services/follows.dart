@@ -17,7 +17,7 @@ Future<List<String>?> loadFollowingOrNull(
   final following = await RelayContactsRepository(client: client)
       .fetchFollowingOrNull(pubkeyHex, relayUrls);
   if (following != null) {
-    await CacheStore.putFollowing(pubkeyHex, following);
+    CacheStore.putFollowing(pubkeyHex, following);
   }
   return following;
 }
@@ -54,7 +54,7 @@ Future<List<String>> loadFollowers(
       .fetchFollowers(pubkeyHex, relayUrls);
   // Empty may just mean the relays failed, so it is not worth keeping.
   if (followers.isNotEmpty) {
-    await CacheStore.putFollowers(pubkeyHex, followers);
+    CacheStore.putFollowers(pubkeyHex, followers);
   }
   return followers;
 }

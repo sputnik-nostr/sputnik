@@ -12,9 +12,7 @@ typedef _Publish = Future<Map<String, RelayPublishResult>> Function({
   required Set<String> relayUrls,
 });
 
-/// Fetches the event to act on via [fetchTarget], confirms unless
-/// [alwaysConfirm] is false and confirmation is off, then signs and publishes
-/// via [publish].
+/// Confirms first if [alwaysConfirm] or the confirmation setting is on.
 Future<bool> _publishAgainst(
   BuildContext context, {
   required Future<NostrEvent?> Function(String myPubkeyHex, Set<String> relays)

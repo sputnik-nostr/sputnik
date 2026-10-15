@@ -117,19 +117,17 @@ class MainApp extends StatelessWidget {
           navigatorKey: navigatorKey,
           themeMode: themeModeNotifier.value,
           theme: ThemeData(
-            useMaterial3: true,
             brightness: Brightness.light,
             colorSchemeSeed: seedColor,
           ),
           darkTheme: ThemeData(
-            useMaterial3: true,
             brightness: Brightness.dark,
             colorSchemeSeed: seedColor,
           ),
           home: const RootScreen(),
           builder: (context, child) => CallbackShortcuts(
             bindings: {
-              // Go back when the escape key is pressed (mostly for desktop)
+              // Desktop has no system back button.
               const SingleActivator(LogicalKeyboardKey.escape): () {
                 final navigator = navigatorKey.currentState;
                 if (navigator != null && navigator.canPop()) {

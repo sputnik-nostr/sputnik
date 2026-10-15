@@ -7,9 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import '../nostr/models/nostr_metadata.dart';
 import '../nostr/models/nostr_payment_target.dart';
 
-/// Local Hive-backed cache for data fetched from relays. Each entry is stored
-/// with a fetch timestamp, so callers can decide whether it's fresh enough to
-/// skip a relay round-trip.
+/// Relay data with fetch times, so a fresh entry can skip a relay round trip.
 class CacheStore {
   CacheStore._();
 
@@ -129,10 +127,10 @@ class CacheStore {
   static bool isFollowersFresh(String pubkeyHex) =>
       _isFresh(_contacts['$pubkeyHex:followers']?.fetchedAt);
 
-  static Future<void> putFollowing(String pubkeyHex, List<String> pubkeys) =>
+  static void putFollowing(String pubkeyHex, List<String> pubkeys) =>
       _putList('$pubkeyHex:following', pubkeys);
 
-  static Future<void> putFollowers(String pubkeyHex, List<String> pubkeys) =>
+  static void putFollowers(String pubkeyHex, List<String> pubkeys) =>
       _putList('$pubkeyHex:followers', pubkeys);
 
   static List<String>? _getList(String key) {
@@ -140,14 +138,13 @@ class CacheStore {
     return pubkeys == null ? null : List.of(pubkeys);
   }
 
-  static Future<void> _putList(String key, List<String> pubkeys) {
+  static void _putList(String key, List<String> pubkeys) {
     // Stale lists are never read, so dropping them bounds memory.
     _contacts.removeWhere((_, entry) => !_isFresh(entry.fetchedAt));
     _contacts[key] = (
       pubkeys: List.unmodifiable(pubkeys),
       fetchedAt: DateTime.now().millisecondsSinceEpoch,
     );
-    return Future.value();
   }
 
   static List<NostrPaymentTarget>? getPaymentTargets(String pubkeyHex) {

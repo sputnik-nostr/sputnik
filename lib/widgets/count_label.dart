@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// A `<count> <label>` pill (e.g. "20 reposts"), optionally tappable. Used
-/// anywhere a count links through to the list of users behind it.
+/// A `<count> <label>` pill (e.g. "20 reposts"), optionally tappable.
 class CountLabel extends StatelessWidget {
   const CountLabel({
     super.key,

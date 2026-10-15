@@ -4,9 +4,6 @@ import 'dart:io';
 typedef _CreateNative = Pointer<Void> Function();
 typedef CreateFn = Pointer<Void> Function();
 
-typedef _DestroyNative = Void Function(Pointer<Void> wrapper);
-typedef DestroyFn = void Function(Pointer<Void> wrapper);
-
 typedef _PubkeyFromSeckeyNative = Int32 Function(
   Pointer<Void> wrapper,
   Pointer<Uint8> seckey32,
@@ -79,26 +76,22 @@ DynamicLibrary _openNostrSecp256k1() {
 }
 
 class NostrSecp256k1Bindings {
-  NostrSecp256k1Bindings._(this._lib)
-    : create = _lib.lookupFunction<_CreateNative, CreateFn>(
+  NostrSecp256k1Bindings._(DynamicLibrary lib)
+    : create = lib.lookupFunction<_CreateNative, CreateFn>(
         'nostr_secp256k1_create',
       ),
-      destroy = _lib.lookupFunction<_DestroyNative, DestroyFn>(
-        'nostr_secp256k1_destroy',
-      ),
-      pubkeyFromSeckey = _lib
+      pubkeyFromSeckey = lib
           .lookupFunction<_PubkeyFromSeckeyNative, PubkeyFromSeckeyFn>(
             'nostr_secp256k1_pubkey_from_seckey',
           ),
-      generateKeypair = _lib
+      generateKeypair = lib
           .lookupFunction<_GenerateKeypairNative, GenerateKeypairFn>(
             'nostr_secp256k1_generate_keypair',
           ),
-      verifySchnorr = _lib
-          .lookupFunction<_VerifySchnorrNative, VerifySchnorrFn>(
-            'nostr_secp256k1_verify_schnorr',
-          ),
-      signSchnorr = _lib.lookupFunction<_SignSchnorrNative, SignSchnorrFn>(
+      verifySchnorr = lib.lookupFunction<_VerifySchnorrNative, VerifySchnorrFn>(
+        'nostr_secp256k1_verify_schnorr',
+      ),
+      signSchnorr = lib.lookupFunction<_SignSchnorrNative, SignSchnorrFn>(
         'nostr_secp256k1_sign_schnorr',
       );
 
@@ -106,11 +99,7 @@ class NostrSecp256k1Bindings {
     _openNostrSecp256k1(),
   );
 
-  // ignore: unused_field
-  final DynamicLibrary _lib;
-
   final CreateFn create;
-  final DestroyFn destroy;
   final PubkeyFromSeckeyFn pubkeyFromSeckey;
   final GenerateKeypairFn generateKeypair;
   final VerifySchnorrFn verifySchnorr;

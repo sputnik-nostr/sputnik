@@ -35,7 +35,6 @@ class _SecureSecretStore implements SecretStore {
   Future<void> delete(String key) => _storage.delete(key: key);
 }
 
-/// Reports [error] through [FlutterError.reportError] instead of throwing.
 void _reportPersistenceError(String what, Object error, StackTrace stack) {
   FlutterError.reportError(
     FlutterErrorDetails(
@@ -47,9 +46,7 @@ void _reportPersistenceError(String what, Object error, StackTrace stack) {
   );
 }
 
-/// Loads a notifier's persisted value and wires it to save on every change.
-/// Used to bind each of the app's settings notifiers without repeating the
-/// "load, assign, add a saving listener" sequence for each one.
+/// Loads [notifier]'s value; on failure it is left unsaved, so bad data stays.
 Future<void> bindPersisted<T>(
   ValueNotifier<T> notifier,
   Future<T> Function() load,

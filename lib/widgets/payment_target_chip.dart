@@ -33,14 +33,12 @@ String _ticker(String type) =>
     paymentTargetTypes[type]?.ticker ?? type.toUpperCase();
 
 /// Proper-noun currency names stay capitalized even mid-sentence.
-String _displayName(String type) =>
+String paymentTargetTypeDisplayName(String type) =>
     paymentTargetTypes[type]?.displayName ??
     (type.isEmpty ? type : type[0].toUpperCase() + type.substring(1));
 
 /// All types the app recognizes, for the "hide address types" setting.
 final knownPaymentTargetTypes = paymentTargetTypes.keys.toList();
-
-String paymentTargetTypeDisplayName(String type) => _displayName(type);
 
 /// A hint under a type's display name: its ticker, or a short description.
 String? paymentTargetTypeSubtitle(String type) {
@@ -73,7 +71,7 @@ class PaymentTargetChip extends StatelessWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'This ${_displayName(target.type)} address looks malformed',
+              'This ${paymentTargetTypeDisplayName(target.type)} address looks malformed',
             ),
           ),
         );
@@ -84,7 +82,7 @@ class PaymentTargetChip extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'No app found to open ${_displayName(target.type)} addresses',
+            'No app found to open ${paymentTargetTypeDisplayName(target.type)} addresses',
           ),
         ),
       );
@@ -115,7 +113,7 @@ class PaymentTargetChip extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Copied ${_displayName(target.type)} address to clipboard',
+                'Copied ${paymentTargetTypeDisplayName(target.type)} address to clipboard',
               ),
             ),
           );

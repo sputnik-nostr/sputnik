@@ -191,84 +191,78 @@ class _PostScreenState extends State<PostScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final thread = _thread;
+    final loading = _loading;
+    final ancestors = thread?.ancestors ?? const <Note>[];
+    final replies = thread?.replies ?? const <Note>[];
+
     return Scaffold(
       appBar: AppBar(),
-      body: Builder(
-        builder: (context) {
-          final thread = _thread;
-          final loading = _loading;
-          final ancestors = thread?.ancestors ?? const <Note>[];
-          final replies = thread?.replies ?? const <Note>[];
-
-          return CustomScrollView(
-            controller: _scrollController,
-            // Ancestors grow upward from the viewed note, so it stays in view.
-            center: _focusKey,
-            slivers: [
-              SliverList.builder(
-                itemCount: ancestors.length,
-                itemBuilder: (context, index) => Column(
-                  key: index == 0 ? _parentKey : null,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    NoteTile(note: ancestors[ancestors.length - 1 - index]),
-                    const Divider(height: 1),
-                  ],
-                ),
-              ),
-              SliverToBoxAdapter(
-                key: _focusKey,
-                child: Column(
-                  children: [
-                    if (!loading &&
-                        thread?.replyToId != null &&
-                        ancestors.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'The note this replies to was not found on your '
-                            'relays',
-                            style: Theme.of(context).metadata,
-                          ),
-                        ),
+      body: CustomScrollView(
+        controller: _scrollController,
+        // Ancestors grow upward from the viewed note, so it stays in view.
+        center: _focusKey,
+        slivers: [
+          SliverList.builder(
+            itemCount: ancestors.length,
+            itemBuilder: (context, index) => Column(
+              key: index == 0 ? _parentKey : null,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                NoteTile(note: ancestors[ancestors.length - 1 - index]),
+                const Divider(height: 1),
+              ],
+            ),
+          ),
+          SliverToBoxAdapter(
+            key: _focusKey,
+            child: Column(
+              children: [
+                if (!loading && thread?.replyToId != null && ancestors.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'The note this replies to was not found on your '
+                        'relays',
+                        style: Theme.of(context).metadata,
                       ),
-                    _PostHeader(
-                      note: widget.note,
-                      relayClient: widget.relayClient,
-                      replyCount: thread?.directReplyCount,
-                      likerPubkeys: thread?.likerPubkeys,
-                      reposterPubkeys: thread?.reposterPubkeys,
-                      onReply: () => _reply(widget.note),
-                      onDeleted: () => Navigator.pop(context),
                     ),
-                    const Divider(height: 1),
-                  ],
+                  ),
+                _PostHeader(
+                  note: widget.note,
+                  relayClient: widget.relayClient,
+                  replyCount: thread?.directReplyCount,
+                  likerPubkeys: thread?.likerPubkeys,
+                  reposterPubkeys: thread?.reposterPubkeys,
+                  onReply: () => _reply(widget.note),
+                  onDeleted: () => Navigator.pop(context),
+                ),
+                const Divider(height: 1),
+              ],
+            ),
+          ),
+          if (replies.isEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Center(
+                  child: loading
+                      ? const CircularProgressIndicator()
+                      : const Text('No replies yet'),
                 ),
               ),
-              if (replies.isEmpty)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Center(
-                      child: loading
-                          ? const CircularProgressIndicator()
-                          : const Text('No replies yet'),
-                    ),
-                  ),
-                )
-              else
-                SliverList.builder(
-                  itemCount: replies.length,
-                  itemBuilder: (context, index) => _NestedReply(
-                    note: replies[index],
-                    depth: thread!.depths[index],
-                  ),
-                ),
-            ],
-          );
-        },
+            )
+          else
+            SliverList.builder(
+              itemCount: replies.length,
+              itemBuilder: (context, index) => _NestedReply(
+                note: replies[index],
+                depth: thread!.depths[index],
+              ),
+            ),
+        ],
       ),
     );
   }

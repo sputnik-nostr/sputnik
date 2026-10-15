@@ -155,7 +155,7 @@ Future<void> _runSync() async {
         return;
       }
       _failedAttempts = 0;
-      await CacheStore.putFollowing(myPubkeyHex, outcome.following.toList());
+      CacheStore.putFollowing(myPubkeyHex, outcome.following.toList());
 
       // Anything toggled again mid-publish stays queued for the next pass.
       for (final change in changes.entries) {

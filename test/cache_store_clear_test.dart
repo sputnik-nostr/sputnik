@@ -35,8 +35,8 @@ void main() {
 
   test('clearAll empties profiles, follow lists and payment targets', () async {
     await CacheStore.putProfiles({'a' * 64: const NostrMetadata(name: 'a')});
-    await CacheStore.putFollowing('a' * 64, ['b' * 64]);
-    await CacheStore.putFollowers('a' * 64, ['c' * 64]);
+    CacheStore.putFollowing('a' * 64, ['b' * 64]);
+    CacheStore.putFollowers('a' * 64, ['c' * 64]);
     await CacheStore.putPaymentTargets('a' * 64, [
       const NostrPaymentTarget(type: 'monero', address: '4abc'),
     ]);
