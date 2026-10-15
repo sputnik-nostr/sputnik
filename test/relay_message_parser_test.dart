@@ -65,7 +65,7 @@ void main() {
 
     String eventMessage(String subId, {DateTime? at}) {
       final event = signEvent(
-        seckeyHex: key.privateKeyHex,
+        secretKey: SecretKey.fromHex(key.privateKeyHex),
         pubkeyHex: key.publicKeyHex,
         kind: 1,
         content: 'hello',

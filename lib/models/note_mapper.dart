@@ -1,6 +1,5 @@
 import '../nostr/nostr.dart';
 import 'note.dart';
-import 'time_format.dart';
 
 /// Sets like/repost counts, and whether [myPubkeyHex] is among them, from
 /// [reactionsByPostId], where present.
@@ -37,7 +36,6 @@ Note noteFromNostrPost(
     handle: post.author.handle,
     pictureUrl: authorMetadata?.picture,
     content: post.content,
-    postedAt: relativeTime(post.createdAt),
     createdAt: post.createdAt,
     replyCount: post.replyCount,
     repostCount: post.repostCount,

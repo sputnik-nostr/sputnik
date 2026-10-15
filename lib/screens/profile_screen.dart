@@ -6,13 +6,16 @@ import '../models/note.dart';
 import '../models/time_format.dart';
 import '../nostr/nip05.dart';
 import '../nostr/nostr.dart';
+import '../services/follow_sync.dart';
+import '../services/media_loader.dart';
+import '../services/note_hydration.dart';
+import '../services/post_cursor.dart';
+import '../services/profiles.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/compact_tab_bar.dart';
 import '../widgets/count_label.dart';
 import '../widgets/fade_in_avatar.dart';
 import '../widgets/follow_button.dart';
-import '../services/media_loader.dart';
-import '../services/post_cursor.dart';
 import '../widgets/linkified_text.dart';
 import '../widgets/load_more_footer.dart';
 import '../widgets/nip05_badge.dart';
@@ -24,9 +27,6 @@ import 'identities_screen.dart';
 import 'image_viewer_screen.dart';
 import 'user_relays_screen.dart';
 import 'users_list_screen.dart';
-import '../services/profiles.dart';
-import '../services/note_hydration.dart';
-import '../services/follow_sync.dart';
 
 const _bannerHeight = 140.0 * 0.8;
 const _bannerMaxDecodeExtent = 1600;
@@ -122,18 +122,14 @@ class _ProfileScreenState extends State<ProfileScreen>
     });
   }
 
-  void _openImage(BuildContext context, String imageUrl) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            ImageViewerScreen(sources: [profileImageSource(imageUrl)]),
-      ),
-    );
+  void _onProfileCacheChanged() {
+    final pubkeyHex = _resolvedPubkeyHex!;
+    _maybeVerifyNip05(profileCacheNotifier.value[pubkeyHex]?.nip05, pubkeyHex);
   }
 
   @override
   void dispose() {
+    profileCacheNotifier.removeListener(_onProfileCacheChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -148,6 +144,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       return;
     }
 
+    profileCacheNotifier.addListener(_onProfileCacheChanged);
+    _onProfileCacheChanged();
     loadProfile(
       pubkeyHex,
       selectedRelaysNotifier.value,
@@ -260,38 +258,55 @@ class _ProfileScreenState extends State<ProfileScreen>
     ]);
   }
 
+  /// Published targets, the legacy Monero field as fallback, minus hidden types.
+  List<NostrPaymentTarget> _visiblePaymentTargets(NostrMetadata? metadata) {
+    final targets = _paymentTargets ?? const <NostrPaymentTarget>[];
+    final legacyMonero = metadata?.legacyMoneroAddress;
+    final hidden = hiddenPaymentTargetTypesNotifier.value;
+    return [
+      ...targets,
+      if (legacyMonero != null && targets.every((t) => t.type != 'monero'))
+        NostrPaymentTarget(type: 'monero', address: legacyMonero),
+    ].where((target) => !hidden.contains(target.type)).toList();
+  }
+
+  /// This profile's notes and reposts, newest activity first.
+  List<Note> _ownNotes(String pubkeyHex, NostrMetadata? metadata) {
+    final byId = <String, Note>{
+      for (final note in notesNotifier.value ?? const <Note>[])
+        if (note.pubkey == pubkeyHex) note.id: note,
+      for (final note in _fetchedNotes ?? const <Note>[]) note.id: note,
+    };
+    // Re-apply fresh metadata; a repost keeps its original author's data.
+    return byId.values
+        .map(
+          (note) => metadata == null || note.pubkey != pubkeyHex
+              ? note
+              : note.copyWith(
+                  displayName: metadata.resolvedName,
+                  pictureUrl: metadata.picture,
+                ),
+        )
+        .toList()
+      ..sort((a, b) => _activityTime(b).compareTo(_activityTime(a)));
+  }
+
+  static DateTime _activityTime(Note note) => note.repostedAt ?? note.createdAt;
+
+  Future<void> _editProfile(String pubkeyHex) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditProfileScreen(relayClient: widget.relayClient),
+      ),
+    );
+    if (mounted) _loadPaymentTargets(pubkeyHex);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final pubkeyHex = _resolvedPubkeyHex;
-
-    if (pubkeyHex == null) {
-      return Scaffold(
-        appBar: AppBar(),
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const PlaceholderTab(
-                icon: Icons.person_outline,
-                label: 'No identity yet',
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                key: const Key('createIdentityFromProfileButton'),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const IdentitiesScreen()),
-                ),
-                child: const Text('Create or import an identity'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final npub = npubFromHex(pubkeyHex);
+    if (pubkeyHex == null) return const _NoIdentity();
 
     return Scaffold(
       body: AnimatedBuilder(
@@ -302,66 +317,14 @@ class _ProfileScreenState extends State<ProfileScreen>
           loadMediaNotifier,
           hiddenPaymentTargetTypesNotifier,
         ]),
-        builder: (context, child) {
+        builder: (context, _) {
           final metadata = profileCacheNotifier.value[pubkeyHex];
-          final notes = notesNotifier.value;
-          final legacyMonero = metadata?.legacyMoneroAddress;
-          final paymentTargets = [
-            ...?_paymentTargets,
-            if (legacyMonero != null &&
-                (_paymentTargets ?? const []).every((t) => t.type != 'monero'))
-              NostrPaymentTarget(type: 'monero', address: legacyMonero),
-          ];
-          final visiblePaymentTargets = paymentTargets
-              .where(
-                (target) => !hiddenPaymentTargetTypesNotifier.value.contains(
-                  target.type,
-                ),
-              )
-              .toList();
-          final ownNotesById = <String, Note>{
-            for (final note in (notes ?? const []))
-              if (note.pubkey == pubkeyHex) note.id: note,
-            for (final note in (_fetchedNotes ?? const [])) note.id: note,
-          };
-          // Notes fetched before this profile's metadata landed carry stale
-          // author data, so re-apply whatever is cached now. A repost entry
-          // keeps the original (foreign) author's data untouched.
-          final ownNotes =
-              ownNotesById.values
-                  .map(
-                    (note) => metadata == null || note.pubkey != pubkeyHex
-                        ? note
-                        : note.copyWith(
-                            displayName: metadata.resolvedName,
-                            pictureUrl: metadata.picture,
-                          ),
-                  )
-                  .toList()
-                ..sort(
-                  (a, b) => (b.repostedAt ?? b.createdAt).compareTo(
-                    a.repostedAt ?? a.createdAt,
-                  ),
-                );
-          final posts = [
-            for (final note in ownNotes)
-              if (!note.isReply) note,
-          ];
-          final replies = [
-            for (final note in ownNotes)
-              if (note.isReply) note,
-          ];
+          final ownNotes = _ownNotes(pubkeyHex, metadata);
           final displayName =
               metadata?.resolvedName ??
               (ownNotes.isNotEmpty
                   ? ownNotes.first.displayName
                   : shortPubkey(pubkeyHex));
-          final pictureUrl = fetchableUrlOrNull(metadata?.picture);
-          final bannerUrl = fetchableUrlOrNull(metadata?.banner);
-          final bio = metadata?.about;
-          final hasBio = bio != null && bio.trim().isNotEmpty;
-          final nip05 = metadata?.nip05;
-          _maybeVerifyNip05(nip05, pubkeyHex);
 
           return RefreshIndicator(
             onRefresh: _refresh,
@@ -372,336 +335,33 @@ class _ProfileScreenState extends State<ProfileScreen>
                 SliverToBoxAdapter(
                   child: Column(
                     children: [
-                      SizedBox(
-                        height:
-                            _bannerHeight + _avatarRadius * 2 - _avatarOverlap,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            GestureDetector(
-                              onTap: bannerUrl != null
-                                  ? () => _openImage(context, bannerUrl)
-                                  : null,
-                              child: ClipRect(
-                                child: SizedBox(
-                                  height: _bannerHeight,
-                                  width: double.infinity,
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                            colors: [
-                                              theme.colorScheme.primary,
-                                              theme.colorScheme.tertiary,
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      if (bannerUrl != null &&
-                                          loadMediaNotifier.value)
-                                        Image(
-                                          image: ResizeImage(
-                                            BoundedNetworkImage(
-                                              profileImageSource(bannerUrl),
-                                            ),
-                                            width: _bannerMaxDecodeExtent,
-                                            height: _bannerMaxDecodeExtent,
-                                            policy: ResizeImagePolicy.fit,
-                                          ),
-                                          fit: BoxFit.cover,
-                                          frameBuilder:
-                                              (
-                                                context,
-                                                child,
-                                                frame,
-                                                wasSynchronouslyLoaded,
-                                              ) {
-                                                if (wasSynchronouslyLoaded) {
-                                                  return child;
-                                                }
-                                                return AnimatedOpacity(
-                                                  opacity: frame == null
-                                                      ? 0
-                                                      : 1,
-                                                  duration: const Duration(
-                                                    milliseconds: 300,
-                                                  ),
-                                                  curve: Curves.easeOut,
-                                                  child: child,
-                                                );
-                                              },
-                                          errorBuilder: (_, _, _) =>
-                                              const SizedBox.shrink(),
-                                        ),
-                                    ],
-                                  ),
-                                ),
+                      _ProfileHeader(
+                        bannerUrl: fetchableUrlOrNull(metadata?.banner),
+                        pictureUrl: fetchableUrlOrNull(metadata?.picture),
+                        displayName: displayName,
+                        action: _isCurrentUser
+                            ? _EditProfileButton(
+                                onPressed: () => _editProfile(pubkeyHex),
+                              )
+                            : activeIdentityPubkeyNotifier.value == null
+                            ? null
+                            : FollowButton(
+                                targetPubkeyHex: pubkeyHex,
+                                relayClient: widget.relayClient,
                               ),
-                            ),
-                            Positioned(
-                              top: 8,
-                              left: 8,
-                              child: SafeArea(
-                                bottom: false,
-                                child: _FloatingBackButton(
-                                  onTap: () => Navigator.pop(context),
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 8,
-                              right: 16,
-                              child: _isCurrentUser
-                                  ? IconButton.filled(
-                                      key: const Key('editProfileButton'),
-                                      tooltip: 'Edit profile',
-                                      onPressed: () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => EditProfileScreen(
-                                              relayClient: widget.relayClient,
-                                            ),
-                                          ),
-                                        );
-                                        if (mounted) {
-                                          _loadPaymentTargets(pubkeyHex);
-                                        }
-                                      },
-                                      icon: const Icon(
-                                        Icons.edit_outlined,
-                                        size: 16,
-                                      ),
-                                      style: IconButton.styleFrom(
-                                        backgroundColor:
-                                            theme.colorScheme.inverseSurface,
-                                        foregroundColor:
-                                            theme.colorScheme.onInverseSurface,
-                                        shape: const StadiumBorder(),
-                                        minimumSize: const Size(44, 30),
-                                        padding: EdgeInsets.zero,
-                                      ),
-                                    )
-                                  : activeIdentityPubkeyNotifier.value == null
-                                  ? const SizedBox.shrink()
-                                  : FollowButton(
-                                      targetPubkeyHex: pubkeyHex,
-                                      relayClient: widget.relayClient,
-                                    ),
-                            ),
-                            Positioned(
-                              top: _bannerHeight - _avatarOverlap,
-                              left: 16,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: theme.colorScheme.surface,
-                                ),
-                                child: GestureDetector(
-                                  onTap: pictureUrl != null
-                                      ? () => _openImage(context, pictureUrl)
-                                      : null,
-                                  child: FadeInAvatar(
-                                    radius: _avatarRadius,
-                                    minDecodeExtent: _avatarMinDecodeExtent,
-                                    imageUrl: pictureUrl,
-                                    backgroundColor:
-                                        theme.colorScheme.primaryContainer,
-                                    fallback: Text(
-                                      avatarInitial(displayName),
-                                      style: theme.avatarFallback.copyWith(
-                                        fontSize: _avatarInitialFontSize,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              displayName,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(truncateNpub(npub), style: theme.metadata),
-                                const SizedBox(width: 4),
-                                InkWell(
-                                  borderRadius: const BorderRadius.all(
-                                    Radius.circular(12),
-                                  ),
-                                  onTap: () {
-                                    Clipboard.setData(
-                                      ClipboardData(text: npub),
-                                    );
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Copied npub to clipboard',
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(4),
-                                    child: Icon(
-                                      Icons.copy,
-                                      size: 14,
-                                      color: theme.colorScheme.outline,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (nip05 != null && nip05.trim().isNotEmpty) ...[
-                              const SizedBox(height: 2),
-                              Nip05Badge(
-                                identifier: nip05.trim(),
-                                status: _nip05Status,
-                              ),
-                            ],
-                            if (ownNotes.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                formatLastActiveFromPostedAt(
-                                  ownNotes.first.postedAt,
-                                ),
-                                style: theme.metadata,
-                              ),
-                            ],
-                            if (hasBio) ...[
-                              const SizedBox(height: 8),
-                              LinkifiedText(
-                                bio,
-                                style: theme.textTheme.bodyMedium,
-                              ),
-                            ],
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                CountLabel(
-                                  count: _following?.length,
-                                  label: 'following',
-                                  onTap: _following == null
-                                      ? null
-                                      : () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => UsersListScreen(
-                                              title: 'Following',
-                                              pubkeys: _following!,
-                                            ),
-                                          ),
-                                        ),
-                                ),
-                                const SizedBox(width: 16),
-                                CountLabel(
-                                  count: _followers?.length,
-                                  label: 'followers',
-                                  onTap: _followers == null
-                                      ? null
-                                      : () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => UsersListScreen(
-                                              title: 'Followers',
-                                              pubkeys: _followers!,
-                                            ),
-                                          ),
-                                        ),
-                                ),
-                                const Spacer(),
-                                Material(
-                                  color: Colors.transparent,
-                                  shape: StadiumBorder(
-                                    side: BorderSide(
-                                      color: theme.colorScheme.outlineVariant,
-                                    ),
-                                  ),
-                                  clipBehavior: Clip.antiAlias,
-                                  child: InkWell(
-                                    key: const Key('profileRelaysButton'),
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => UserRelaysScreen(
-                                          pubkeyHex: pubkeyHex,
-                                          relayClient: widget.relayClient,
-                                        ),
-                                      ),
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 5,
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.dns_outlined,
-                                            size: 14,
-                                            color: theme
-                                                .colorScheme
-                                                .onSurfaceVariant,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            'Relays',
-                                            style: theme.textTheme.labelMedium
-                                                ?.copyWith(
-                                                  color: theme
-                                                      .colorScheme
-                                                      .onSurfaceVariant,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (visiblePaymentTargets.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: [
-                                    for (
-                                      var i = 0;
-                                      i < visiblePaymentTargets.length;
-                                      i++
-                                    ) ...[
-                                      if (i > 0) const SizedBox(width: 8),
-                                      PaymentTargetChip(
-                                        target: visiblePaymentTargets[i],
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
+                      _ProfileDetails(
+                        pubkeyHex: pubkeyHex,
+                        displayName: displayName,
+                        metadata: metadata,
+                        nip05Status: _nip05Status,
+                        lastActive: ownNotes.isEmpty
+                            ? null
+                            : _activityTime(ownNotes.first),
+                        following: _following,
+                        followers: _followers,
+                        paymentTargets: _visiblePaymentTargets(metadata),
+                        relayClient: widget.relayClient,
                       ),
                       CompactTabBar(
                         controller: _tabController,
@@ -714,8 +374,14 @@ class _ProfileScreenState extends State<ProfileScreen>
               body: TabBarView(
                 controller: _tabController,
                 children: [
-                  _notesTab('posts', posts, 'No posts yet'),
-                  _notesTab('replies', replies, 'No replies yet'),
+                  _notesTab('posts', [
+                    for (final note in ownNotes)
+                      if (!note.isReply) note,
+                  ], 'No posts yet'),
+                  _notesTab('replies', [
+                    for (final note in ownNotes)
+                      if (note.isReply) note,
+                  ], 'No replies yet'),
                 ],
               ),
             ),
@@ -771,6 +437,402 @@ class _ProfileScreenState extends State<ProfileScreen>
               index == notes.length ? footer() : NoteTile(note: notes[index]),
         );
       },
+    );
+  }
+}
+
+class _NoIdentity extends StatelessWidget {
+  const _NoIdentity();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const PlaceholderTab(
+              icon: Icons.person_outline,
+              label: 'No identity yet',
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              key: const Key('createIdentityFromProfileButton'),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const IdentitiesScreen()),
+              ),
+              child: const Text('Create or import an identity'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+void _openImage(BuildContext context, String imageUrl) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) =>
+          ImageViewerScreen(sources: [profileImageSource(imageUrl)]),
+    ),
+  );
+}
+
+/// Banner and overlapping avatar, with back and [action] buttons over it.
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({
+    required this.bannerUrl,
+    required this.pictureUrl,
+    required this.displayName,
+    required this.action,
+  });
+
+  final String? bannerUrl;
+  final String? pictureUrl;
+  final String displayName;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bannerUrl = this.bannerUrl;
+    final pictureUrl = this.pictureUrl;
+    final action = this.action;
+
+    return SizedBox(
+      height: _bannerHeight + _avatarRadius * 2 - _avatarOverlap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          GestureDetector(
+            onTap: bannerUrl == null
+                ? null
+                : () => _openImage(context, bannerUrl),
+            child: _Banner(url: bannerUrl),
+          ),
+          Positioned(
+            top: 8,
+            left: 8,
+            child: SafeArea(
+              bottom: false,
+              child: _FloatingBackButton(onTap: () => Navigator.pop(context)),
+            ),
+          ),
+          if (action != null) Positioned(bottom: 8, right: 16, child: action),
+          Positioned(
+            top: _bannerHeight - _avatarOverlap,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: theme.colorScheme.surface,
+              ),
+              child: GestureDetector(
+                onTap: pictureUrl == null
+                    ? null
+                    : () => _openImage(context, pictureUrl),
+                child: FadeInAvatar(
+                  radius: _avatarRadius,
+                  minDecodeExtent: _avatarMinDecodeExtent,
+                  imageUrl: pictureUrl,
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  fallback: Text(
+                    avatarInitial(displayName),
+                    style: theme.avatarFallback.copyWith(
+                      fontSize: _avatarInitialFontSize,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A theme gradient, with the banner faded in over it if media loads.
+class _Banner extends StatelessWidget {
+  const _Banner({required this.url});
+
+  final String? url;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final url = this.url;
+
+    return ClipRect(
+      child: SizedBox(
+        height: _bannerHeight,
+        width: double.infinity,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [colorScheme.primary, colorScheme.tertiary],
+                ),
+              ),
+            ),
+            if (url != null && loadMediaNotifier.value)
+              Image(
+                image: ResizeImage(
+                  BoundedNetworkImage(profileImageSource(url)),
+                  width: _bannerMaxDecodeExtent,
+                  height: _bannerMaxDecodeExtent,
+                  policy: ResizeImagePolicy.fit,
+                ),
+                fit: BoxFit.cover,
+                frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                  if (wasSynchronouslyLoaded) return child;
+                  return AnimatedOpacity(
+                    opacity: frame == null ? 0 : 1,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                    child: child,
+                  );
+                },
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EditProfileButton extends StatelessWidget {
+  const _EditProfileButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return IconButton.filled(
+      key: const Key('editProfileButton'),
+      tooltip: 'Edit profile',
+      onPressed: onPressed,
+      icon: const Icon(Icons.edit_outlined, size: 16),
+      style: IconButton.styleFrom(
+        backgroundColor: colorScheme.inverseSurface,
+        foregroundColor: colorScheme.onInverseSurface,
+        shape: const StadiumBorder(),
+        minimumSize: const Size(44, 30),
+        padding: EdgeInsets.zero,
+      ),
+    );
+  }
+}
+
+/// Name, npub, NIP-05, activity, bio, follow counts, and payment targets.
+class _ProfileDetails extends StatelessWidget {
+  const _ProfileDetails({
+    required this.pubkeyHex,
+    required this.displayName,
+    required this.metadata,
+    required this.nip05Status,
+    required this.lastActive,
+    required this.following,
+    required this.followers,
+    required this.paymentTargets,
+    required this.relayClient,
+  });
+
+  final String pubkeyHex;
+  final String displayName;
+  final NostrMetadata? metadata;
+  final Nip05Status? nip05Status;
+  final DateTime? lastActive;
+  final List<String>? following;
+  final List<String>? followers;
+  final List<NostrPaymentTarget> paymentTargets;
+  final RelayClient relayClient;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final nip05 = metadata?.nip05?.trim();
+    final bio = metadata?.about;
+    final lastActive = this.lastActive;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            displayName,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          _NpubRow(npub: npubFromHex(pubkeyHex)),
+          if (nip05 != null && nip05.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Nip05Badge(identifier: nip05, status: nip05Status),
+          ],
+          if (lastActive != null) ...[
+            const SizedBox(height: 4),
+            Text(formatLastActive(lastActive), style: theme.metadata),
+          ],
+          if (bio != null && bio.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            LinkifiedText(bio, style: theme.textTheme.bodyMedium),
+          ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _ContactsCount(
+                pubkeys: following,
+                label: 'following',
+                title: 'Following',
+              ),
+              const SizedBox(width: 16),
+              _ContactsCount(
+                pubkeys: followers,
+                label: 'followers',
+                title: 'Followers',
+              ),
+              const Spacer(),
+              _RelaysButton(pubkeyHex: pubkeyHex, relayClient: relayClient),
+            ],
+          ),
+          if (paymentTargets.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                spacing: 8,
+                children: [
+                  for (final target in paymentTargets)
+                    PaymentTargetChip(target: target),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _NpubRow extends StatelessWidget {
+  const _NpubRow({required this.npub});
+
+  final String npub;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(truncateNpub(npub), style: theme.metadata),
+        const SizedBox(width: 4),
+        InkWell(
+          borderRadius: const BorderRadius.all(Radius.circular(12)),
+          onTap: () {
+            Clipboard.setData(ClipboardData(text: npub));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Copied npub to clipboard')),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: Icon(Icons.copy, size: 14, color: theme.colorScheme.outline),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A following/followers count that opens the list once it has loaded.
+class _ContactsCount extends StatelessWidget {
+  const _ContactsCount({
+    required this.pubkeys,
+    required this.label,
+    required this.title,
+  });
+
+  final List<String>? pubkeys;
+  final String label;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final pubkeys = this.pubkeys;
+    return CountLabel(
+      count: pubkeys?.length,
+      label: label,
+      onTap: pubkeys == null
+          ? null
+          : () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UsersListScreen(title: title, pubkeys: pubkeys),
+              ),
+            ),
+    );
+  }
+}
+
+class _RelaysButton extends StatelessWidget {
+  const _RelaysButton({required this.pubkeyHex, required this.relayClient});
+
+  final String pubkeyHex;
+  final RelayClient relayClient;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.onSurfaceVariant;
+    return Material(
+      color: Colors.transparent,
+      shape: StadiumBorder(
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: const Key('profileRelaysButton'),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UserRelaysScreen(
+              pubkeyHex: pubkeyHex,
+              relayClient: relayClient,
+            ),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.dns_outlined, size: 14, color: color),
+              const SizedBox(width: 6),
+              Text(
+                'Relays',
+                style: theme.textTheme.labelMedium?.copyWith(color: color),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

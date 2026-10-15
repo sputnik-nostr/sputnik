@@ -10,8 +10,8 @@ import '../nostr/relay_client.dart';
 import '../nostr/relay_post_repository.dart';
 import '../screens/post_screen.dart';
 import '../screens/profile_screen.dart';
-import 'open_url.dart';
 import '../services/profiles.dart';
+import 'open_url.dart';
 
 /// Matches HTTP(S) URLs, nostr: URIs, and bare npub/nprofile/note/nevent.
 final _linkPattern = RegExp(

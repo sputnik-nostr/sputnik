@@ -42,7 +42,7 @@ class _FakeRelayClient extends RelayClient with AnsweringRelayClient {
     if (followingQueryGate != null) await followingQueryGate!.future;
     return [
       signEvent(
-        seckeyHex: seckeyHex,
+        secretKey: SecretKey.fromHex(seckeyHex),
         pubkeyHex: author,
         kind: 3,
         tags: followingTags,

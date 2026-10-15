@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../nostr/nostr.dart';
+import '../services/follow_sync.dart';
+import '../services/profiles.dart';
 import '../widgets/placeholder_tab.dart';
 import '../widgets/profile_result_tile.dart';
-import '../services/profiles.dart';
-import '../services/follow_sync.dart';
 
 /// A list of users, rendered as profile tiles. Used for followers/following
 /// lists, as well as for who liked/reposted a post.

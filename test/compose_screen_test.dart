@@ -242,7 +242,6 @@ void main() {
     displayName: 'Alice',
     handle: 'alice',
     content: 'quoted note',
-    postedAt: 'now',
     createdAt: DateTime.now(),
   );
 

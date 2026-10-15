@@ -35,7 +35,7 @@ void main() {
     // NostrEvent.fromJson (which verifies id/sig) actually succeeds.
     final keypair = generateNostrKeyPair();
     final embeddedOriginal = signEvent(
-      seckeyHex: keypair.privateKeyHex,
+      secretKey: SecretKey.fromHex(keypair.privateKeyHex),
       pubkeyHex: keypair.publicKeyHex,
       kind: 1,
       content: 'hello from embedded content',

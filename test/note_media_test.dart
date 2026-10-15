@@ -8,7 +8,6 @@ Note _note({List<NostrMedia> media = const []}) => Note(
   displayName: 'Name',
   handle: 'h',
   content: 'hello',
-  postedAt: '1m',
   createdAt: DateTime.fromMillisecondsSinceEpoch(1700000000000),
   media: media,
 );

@@ -57,7 +57,7 @@ void main() {
     () async {
       final relay = _RecordingRelay();
       await RelayReactionsRepository(client: relay).publishLike(
-        seckeyHex: seckeyHex,
+        secretKey: SecretKey.fromHex(seckeyHex),
         myPubkeyHex: me,
         target: target,
         relayUrls: {'wss://relay.example'},
@@ -78,7 +78,7 @@ void main() {
     () async {
       final relay = _RecordingRelay();
       await RelayReactionsRepository(client: relay).publishRepost(
-        seckeyHex: seckeyHex,
+        secretKey: SecretKey.fromHex(seckeyHex),
         myPubkeyHex: me,
         target: target,
         relayUrls: {'wss://relay.example'},
@@ -193,7 +193,7 @@ void main() {
     );
 
     await RelayReactionsRepository(client: relay).publishRetraction(
-      seckeyHex: seckeyHex,
+      secretKey: SecretKey.fromHex(seckeyHex),
       myPubkeyHex: me,
       target: myLike,
       relayUrls: {'wss://relay.example'},

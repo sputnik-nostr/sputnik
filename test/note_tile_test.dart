@@ -17,7 +17,6 @@ void main() {
     displayName: 'Name',
     handle: 'h',
     content: 'hello world text',
-    postedAt: '1m',
     createdAt: DateTime(2024),
   );
 
@@ -33,6 +32,22 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('\u{1F600}'), findsOneWidget);
+  });
+
+  testWidgets('shows the age from createdAt when it is built', (tester) async {
+    final restored = Note.fromJson({
+      ...note.toJson(),
+      'createdAt': DateTime.now()
+          .subtract(const Duration(hours: 3))
+          .millisecondsSinceEpoch,
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: NoteTile(note: restored)),
+      ),
+    );
+
+    expect(find.text('3h'), findsOneWidget);
   });
 
   for (final platform in [TargetPlatform.linux, TargetPlatform.android]) {

@@ -87,7 +87,6 @@ void main() {
       displayName: 'Bob',
       handle: 'bob',
       content: 'hello',
-      postedAt: 'now',
       createdAt: target.createdAt,
     );
   });

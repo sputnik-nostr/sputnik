@@ -115,6 +115,38 @@ void main() {
     expect(find.byKey(const Key('followButton')), findsNothing);
   });
 
+  testWidgets('last active counts from a repost, not the reposted note', (
+    tester,
+  ) async {
+    final pubkeyHex = 'b' * 64;
+    final now = DateTime.now();
+    notesNotifier.value = [
+      Note(
+        id: 'c' * 64,
+        pubkey: pubkeyHex,
+        displayName: 'Bob',
+        handle: 'bob',
+        content: 'old note',
+        createdAt: now.subtract(const Duration(days: 3)),
+        repostedByPubkey: pubkeyHex,
+        repostedByDisplayName: 'Bob',
+        repostedAt: now.subtract(const Duration(hours: 2)),
+      ),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ProfileScreen(
+          pubkeyHex: pubkeyHex,
+          relayClient: _FakeRelayClient(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Last active 2h ago'), findsOneWidget);
+  });
+
   group('posts and replies tabs', () {
     final pubkeyHex = 'b' * 64;
 
@@ -125,7 +157,6 @@ void main() {
       displayName: 'Bob',
       handle: 'bob',
       content: content,
-      postedAt: '1m',
       createdAt: DateTime.now().subtract(
         Duration(minutes: int.tryParse(id) ?? 0),
       ),

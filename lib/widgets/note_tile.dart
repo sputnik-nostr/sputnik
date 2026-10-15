@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../models/note.dart';
+import '../models/time_format.dart';
 import '../nostr/nostr.dart';
 import '../screens/compose_screen.dart';
 import '../screens/post_screen.dart';
@@ -96,7 +97,10 @@ class NoteTile extends StatelessWidget {
                               ),
                             ),
                           ),
-                          Text(note.postedAt, style: theme.metadata),
+                          Text(
+                            relativeTime(note.createdAt),
+                            style: theme.metadata,
+                          ),
                         ],
                       ),
                       const SizedBox(height: 4),

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
-import '../theme/app_text_styles.dart';
 import '../nostr/nostr.dart';
 import '../services/cache_store.dart';
 import '../services/publishing.dart';
+import '../theme/app_text_styles.dart';
 import '../widgets/payment_target_chip.dart';
 
 /// Maximum number of payment targets.
@@ -146,13 +146,14 @@ class _EditPaymentTargetsScreenState extends State<EditPaymentTargetsScreen> {
     if (!confirmed || !mounted) return;
 
     final messenger = ScaffoldMessenger.of(context);
-    final privkeyHex = await loadPrivateKeyOrReport(identity, messenger);
-    if (privkeyHex == null || !mounted) return;
+    final secretKey = await loadSecretKeyOrReport(identity, messenger);
+    if (secretKey == null) return;
 
-    setState(() => _saving = true);
     try {
+      if (!mounted) return;
+      setState(() => _saving = true);
       final published = await _repository.publishPaymentTargets(
-        seckeyHex: privkeyHex,
+        secretKey: secretKey,
         pubkeyHex: identity.pubkeyHex,
         base: _base,
         paytoTags: _paytoTags(),
@@ -178,6 +179,7 @@ class _EditPaymentTargetsScreenState extends State<EditPaymentTargetsScreen> {
         const SnackBar(content: Text('Could not sign your payment targets')),
       );
     } finally {
+      secretKey.wipe();
       if (mounted) setState(() => _saving = false);
     }
   }

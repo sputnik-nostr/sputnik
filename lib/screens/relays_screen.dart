@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../models/relay.dart';
 import '../nostr/nostr.dart';
-import '../services/relay_settings.dart';
 import '../services/publishing.dart';
+import '../services/relay_settings.dart';
 
 bool _isPlaintext(String relay) => Uri.tryParse(relay)?.scheme == 'ws';
 
@@ -280,13 +280,14 @@ class _MyRelayListState extends State<_MyRelayList> {
     }
 
     final messenger = ScaffoldMessenger.of(context);
-    final privkeyHex = await loadPrivateKeyOrReport(identity, messenger);
-    if (privkeyHex == null || !mounted) return;
+    final secretKey = await loadSecretKeyOrReport(identity, messenger);
+    if (secretKey == null) return;
 
-    setState(() => _publishing = true);
     try {
+      if (!mounted) return;
+      setState(() => _publishing = true);
       final published = await _repository.publish(
-        seckeyHex: privkeyHex,
+        secretKey: secretKey,
         pubkeyHex: identity.pubkeyHex,
         base: _own?.event,
         entries: [
@@ -318,6 +319,7 @@ class _MyRelayListState extends State<_MyRelayList> {
         const SnackBar(content: Text('Could not sign your relay list')),
       );
     } finally {
+      secretKey.wipe();
       if (mounted) setState(() => _publishing = false);
     }
   }

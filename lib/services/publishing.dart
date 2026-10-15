@@ -41,22 +41,20 @@ Identity? activeIdentity() {
   return identityWithPubkey(identitiesNotifier.value, pubkeyHex);
 }
 
-/// Loads [identity]'s private key, telling the user via [messenger] if it is
-/// missing. Call only after the user has confirmed, to keep secure storage
-/// reads to a minimum.
-Future<String?> loadPrivateKeyOrReport(
+/// [identity]'s key for signing, or null with a snackbar; wipe it after use.
+Future<SecretKey?> loadSecretKeyOrReport(
   Identity identity,
   ScaffoldMessengerState messenger,
 ) async {
-  final privkeyHex = await SettingsStore.loadPrivateKey(identity.pubkeyHex);
-  if (privkeyHex == null) {
+  final secretKey = await SettingsStore.loadSecretKey(identity.pubkeyHex);
+  if (secretKey == null) {
     messenger.showSnackBar(
       const SnackBar(
         content: Text("Could not find this identity's private key"),
       ),
     );
   }
-  return privkeyHex;
+  return secretKey;
 }
 
 /// Snackbars how [results] went and returns whether any relay accepted.

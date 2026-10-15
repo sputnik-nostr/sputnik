@@ -27,7 +27,6 @@ Note _note(String content, {List<NostrMedia> media = const []}) => Note(
   displayName: 'Quoter',
   handle: 'h',
   content: content,
-  postedAt: '1m',
   createdAt: DateTime(2024),
   media: media,
 );

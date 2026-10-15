@@ -27,7 +27,7 @@ void main() {
     required String content,
     required Duration age,
   }) => signEvent(
-    seckeyHex: by.privateKeyHex,
+    secretKey: SecretKey.fromHex(by.privateKeyHex),
     pubkeyHex: by.publicKeyHex,
     kind: kind,
     content: content,

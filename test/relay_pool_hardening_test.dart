@@ -37,7 +37,7 @@ void main() {
   }) {
     final signer = by ?? key;
     return signEvent(
-      seckeyHex: signer.privateKeyHex,
+      secretKey: SecretKey.fromHex(signer.privateKeyHex),
       pubkeyHex: signer.publicKeyHex,
       kind: kind,
       content: content,
@@ -97,7 +97,7 @@ void main() {
 
     test('keeps only events carrying a requested tag', () async {
       final tagged = signEvent(
-        seckeyHex: key.privateKeyHex,
+        secretKey: SecretKey.fromHex(key.privateKeyHex),
         pubkeyHex: key.publicKeyHex,
         kind: 1,
         tags: [

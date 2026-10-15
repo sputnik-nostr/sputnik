@@ -269,7 +269,7 @@ void main() {
     Future<({Map<String, RelayPublishResult> results, Set<String> following})>
     apply(RelayClient client, Map<String, bool> changes) {
       return RelayContactsRepository(client: client).applyFollowChanges(
-        seckeyHex: me.privateKeyHex,
+        secretKey: SecretKey.fromHex(me.privateKeyHex),
         myPubkeyHex: me.publicKeyHex,
         changes: changes,
         relayUrls: {'wss://r'},

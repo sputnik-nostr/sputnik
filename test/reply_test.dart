@@ -20,7 +20,6 @@ Note _noteOf(NostrEvent event, {String name = 'Someone'}) => Note(
   displayName: name,
   handle: name,
   content: event.content,
-  postedAt: '1m',
   createdAt: event.createdAt,
 );
 

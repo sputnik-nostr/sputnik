@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'keys.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'models/post_reactions.dart';
@@ -94,13 +95,13 @@ class RelayReactionsRepository {
 
   /// Publishes a NIP-25 like (kind 7, content "+") for [target].
   Future<Map<String, RelayPublishResult>> publishLike({
-    required String seckeyHex,
+    required SecretKey secretKey,
     required String myPubkeyHex,
     required NostrEvent target,
     required Set<String> relayUrls,
   }) {
     final event = signEvent(
-      seckeyHex: seckeyHex,
+      secretKey: secretKey,
       pubkeyHex: myPubkeyHex,
       kind: 7,
       tags: [
@@ -116,13 +117,13 @@ class RelayReactionsRepository {
   /// Publishes a NIP-18 repost (kind 6) of [target], content the reposted
   /// note's stringified JSON.
   Future<Map<String, RelayPublishResult>> publishRepost({
-    required String seckeyHex,
+    required SecretKey secretKey,
     required String myPubkeyHex,
     required NostrEvent target,
     required Set<String> relayUrls,
   }) {
     final event = signEvent(
-      seckeyHex: seckeyHex,
+      secretKey: secretKey,
       pubkeyHex: myPubkeyHex,
       kind: 6,
       tags: [
@@ -167,13 +168,13 @@ class RelayReactionsRepository {
   /// Publishes a NIP-09 deletion request for [target]; removal is never
   /// guaranteed, since other relays or clients may already have a copy.
   Future<Map<String, RelayPublishResult>> publishRetraction({
-    required String seckeyHex,
+    required SecretKey secretKey,
     required String myPubkeyHex,
     required NostrEvent target,
     required Set<String> relayUrls,
   }) {
     final event = signEvent(
-      seckeyHex: seckeyHex,
+      secretKey: secretKey,
       pubkeyHex: myPubkeyHex,
       kind: 5,
       tags: [

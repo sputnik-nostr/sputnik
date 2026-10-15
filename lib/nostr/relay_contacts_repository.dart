@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../services/cache_store.dart';
+import 'keys.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'relay_client.dart';
@@ -174,7 +175,7 @@ class RelayContactsRepository {
   /// which NIP-02 has us republish in full each time.
   Future<({Map<String, RelayPublishResult> results, Set<String> following})>
   applyFollowChanges({
-    required String seckeyHex,
+    required SecretKey secretKey,
     required String myPubkeyHex,
     required Map<String, bool> changes,
     required Set<String> relayUrls,
@@ -202,7 +203,7 @@ class RelayContactsRepository {
     }
 
     final results = await _publishFollowing(
-      seckeyHex: seckeyHex,
+      secretKey: secretKey,
       myPubkeyHex: myPubkeyHex,
       currentTags: current.tags,
       previous: current.event,
@@ -213,7 +214,7 @@ class RelayContactsRepository {
   }
 
   Future<Map<String, RelayPublishResult>> _publishFollowing({
-    required String seckeyHex,
+    required SecretKey secretKey,
     required String myPubkeyHex,
     required List<List<String>> currentTags,
     required NostrEvent? previous,
@@ -233,7 +234,7 @@ class RelayContactsRepository {
     ];
 
     final event = signEvent(
-      seckeyHex: seckeyHex,
+      secretKey: secretKey,
       pubkeyHex: myPubkeyHex,
       kind: 3,
       tags: newTags,

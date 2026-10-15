@@ -141,13 +141,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!confirmed || !mounted) return;
 
     final messenger = ScaffoldMessenger.of(context);
-    final privkeyHex = await loadPrivateKeyOrReport(identity, messenger);
-    if (privkeyHex == null || !mounted) return;
+    final secretKey = await loadSecretKeyOrReport(identity, messenger);
+    if (secretKey == null) return;
 
-    setState(() => _saving = true);
     try {
+      if (!mounted) return;
+      setState(() => _saving = true);
       final published = await _profiles.publishProfile(
-        seckeyHex: privkeyHex,
+        secretKey: secretKey,
         pubkeyHex: pubkeyHex,
         base: _base,
         fields: {
@@ -183,6 +184,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         const SnackBar(content: Text('Could not sign this profile update')),
       );
     } finally {
+      secretKey.wipe();
       if (mounted) setState(() => _saving = false);
     }
   }

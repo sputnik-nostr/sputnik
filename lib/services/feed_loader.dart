@@ -4,9 +4,9 @@ import '../app_state.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
-import 'post_cursor.dart';
-import 'note_hydration.dart';
 import 'follow_sync.dart';
+import 'note_hydration.dart';
+import 'post_cursor.dart';
 
 /// Tests swap this to feed the loaders without a network.
 RelayClient feedRelayClient = const RelayClient();

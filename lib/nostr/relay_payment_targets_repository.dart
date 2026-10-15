@@ -1,4 +1,5 @@
 import '../services/cache_store.dart';
+import 'keys.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'models/nostr_payment_target.dart';
@@ -56,14 +57,14 @@ class RelayPaymentTargetsRepository {
   /// Publishes [paytoTags] as the whole set; other tags carry over from [base].
   Future<({NostrEvent event, Map<String, RelayPublishResult> results})>
   publishPaymentTargets({
-    required String seckeyHex,
+    required SecretKey secretKey,
     required String pubkeyHex,
     required NostrEvent? base,
     required List<List<String>> paytoTags,
     required Set<String> relayUrls,
   }) async {
     final event = signEvent(
-      seckeyHex: seckeyHex,
+      secretKey: secretKey,
       pubkeyHex: pubkeyHex,
       kind: 10133,
       tags: [

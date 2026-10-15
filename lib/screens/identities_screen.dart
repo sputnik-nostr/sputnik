@@ -29,6 +29,16 @@ void _scheduleClipboardClear(String copiedValue) {
   });
 }
 
+/// Throws [ArgumentError] if [seckeyHex] is not a valid secret key.
+String _pubkeyHexOf(String seckeyHex) {
+  final secretKey = SecretKey.fromHex(seckeyHex);
+  try {
+    return xonlyPubkeyHex(secretKey);
+  } finally {
+    secretKey.wipe();
+  }
+}
+
 Future<void> _addIdentity(String pubkeyHex, String privkeyHex) async {
   // Save the secret first so an identity is never listed without one.
   await SettingsStore.savePrivateKey(pubkeyHex, privkeyHex);
@@ -87,8 +97,8 @@ class _ImportIdentityDialogState extends State<_ImportIdentityDialog> {
 
             final String candidatePubkeyHex;
             try {
-              candidatePubkeyHex = xonlyPubkeyHexFromSeckeyHex(seckeyHex);
-            } catch (_) {
+              candidatePubkeyHex = _pubkeyHexOf(seckeyHex);
+            } on ArgumentError {
               return 'Enter a valid nsec key';
             }
             if (identityWithPubkey(
@@ -131,8 +141,7 @@ Future<void> _importIdentity(BuildContext context) async {
   if (seckeyHex == null) return;
 
   try {
-    final pubkeyHex = xonlyPubkeyHexFromSeckeyHex(seckeyHex);
-    await _addIdentity(pubkeyHex, seckeyHex);
+    await _addIdentity(_pubkeyHexOf(seckeyHex), seckeyHex);
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(

@@ -10,7 +10,7 @@ void main() {
     const expectedPubkeyHex =
         'F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9';
 
-    final pubkeyHex = xonlyPubkeyHexFromSeckeyHex(seckeyHex);
+    final pubkeyHex = xonlyPubkeyHex(SecretKey.fromHex(seckeyHex));
 
     expect(pubkeyHex.toUpperCase(), expectedPubkeyHex);
   });
@@ -24,7 +24,7 @@ void main() {
     expect(RegExp(r'^[0-9a-f]{64}$').hasMatch(keypair.publicKeyHex), isTrue);
 
     expect(
-      xonlyPubkeyHexFromSeckeyHex(keypair.privateKeyHex),
+      xonlyPubkeyHex(SecretKey.fromHex(keypair.privateKeyHex)),
       keypair.publicKeyHex,
     );
 
@@ -37,7 +37,7 @@ void main() {
     // and not anyone's real identity.
     const seckeyHex =
         '0000000000000000000000000000000000000000000000000000000000000003';
-    final pubkeyHex = xonlyPubkeyHexFromSeckeyHex(seckeyHex);
+    final pubkeyHex = xonlyPubkeyHex(SecretKey.fromHex(seckeyHex));
     final pubkeyBytes = Uint8List.fromList(
       List.generate(
         32,
@@ -46,7 +46,10 @@ void main() {
     );
     final msg = Uint8List(32)..fillRange(0, 32, 0x42);
 
-    final sig = signSchnorrSignature(seckeyHex: seckeyHex, msg32: msg);
+    final sig = signSchnorrSignature(
+      secretKey: SecretKey.fromHex(seckeyHex),
+      msg32: msg,
+    );
 
     expect(sig, hasLength(64));
     expect(
@@ -58,7 +61,7 @@ void main() {
   test('a signature does not verify against a different message', () {
     const seckeyHex =
         '0000000000000000000000000000000000000000000000000000000000000003';
-    final pubkeyHex = xonlyPubkeyHexFromSeckeyHex(seckeyHex);
+    final pubkeyHex = xonlyPubkeyHex(SecretKey.fromHex(seckeyHex));
     final pubkeyBytes = Uint8List.fromList(
       List.generate(
         32,
@@ -68,7 +71,10 @@ void main() {
     final msg = Uint8List(32)..fillRange(0, 32, 0x42);
     final otherMsg = Uint8List(32)..fillRange(0, 32, 0x43);
 
-    final sig = signSchnorrSignature(seckeyHex: seckeyHex, msg32: msg);
+    final sig = signSchnorrSignature(
+      secretKey: SecretKey.fromHex(seckeyHex),
+      msg32: msg,
+    );
 
     expect(
       verifySchnorrSignature(
@@ -87,20 +93,19 @@ void main() {
       'a key longer than 32 bytes is rejected, not copied past the buffer',
       () {
         expect(
-          () => xonlyPubkeyHexFromSeckeyHex('${valid}00'),
+          () => xonlyPubkeyHex(SecretKey.fromHex('${valid}00')),
           throwsArgumentError,
         );
-        expect(
-          () =>
-              signSchnorrSignature(seckeyHex: valid * 4, msg32: Uint8List(32)),
-          throwsArgumentError,
-        );
+        expect(() => SecretKey.fromHex(valid * 4), throwsArgumentError);
       },
     );
 
     test('a key shorter than 32 bytes is rejected', () {
-      expect(() => xonlyPubkeyHexFromSeckeyHex('03'), throwsArgumentError);
-      expect(() => xonlyPubkeyHexFromSeckeyHex(''), throwsArgumentError);
+      expect(
+        () => xonlyPubkeyHex(SecretKey.fromHex('03')),
+        throwsArgumentError,
+      );
+      expect(() => xonlyPubkeyHex(SecretKey.fromHex('')), throwsArgumentError);
     });
 
     test('only well-formed hex digits are accepted', () {
@@ -108,17 +113,32 @@ void main() {
       for (final bad in ['-f', '+f', ' f', 'f ', '0x']) {
         final key = (bad * 32).substring(0, 64);
         expect(
-          () => xonlyPubkeyHexFromSeckeyHex(key),
+          () => xonlyPubkeyHex(SecretKey.fromHex(key)),
           throwsArgumentError,
           reason: bad,
         );
       }
     });
 
+    test('a wiped key refuses further use', () {
+      final secretKey = SecretKey.fromHex(valid);
+      secretKey.wipe();
+
+      expect(() => xonlyPubkeyHex(secretKey), throwsStateError);
+      expect(
+        () => signSchnorrSignature(secretKey: secretKey, msg32: Uint8List(32)),
+        throwsStateError,
+      );
+    });
+
+    test('toString does not reveal the key', () {
+      expect(SecretKey.fromHex(valid).toString(), isNot(contains('03')));
+    });
+
     test('the error does not echo the secret', () {
       final secret = 'zz${'00' * 31}';
       try {
-        xonlyPubkeyHexFromSeckeyHex(secret);
+        xonlyPubkeyHex(SecretKey.fromHex(secret));
         fail('expected an error');
       } on ArgumentError catch (e) {
         expect(e.toString(), isNot(contains('zz')));

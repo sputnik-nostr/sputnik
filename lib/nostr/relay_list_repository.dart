@@ -1,3 +1,4 @@
+import 'keys.dart';
 import 'models/nostr_event.dart';
 import 'relay_client.dart';
 import 'relay_list.dart';
@@ -21,14 +22,14 @@ class RelayListRepository {
   /// Publishes [entries] as the whole list; other tags carry over from [base].
   Future<({NostrEvent event, Map<String, RelayPublishResult> results})>
   publish({
-    required String seckeyHex,
+    required SecretKey secretKey,
     required String pubkeyHex,
     required NostrEvent? base,
     required List<RelayListEntry> entries,
     required Set<String> relayUrls,
   }) async {
     final event = signEvent(
-      seckeyHex: seckeyHex,
+      secretKey: secretKey,
       pubkeyHex: pubkeyHex,
       kind: 10002,
       tags: [

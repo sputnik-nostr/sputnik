@@ -4,10 +4,10 @@ import '../app_state.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
+import '../services/profiles.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/placeholder_tab.dart';
 import '../widgets/profile_result_tile.dart';
-import '../services/profiles.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});

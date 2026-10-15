@@ -6,7 +6,7 @@ import '../nostr/nostr.dart';
 import 'publishing.dart';
 
 typedef _Publish = Future<Map<String, RelayPublishResult>> Function({
-  required String seckeyHex,
+  required SecretKey secretKey,
   required String myPubkeyHex,
   required NostrEvent target,
   required Set<String> relayUrls,
@@ -48,20 +48,25 @@ Future<bool> _publishAgainst(
     if (!confirmed || !context.mounted) return false;
   }
 
-  final privkeyHex = await loadPrivateKeyOrReport(identity, messenger);
-  if (privkeyHex == null || !context.mounted) return false;
+  final secretKey = await loadSecretKeyOrReport(identity, messenger);
+  if (secretKey == null) return false;
 
-  final results = await publish(
-    seckeyHex: privkeyHex,
-    myPubkeyHex: identity.pubkeyHex,
-    target: target,
-    relayUrls: relayUrls,
-  );
-  return reportPublishResults(
-    messenger,
-    results,
-    failure: 'Could not publish to any relay',
-  );
+  try {
+    if (!context.mounted) return false;
+    final results = await publish(
+      secretKey: secretKey,
+      myPubkeyHex: identity.pubkeyHex,
+      target: target,
+      relayUrls: relayUrls,
+    );
+    return reportPublishResults(
+      messenger,
+      results,
+      failure: 'Could not publish to any relay',
+    );
+  } finally {
+    secretKey.wipe();
+  }
 }
 
 /// [_publishAgainst] with [note]'s own signed event as the target.

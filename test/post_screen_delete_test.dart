@@ -18,7 +18,6 @@ Note _noteOf(NostrEvent event) => Note(
   displayName: 'Me',
   handle: 'me',
   content: event.content,
-  postedAt: '1m',
   createdAt: event.createdAt,
 );
 

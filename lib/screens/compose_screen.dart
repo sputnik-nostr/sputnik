@@ -128,13 +128,14 @@ class _ComposeScreenState extends State<ComposeScreen> {
       content = content.isEmpty ? reference : '$content\n\n$reference';
     }
 
-    final privkeyHex = await loadPrivateKeyOrReport(identity, messenger);
-    if (privkeyHex == null || !mounted) return;
+    final secretKey = await loadSecretKeyOrReport(identity, messenger);
+    if (secretKey == null) return;
 
     final NostrEvent event;
     try {
+      if (!mounted) return;
       event = signEvent(
-        seckeyHex: privkeyHex,
+        secretKey: secretKey,
         pubkeyHex: identity.pubkeyHex,
         kind: 1,
         tags: tags,
@@ -145,6 +146,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
         const SnackBar(content: Text('Could not sign this note')),
       );
       return;
+    } finally {
+      secretKey.wipe();
     }
 
     final results = await widget.relayClient.publish(event, relayUrls);

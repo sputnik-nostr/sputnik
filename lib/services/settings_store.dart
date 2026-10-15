@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/app_seed_color.dart';
 import '../models/identity.dart';
 import '../models/relay.dart';
+import '../nostr/keys.dart';
 
 /// Storage seam so tests can fake [SettingsStore.secretStore].
 abstract class SecretStore {
@@ -238,6 +239,17 @@ class SettingsStore {
   /// One secure-storage entry per identity, read only when needed.
   static Future<String?> loadPrivateKey(String pubkeyHex) {
     return secretStore.read('$_identitySecretPrefix$pubkeyHex');
+  }
+
+  /// [loadPrivateKey] as a [SecretKey], or null if missing or malformed.
+  static Future<SecretKey?> loadSecretKey(String pubkeyHex) async {
+    final privkeyHex = await loadPrivateKey(pubkeyHex);
+    if (privkeyHex == null) return null;
+    try {
+      return SecretKey.fromHex(privkeyHex);
+    } on ArgumentError {
+      return null;
+    }
   }
 
   static Future<void> savePrivateKey(String pubkeyHex, String privkeyHex) {

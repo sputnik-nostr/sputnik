@@ -1,3 +1,4 @@
+import 'keys.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'models/nostr_metadata.dart';
@@ -61,14 +62,14 @@ class RelayProfileRepository {
   /// Publishes [fields] over [base]; its other fields and tags carry over.
   Future<({NostrEvent event, Map<String, RelayPublishResult> results})>
   publishProfile({
-    required String seckeyHex,
+    required SecretKey secretKey,
     required String pubkeyHex,
     required NostrEvent? base,
     required Map<String, String> fields,
     required Set<String> relayUrls,
   }) async {
     final event = signEvent(
-      seckeyHex: seckeyHex,
+      secretKey: secretKey,
       pubkeyHex: pubkeyHex,
       kind: 0,
       tags: base?.tags ?? const [],

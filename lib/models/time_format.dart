@@ -1,6 +1,6 @@
 import 'package:intl/intl.dart';
 
-final _absoluteTimeFormat = DateFormat('h:mm a · MMM d, y');
+final _absoluteTimeFormat = DateFormat('h:mm a, MMM d, y');
 
 String relativeTime(DateTime time) {
   final diff = DateTime.now().difference(time);
@@ -10,11 +10,9 @@ String relativeTime(DateTime time) {
   return '${diff.inDays}d';
 }
 
-/// "Last active" text built from a [relativeTime] string.
-String formatLastActiveFromPostedAt(String postedAt) {
-  return postedAt == 'now'
-      ? 'Last active just now'
-      : 'Last active $postedAt ago';
+String formatLastActive(DateTime time) {
+  final ago = relativeTime(time);
+  return ago == 'now' ? 'Last active just now' : 'Last active $ago ago';
 }
 
 String formatAbsoluteTime(DateTime time) {

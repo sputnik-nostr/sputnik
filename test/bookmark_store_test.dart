@@ -13,7 +13,6 @@ Note _note(String id, {String content = 'hello'}) => Note(
   displayName: 'Alice',
   handle: '@alice',
   content: content,
-  postedAt: '1m',
   createdAt: DateTime.fromMillisecondsSinceEpoch(1700000000000),
 );
 

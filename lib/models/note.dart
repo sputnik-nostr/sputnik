@@ -1,5 +1,4 @@
 import '../nostr/models/nostr_media.dart';
-import 'time_format.dart';
 
 /// Skips malformed entries, since bookmarks outlive the code that wrote them.
 List<NostrMedia> _mediaFromJson(Object? raw) {
@@ -19,7 +18,6 @@ class Note {
     required this.displayName,
     required this.handle,
     required this.content,
-    required this.postedAt,
     required this.createdAt,
     this.pictureUrl,
     this.replyCount = 0,
@@ -44,7 +42,6 @@ class Note {
       displayName: json['displayName'] as String,
       handle: json['handle'] as String,
       content: json['content'] as String,
-      postedAt: relativeTime(createdAt),
       createdAt: createdAt,
       pictureUrl: json['pictureUrl'] as String?,
       replyCount: json['replyCount'] as int? ?? 0,
@@ -67,7 +64,6 @@ class Note {
   final String displayName;
   final String handle;
   final String content;
-  final String postedAt;
   final DateTime createdAt;
   final String? pictureUrl;
   final int replyCount;
@@ -82,7 +78,7 @@ class Note {
   final List<NostrMedia> media;
 
   /// Who reposted this note, and when, if this entry is here as a repost
-  /// rather than the note itself; [postedAt] still reflects the original.
+  /// rather than the note itself; [createdAt] still reflects the original.
   final String? repostedByPubkey;
   final String? repostedByDisplayName;
   final DateTime? repostedAt;
@@ -102,7 +98,6 @@ class Note {
       displayName: displayName ?? this.displayName,
       handle: handle,
       content: content,
-      postedAt: postedAt,
       createdAt: createdAt,
       pictureUrl: pictureUrl ?? this.pictureUrl,
       replyCount: replyCount ?? this.replyCount,

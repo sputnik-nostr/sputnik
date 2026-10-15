@@ -6,6 +6,7 @@ import '../app_state.dart';
 import '../models/note.dart';
 import '../models/time_format.dart';
 import '../nostr/nostr.dart';
+import '../services/note_hydration.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/bookmark_button.dart';
 import '../widgets/count_label.dart';
@@ -16,7 +17,6 @@ import '../widgets/note_tile.dart';
 import '../widgets/reaction_buttons.dart';
 import 'profile_screen.dart';
 import 'users_list_screen.dart';
-import '../services/note_hydration.dart';
 
 class PostScreen extends StatefulWidget {
   const PostScreen({

@@ -77,7 +77,6 @@ void main() {
       displayName: 'Me',
       handle: 'me',
       content: 'hello',
-      postedAt: 'now',
       createdAt: target.createdAt,
     );
     notesNotifier.value = [note];

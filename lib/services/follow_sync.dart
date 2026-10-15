@@ -107,19 +107,25 @@ Future<void> _runSync() async {
       final myPubkeyHex = _pendingFor!;
       final changes = Map<String, bool>.of(_pending);
 
-      final privkeyHex = await SettingsStore.loadPrivateKey(myPubkeyHex);
-      if (privkeyHex == null) {
+      final secretKey = await SettingsStore.loadSecretKey(myPubkeyHex);
+      if (secretKey == null) {
         _reportSyncFailure();
         return;
       }
 
-      final outcome = await RelayContactsRepository(client: _syncClient)
-          .applyFollowChanges(
-            seckeyHex: privkeyHex,
-            myPubkeyHex: myPubkeyHex,
-            changes: changes,
-            relayUrls: selectedRelaysNotifier.value,
-          );
+      final ({Map<String, RelayPublishResult> results, Set<String> following})
+      outcome;
+      try {
+        outcome = await RelayContactsRepository(client: _syncClient)
+            .applyFollowChanges(
+              secretKey: secretKey,
+              myPubkeyHex: myPubkeyHex,
+              changes: changes,
+              relayUrls: selectedRelaysNotifier.value,
+            );
+      } finally {
+        secretKey.wipe();
+      }
       if (outcome.results.acceptedCount == 0) {
         _retryLater();
         return;

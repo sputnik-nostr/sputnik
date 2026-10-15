@@ -23,7 +23,6 @@ Note _note(String content, List<NostrMedia> media) => Note(
   displayName: 'Name',
   handle: 'h',
   content: content,
-  postedAt: '1m',
   createdAt: DateTime(2024),
   media: media,
 );

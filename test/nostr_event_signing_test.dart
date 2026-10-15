@@ -13,7 +13,7 @@ void main() {
   test('toJson round-trips tags and created_at exactly', () {
     final createdAt = DateTime.fromMillisecondsSinceEpoch(1700000042 * 1000);
     final event = signEvent(
-      seckeyHex: keypair.privateKeyHex,
+      secretKey: SecretKey.fromHex(keypair.privateKeyHex),
       pubkeyHex: keypair.publicKeyHex,
       kind: 1,
       tags: [
@@ -42,7 +42,7 @@ void main() {
     'serializes only the NIP-01 escapes; other characters stay verbatim',
     () {
       final event = signEvent(
-        seckeyHex: keypair.privateKeyHex,
+        secretKey: SecretKey.fromHex(keypair.privateKeyHex),
         pubkeyHex: keypair.publicKeyHex,
         kind: 1,
         tags: [

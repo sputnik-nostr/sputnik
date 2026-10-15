@@ -12,7 +12,6 @@ Note _note(String id, String content) => Note(
   displayName: 'Bob',
   handle: 'bob',
   content: content,
-  postedAt: '1m',
   createdAt: DateTime.now(),
 );
 

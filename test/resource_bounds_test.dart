@@ -59,7 +59,6 @@ void main() {
         displayName: hostileName,
         handle: 'npub1...',
         content: 'hello',
-        postedAt: '2m',
         createdAt: DateTime.now(),
       ),
     ];
@@ -107,7 +106,6 @@ void main() {
               displayName: 'Root',
               handle: 'root',
               content: 'root post',
-              postedAt: '2m',
               createdAt: DateTime(2024),
             ),
             threadRepository: _StubThread(replies),

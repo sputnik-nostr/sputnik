@@ -3,13 +3,14 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
+import '../models/time_format.dart';
 import '../nostr/http_urls.dart';
 import '../nostr/nostr.dart';
 import '../screens/post_screen.dart';
+import '../services/profiles.dart';
 import '../theme/app_text_styles.dart';
 import 'fade_in_avatar.dart';
 import 'linkified_text.dart';
-import '../services/profiles.dart';
 
 const _maxCached = 200;
 const _previewLines = 6;
@@ -186,7 +187,7 @@ class _Preview extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(note.postedAt, style: theme.metadata),
+            Text(relativeTime(note.createdAt), style: theme.metadata),
           ],
         ),
         if (text.isNotEmpty) ...[

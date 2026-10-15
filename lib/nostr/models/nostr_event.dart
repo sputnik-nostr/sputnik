@@ -178,9 +178,9 @@ int compareNewestFirst(NostrEvent a, NostrEvent b) {
   return byTime != 0 ? byTime : a.id.compareTo(b.id);
 }
 
-/// Builds and signs a NostrEvent with [seckeyHex], per NIP-01.
+/// Builds and signs a NostrEvent with [secretKey], per NIP-01.
 NostrEvent signEvent({
-  required String seckeyHex,
+  required SecretKey secretKey,
   required String pubkeyHex,
   required int kind,
   List<List<String>> tags = const [],
@@ -198,7 +198,7 @@ NostrEvent signEvent({
     content: content,
   );
   final idBytes = Uint8List.fromList(sha256.convert(serialized).bytes);
-  final sigBytes = signSchnorrSignature(seckeyHex: seckeyHex, msg32: idBytes);
+  final sigBytes = signSchnorrSignature(secretKey: secretKey, msg32: idBytes);
 
   final event = NostrEvent(
     id: hexEncode(idBytes),

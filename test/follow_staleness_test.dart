@@ -30,7 +30,7 @@ void main() {
 
   NostrEvent contactList(List<String> follows, {required Duration age}) {
     return signEvent(
-      seckeyHex: me.privateKeyHex,
+      secretKey: SecretKey.fromHex(me.privateKeyHex),
       pubkeyHex: me.publicKeyHex,
       kind: 3,
       tags: [
@@ -47,7 +47,7 @@ void main() {
   ) async {
     final outcome = await RelayContactsRepository(client: client)
         .applyFollowChanges(
-          seckeyHex: me.privateKeyHex,
+          secretKey: SecretKey.fromHex(me.privateKeyHex),
           myPubkeyHex: me.publicKeyHex,
           changes: {target: true},
           relayUrls: relays,
