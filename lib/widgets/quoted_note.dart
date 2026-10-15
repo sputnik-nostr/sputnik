@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../models/avatar_initial.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../models/time_format.dart';

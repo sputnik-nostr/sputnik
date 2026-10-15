@@ -33,10 +33,6 @@ String? fetchableUrlOrNull(String? url) =>
 MediaSource profileImageSource(String url) =>
     MediaSource(url: url, sha256: blossomHash(Uri.parse(url)));
 
-/// An HttpClient that refuses non-public addresses.
-HttpClient guardedHttpClient() =>
-    HttpClient()..connectionFactory = guardedConnectionFactory;
-
 /// Bounds the connections one host can hold open on the shared client.
 const _maxConnectionsPerHost = 6;
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../models/avatar_initial.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/app_drawer.dart';
 import 'bookmarks_screen.dart';

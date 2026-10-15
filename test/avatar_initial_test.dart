@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sputnik/theme/app_text_styles.dart';
+import 'package:sputnik/models/avatar_initial.dart';
 
 void main() {
   group('avatarInitial', () {

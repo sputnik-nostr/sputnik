@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../nostr/blossom.dart';
 import 'media_loader.dart';
+import 'ssrf_guard.dart';
 
 const _dirPrefix = 'sputnik_media_';
 

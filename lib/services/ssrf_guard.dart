@@ -93,6 +93,10 @@ Future<ConnectionTask<Socket>> guardedConnectionFactory(
   return ConnectionTask.fromSocket(secureSocket, rawTask.cancel);
 }
 
+/// An HttpClient that refuses non-public addresses.
+HttpClient guardedHttpClient() =>
+    HttpClient()..connectionFactory = guardedConnectionFactory;
+
 /// Guards every HttpClient, including NetworkImage, which has no other seam.
 class SsrfGuardedHttpOverrides extends HttpOverrides {
   @override

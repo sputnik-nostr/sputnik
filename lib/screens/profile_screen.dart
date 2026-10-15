@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app_state.dart';
+import '../models/avatar_initial.dart';
 import '../models/note.dart';
 import '../models/time_format.dart';
 import '../nostr/nip05.dart';
 import '../nostr/nostr.dart';
 import '../services/follow_sync.dart';
 import '../services/media_loader.dart';
+import '../services/nip05_verification.dart';
 import '../services/note_hydration.dart';
 import '../services/post_cursor.dart';
 import '../services/profiles.dart';

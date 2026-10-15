@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../models/avatar_initial.dart';
 import '../models/note.dart';
 import '../models/time_format.dart';
 import '../nostr/nostr.dart';

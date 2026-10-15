@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/nostr/nip05.dart';
+import 'package:sputnik/services/nip05_verification.dart';
 
 void main() {
   final pubkey = 'aa' * 32;

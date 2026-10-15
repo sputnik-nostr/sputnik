@@ -22,70 +22,61 @@ Future<void> main() async {
   VideoStore.instance.sweepStale().ignore();
   SettingsStore.removeObsoleteKeys().ignore();
 
-  final cacheInit = CacheStore.init();
-  final themeModeBound = bindPersisted(
-    themeModeNotifier,
-    SettingsStore.loadThemeMode,
-    SettingsStore.saveThemeMode,
-  );
-  final seedColorBound = bindPersisted(
-    seedColorNotifier,
-    SettingsStore.loadSeedColor,
-    SettingsStore.saveSeedColor,
-  );
-  final bookmarkedNotesBound = bindPersisted(
-    bookmarkedNotesNotifier,
-    BookmarkStore.load,
-    BookmarkStore.save,
-  );
-  final customRelaysBound = bindPersisted(
-    customRelaysNotifier,
-    SettingsStore.loadCustomRelays,
-    SettingsStore.saveCustomRelays,
-  );
-  final identitiesBound = bindPersisted(
-    identitiesNotifier,
-    SettingsStore.loadIdentities,
-    SettingsStore.saveIdentities,
-  );
-  final activeIdentityPubkeyBound = bindPersisted(
-    activeIdentityPubkeyNotifier,
-    SettingsStore.loadActiveIdentityPubkey,
-    SettingsStore.saveActiveIdentityPubkey,
-  );
-  final loadMediaBound = bindPersisted(
-    loadMediaNotifier,
-    SettingsStore.loadLoadMedia,
-    SettingsStore.saveLoadMedia,
-  );
-  final loadNoteImagesBound = bindPersisted(
-    loadNoteImagesNotifier,
-    SettingsStore.loadLoadNoteImages,
-    SettingsStore.saveLoadNoteImages,
-  );
-  final hiddenPaymentTargetTypesBound = bindPersisted(
-    hiddenPaymentTargetTypesNotifier,
-    SettingsStore.loadHiddenPaymentTargetTypes,
-    SettingsStore.saveHiddenPaymentTargetTypes,
-  );
-  final confirmBeforeReactingBound = bindPersisted(
-    confirmBeforeReactingNotifier,
-    SettingsStore.loadConfirmBeforeReacting,
-    SettingsStore.saveConfirmBeforeReacting,
-  );
+  await Future.wait([
+    CacheStore.init(),
+    bindPersisted(
+      themeModeNotifier,
+      SettingsStore.loadThemeMode,
+      SettingsStore.saveThemeMode,
+    ),
+    bindPersisted(
+      seedColorNotifier,
+      SettingsStore.loadSeedColor,
+      SettingsStore.saveSeedColor,
+    ),
+    bindPersisted(
+      bookmarkedNotesNotifier,
+      BookmarkStore.load,
+      BookmarkStore.save,
+    ),
+    bindPersisted(
+      customRelaysNotifier,
+      SettingsStore.loadCustomRelays,
+      SettingsStore.saveCustomRelays,
+    ),
+    bindPersisted(
+      identitiesNotifier,
+      SettingsStore.loadIdentities,
+      SettingsStore.saveIdentities,
+    ),
+    bindPersisted(
+      activeIdentityPubkeyNotifier,
+      SettingsStore.loadActiveIdentityPubkey,
+      SettingsStore.saveActiveIdentityPubkey,
+    ),
+    bindPersisted(
+      loadMediaNotifier,
+      SettingsStore.loadLoadMedia,
+      SettingsStore.saveLoadMedia,
+    ),
+    bindPersisted(
+      loadNoteImagesNotifier,
+      SettingsStore.loadLoadNoteImages,
+      SettingsStore.saveLoadNoteImages,
+    ),
+    bindPersisted(
+      hiddenPaymentTargetTypesNotifier,
+      SettingsStore.loadHiddenPaymentTargetTypes,
+      SettingsStore.saveHiddenPaymentTargetTypes,
+    ),
+    bindPersisted(
+      confirmBeforeReactingNotifier,
+      SettingsStore.loadConfirmBeforeReacting,
+      SettingsStore.saveConfirmBeforeReacting,
+    ),
+  ]);
 
-  await cacheInit;
-  await themeModeBound;
-  await seedColorBound;
-  await bookmarkedNotesBound;
-  await customRelaysBound;
-  await identitiesBound;
-  await activeIdentityPubkeyBound;
-  await loadMediaBound;
-  await loadNoteImagesBound;
-  await hiddenPaymentTargetTypesBound;
-  await confirmBeforeReactingBound;
-
+  // Valid selections depend on the custom relays loaded above.
   await bindPersisted(
     selectedRelaysNotifier,
     () => SettingsStore.loadSelectedRelays({
