@@ -8,9 +8,11 @@ import '../models/time_format.dart';
 import '../nostr/nip05.dart';
 import '../nostr/nostr.dart';
 import '../services/follow_sync.dart';
+import '../services/follows.dart';
 import '../services/media_loader.dart';
 import '../services/nip05_verification.dart';
 import '../services/note_hydration.dart';
+import '../services/payment_targets.dart';
 import '../services/post_cursor.dart';
 import '../services/profiles.dart';
 import '../theme/app_text_styles.dart';
@@ -221,16 +223,17 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Future<void> _loadContacts(String pubkeyHex, {bool force = false}) async {
     final relayUrls = selectedRelaysNotifier.value;
-    final repository = RelayContactsRepository(client: widget.relayClient);
-    final followingFuture = repository.fetchFollowing(
+    final followingFuture = loadFollowing(
       pubkeyHex,
       relayUrls,
       force: force,
+      client: widget.relayClient,
     );
-    final followersFuture = repository.fetchFollowers(
+    final followersFuture = loadFollowers(
       pubkeyHex,
       relayUrls,
       force: force,
+      client: widget.relayClient,
     );
 
     final following = await followingFuture;
@@ -244,13 +247,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     String pubkeyHex, {
     bool force = false,
   }) async {
-    final targets =
-        await RelayPaymentTargetsRepository(client: widget.relayClient)
-            .fetchPaymentTargets(
-              pubkeyHex,
-              selectedRelaysNotifier.value,
-              force: force,
-            );
+    final targets = await loadPaymentTargets(
+      pubkeyHex,
+      selectedRelaysNotifier.value,
+      force: force,
+      client: widget.relayClient,
+    );
     if (mounted) setState(() => _paymentTargets = targets);
   }
 

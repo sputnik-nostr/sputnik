@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../nostr/nostr.dart';
+import 'cache_store.dart';
+import 'follows.dart';
 import 'settings_store.dart';
 
 const _debounceDuration = Duration(milliseconds: 500);
@@ -32,8 +34,9 @@ RelayClient _syncClient = const RelayClient();
 /// The identity [myFollowingNotifier] was last loaded for.
 String? _myFollowingLoadedFor;
 
-/// The load in flight, so concurrent callers share one fetch.
-Future<void>? _myFollowingLoading;
+/// The load in flight and whose list it is, so concurrent callers for the
+/// same identity share one fetch.
+({String pubkeyHex, Future<void> future})? _myFollowingLoading;
 
 /// Populates [myFollowingNotifier] for the active identity, once per identity.
 Future<void> ensureMyFollowingLoaded(
@@ -50,15 +53,34 @@ Future<void> ensureMyFollowingLoaded(
       myFollowingNotifier.value != null) {
     return Future.value();
   }
-  return _myFollowingLoading ??= RelayContactsRepository(client: relayClient)
-      .fetchFollowingOrNull(myPubkeyHex, relayUrls)
+  if (_myFollowingLoadedFor != myPubkeyHex) {
+    // Another identity's list must not stand in while this one loads.
+    myFollowingNotifier.value = null;
+    _myFollowingLoadedFor = null;
+  }
+
+  final inFlight = _myFollowingLoading;
+  if (inFlight != null && inFlight.pubkeyHex == myPubkeyHex) {
+    return inFlight.future;
+  }
+
+  late final Future<void> future;
+  future = loadFollowingOrNull(myPubkeyHex, relayUrls, client: relayClient)
       .then((following) {
         // Left unloaded on failure so the next call retries.
         if (following == null) return;
+        // The active identity may have changed while this was in flight.
+        if (activeIdentityPubkeyNotifier.value != myPubkeyHex) return;
         myFollowingNotifier.value = following.toSet();
         _myFollowingLoadedFor = myPubkeyHex;
       })
-      .whenComplete(() => _myFollowingLoading = null);
+      .whenComplete(() {
+        if (identical(_myFollowingLoading?.future, future)) {
+          _myFollowingLoading = null;
+        }
+      });
+  _myFollowingLoading = (pubkeyHex: myPubkeyHex, future: future);
+  return future;
 }
 
 /// Queues a follow change, published in a batch after a short debounce.
@@ -85,6 +107,8 @@ void resetFollowSync() {
   _pending.clear();
   _pendingFor = null;
   _failedAttempts = 0;
+  _myFollowingLoadedFor = null;
+  _myFollowingLoading = null;
 }
 
 void _retryLater() {
@@ -131,6 +155,7 @@ Future<void> _runSync() async {
         return;
       }
       _failedAttempts = 0;
+      await CacheStore.putFollowing(myPubkeyHex, outcome.following.toList());
 
       // Anything toggled again mid-publish stays queued for the next pass.
       for (final change in changes.entries) {
@@ -138,6 +163,8 @@ Future<void> _runSync() async {
       }
 
       if (activeIdentityPubkeyNotifier.value == myPubkeyHex) {
+        // Built on a conclusive fetch of the list, so it counts as loaded.
+        _myFollowingLoadedFor = myPubkeyHex;
         myFollowingNotifier.value = {
           for (final pubkey in outcome.following)
             if (_pending[pubkey] != false) pubkey,

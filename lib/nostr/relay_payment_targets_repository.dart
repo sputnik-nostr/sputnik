@@ -1,4 +1,3 @@
-import '../services/cache_store.dart';
 import 'keys.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
@@ -11,16 +10,11 @@ class RelayPaymentTargetsRepository {
 
   final RelayClient client;
 
+  /// The payment targets [pubkeyHex] has published, uncached.
   Future<List<NostrPaymentTarget>> fetchPaymentTargets(
     String pubkeyHex,
-    Set<String> relayUrls, {
-    bool force = false,
-  }) async {
-    if (!force && CacheStore.isPaymentTargetsFresh(pubkeyHex)) {
-      final cached = CacheStore.getPaymentTargets(pubkeyHex);
-      if (cached != null) return cached;
-    }
-
+    Set<String> relayUrls,
+  ) async {
     final events = await client.query(
       relayUrls,
       NostrFilter(kinds: const [10133], authors: [pubkeyHex], limit: 1),
@@ -36,9 +30,7 @@ class RelayPaymentTargetsRepository {
 
     if (own.isEmpty) return const <NostrPaymentTarget>[];
 
-    final targets = paymentTargetsFromEvent(own.first);
-    await CacheStore.putPaymentTargets(pubkeyHex, targets);
-    return targets;
+    return paymentTargetsFromEvent(own.first);
   }
 
   /// Uncached, so an edit builds on what is really published.

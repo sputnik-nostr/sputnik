@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-import '../services/cache_store.dart';
 import 'keys.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
@@ -40,23 +39,15 @@ class RelayContactsRepository {
   /// The pubkeys a person follows, read from their own kind:3 contact list.
   Future<List<String>> fetchFollowing(
     String pubkeyHex,
-    Set<String> relayUrls, {
-    bool force = false,
-  }) async =>
-      await fetchFollowingOrNull(pubkeyHex, relayUrls, force: force) ??
-      const <String>[];
+    Set<String> relayUrls,
+  ) async =>
+      await fetchFollowingOrNull(pubkeyHex, relayUrls) ?? const <String>[];
 
   /// Null when nothing was found and some relay may still hold a list.
   Future<List<String>?> fetchFollowingOrNull(
     String pubkeyHex,
-    Set<String> relayUrls, {
-    bool force = false,
-  }) async {
-    if (!force && CacheStore.isFollowingFresh(pubkeyHex)) {
-      final cached = CacheStore.getFollowing(pubkeyHex);
-      if (cached != null) return cached;
-    }
-
+    Set<String> relayUrls,
+  ) async {
     final result = await client.queryWithStatus(
       relayUrls,
       NostrFilter(kinds: const [3], authors: [pubkeyHex], limit: 1),
@@ -72,23 +63,15 @@ class RelayContactsRepository {
       return result.allRelaysAnswered ? const <String>[] : null;
     }
 
-    final following = _followedPubkeys(own.first);
-    await CacheStore.putFollowing(pubkeyHex, following);
-    return following;
+    return _followedPubkeys(own.first);
   }
 
   /// The pubkeys of people whose own contact list currently includes this
   /// pubkey.
   Future<List<String>> fetchFollowers(
     String pubkeyHex,
-    Set<String> relayUrls, {
-    bool force = false,
-  }) async {
-    if (!force && CacheStore.isFollowersFresh(pubkeyHex)) {
-      final cached = CacheStore.getFollowers(pubkeyHex);
-      if (cached != null) return cached;
-    }
-
+    Set<String> relayUrls,
+  ) async {
     final tagged = await client.query(
       relayUrls,
       NostrFilter(
@@ -125,7 +108,7 @@ class RelayContactsRepository {
     }
 
     final subject = pubkeyHex.toLowerCase();
-    final followers = [
+    return [
       for (final event in latestByAuthor.values)
         if (event.tags.any(
           (tag) =>
@@ -135,9 +118,6 @@ class RelayContactsRepository {
         ))
           event.pubkey,
     ];
-
-    await CacheStore.putFollowers(pubkeyHex, followers);
-    return followers;
   }
 
   Future<({List<List<String>> tags, NostrEvent? event})?> _fetchOwnContactList(
@@ -242,10 +222,8 @@ class RelayContactsRepository {
       createdAt: nextReplaceableTime(previous),
     );
     final results = await client.publish(event, relayUrls);
-
     if (results.acceptedCount > 0) {
       _noteContactList(myPubkeyHex, event.createdAt);
-      await CacheStore.putFollowing(myPubkeyHex, desiredFollowing.toList());
     }
     return results;
   }

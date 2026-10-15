@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/app_state.dart';
 import 'package:sputnik/models/identity.dart';
 import 'package:sputnik/nostr/nostr.dart';
+import 'package:sputnik/services/cache_store.dart';
 import 'package:sputnik/services/follow_sync.dart';
 import 'package:sputnik/services/settings_store.dart';
 
+import 'support/answering_relay_client.dart';
 import 'support/fake_secret_store.dart';
 
 enum _Relays {
@@ -82,6 +86,38 @@ class _FlakyRelay extends RelayClient {
   }
 }
 
+/// Answers each author's contact list, holding back [held]'s until released.
+class _PerAuthorRelay extends RelayClient with AnsweringRelayClient {
+  _PerAuthorRelay(this.followedBy, {required this.held});
+
+  final Map<String, List<String>> followedBy;
+  final String held;
+  final release = Completer<void>();
+
+  @override
+  Future<List<NostrEvent>> query(
+    Set<String> relayUrls,
+    NostrFilter filter,
+  ) async {
+    final author = filter.authors!.single;
+    if (author == held) await release.future;
+    return [
+      NostrEvent(
+        id: 'id',
+        pubkey: author,
+        createdAt: DateTime.now(),
+        kind: 3,
+        tags: [
+          for (final pubkey in followedBy[author] ?? const <String>[])
+            ['p', pubkey],
+        ],
+        content: '',
+        sig: 'sig',
+      ),
+    ];
+  }
+}
+
 // The follow-sync loop debounces before publishing.
 Future<void> _waitForSync() =>
     Future<void>.delayed(const Duration(milliseconds: 800));
@@ -98,6 +134,7 @@ void main() {
 
   setUp(() async {
     resetFollowSync();
+    await CacheStore.clearAll();
     followSyncRetryDelays = const [Duration(milliseconds: 100)];
 
     // A throwaway keypair, never a real saved identity.
@@ -111,6 +148,40 @@ void main() {
     activeIdentityPubkeyNotifier.value = me;
     selectedRelaysNotifier.value = {'wss://relay.example'};
     myFollowingNotifier.value = null;
+  });
+
+  test('switching identity mid-load never shows the previous identity\'s '
+      'follows', () async {
+    final other = 'dd' * 32;
+    final relay = _PerAuthorRelay({
+      me: [alice],
+      other: [bob, carol],
+    }, held: me);
+
+    final first = ensureMyFollowingLoaded({
+      'wss://relay.example',
+    }, relayClient: relay);
+    activeIdentityPubkeyNotifier.value = other;
+    final second = ensureMyFollowingLoaded({
+      'wss://relay.example',
+    }, relayClient: relay);
+    relay.release.complete();
+    await Future.wait([first, second]);
+
+    expect(myFollowingNotifier.value, {bob, carol});
+  });
+
+  test('a list loaded for one identity is not reused for the next', () async {
+    final other = 'dd' * 32;
+    final relay = _FlakyRelay(me, [alice, bob])..relays = _Relays.up;
+    await ensureMyFollowingLoaded({'wss://relay.example'}, relayClient: relay);
+    expect(myFollowingNotifier.value, {alice, bob});
+
+    activeIdentityPubkeyNotifier.value = other;
+    relay.relays = _Relays.down;
+    await ensureMyFollowingLoaded({'wss://relay.example'}, relayClient: relay);
+
+    expect(myFollowingNotifier.value, isNull);
   });
 
   test('a failed startup load is not mistaken for "follows nobody"', () async {
