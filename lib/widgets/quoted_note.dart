@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../nostr/http_urls.dart';
@@ -9,6 +9,7 @@ import '../screens/post_screen.dart';
 import '../theme/app_text_styles.dart';
 import 'fade_in_avatar.dart';
 import 'linkified_text.dart';
+import '../services/profiles.dart';
 
 const _maxCached = 200;
 const _previewLines = 6;
@@ -46,8 +47,11 @@ Future<Note?> _load(String id, RelayClient client) async {
       client: client,
     ).fetchPostById(id);
     if (post != null) {
-      final metadata = await RelayProfileRepository(client: client)
-          .fetchProfile(post.author.pubkey, relayUrls);
+      final metadata = await loadProfile(
+        post.author.pubkey,
+        relayUrls,
+        client: client,
+      );
       if (_notes.length >= _maxCached) _notes.clear();
       return _notes[id] = noteFromNostrPost(post, authorMetadata: metadata);
     }

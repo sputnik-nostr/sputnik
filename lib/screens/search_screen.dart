@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/placeholder_tab.dart';
 import '../widgets/profile_result_tile.dart';
+import '../services/profiles.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -107,10 +108,7 @@ class _NpubResultState extends State<_NpubResult> {
   @override
   void initState() {
     super.initState();
-    const RelayProfileRepository().fetchProfile(
-      widget.pubkeyHex,
-      selectedRelaysNotifier.value,
-    );
+    loadProfile(widget.pubkeyHex, selectedRelaysNotifier.value);
   }
 
   @override
@@ -151,10 +149,7 @@ class _NoteResultState extends State<_NoteResult> {
         .fetchPostById(widget.eventIdHex);
     if (post == null) return null;
 
-    final authorMetadata = await const RelayProfileRepository().fetchProfile(
-      post.author.pubkey,
-      relayUrls,
-    );
+    final authorMetadata = await loadProfile(post.author.pubkey, relayUrls);
     return noteFromNostrPost(post, authorMetadata: authorMetadata);
   }
 

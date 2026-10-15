@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sputnik/main.dart';
+import 'package:sputnik/app_state.dart';
 import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/screens/home_screen.dart';
 import 'package:sputnik/screens/profile_screen.dart';

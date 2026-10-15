@@ -1,5 +1,3 @@
-import '../main.dart';
-import '../services/cache_store.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'models/nostr_metadata.dart';
@@ -12,36 +10,15 @@ class RelayProfileRepository {
 
   final RelayClient client;
 
-  Future<NostrMetadata?> fetchProfile(
-    String pubkey,
-    Set<String> relayUrls, {
-    bool force = false,
-  }) async {
-    final profiles = await fetchProfiles({pubkey}, relayUrls, force: force);
-    return profiles[pubkey];
-  }
-
+  /// The newest metadata each of [pubkeys] has published, uncached.
   Future<Map<String, NostrMetadata>> fetchProfiles(
     Set<String> pubkeys,
-    Set<String> relayUrls, {
-    bool force = false,
-  }) async {
+    Set<String> relayUrls,
+  ) async {
     if (pubkeys.isEmpty) return {};
 
-    final cached = <String, NostrMetadata>{};
-    final toFetch = <String>{};
-    for (final pubkey in pubkeys) {
-      final metadata = profileCacheNotifier.value[pubkey];
-      if (!force && metadata != null && CacheStore.isProfileFresh(pubkey)) {
-        cached[pubkey] = metadata;
-      } else {
-        toFetch.add(pubkey);
-      }
-    }
-    if (toFetch.isEmpty) return cached;
-
     final eventsByChunk = await Future.wait(
-      chunkedAuthors(toFetch.toList()).map(
+      chunkedAuthors(pubkeys.toList()).map(
         (chunk) => client.query(
           relayUrls,
           NostrFilter(kinds: const [0], authors: chunk),
@@ -51,7 +28,7 @@ class RelayProfileRepository {
     final events = eventsByChunk.expand((events) => events).toList()
       ..sort(compareNewestFirst);
 
-    final requested = {for (final pubkey in toFetch) pubkey.toLowerCase()};
+    final requested = {for (final pubkey in pubkeys) pubkey.toLowerCase()};
     final metadataByPubkey = <String, NostrMetadata>{};
     for (final event in events) {
       // Any signed event from a relay is authentic, not necessarily asked for.
@@ -65,16 +42,7 @@ class RelayProfileRepository {
         // Metadata content is malformed; skip event for this author.
       }
     }
-
-    if (metadataByPubkey.isNotEmpty) {
-      profileCacheNotifier.value = {
-        ...profileCacheNotifier.value,
-        ...metadataByPubkey,
-      };
-      await CacheStore.putProfiles(metadataByPubkey);
-    }
-
-    return {...cached, ...metadataByPubkey};
+    return metadataByPubkey;
   }
 
   /// Uncached, so an edit builds on what is really published.

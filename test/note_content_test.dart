@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blurhash/flutter_blurhash.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:sputnik/main.dart';
+import 'package:sputnik/app_state.dart';
 import 'package:sputnik/models/note.dart';
 import 'package:sputnik/nostr/models/nostr_media.dart';
 import 'package:sputnik/screens/image_viewer_screen.dart';

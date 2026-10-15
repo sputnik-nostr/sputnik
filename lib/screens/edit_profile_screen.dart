@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../nostr/nip05.dart';
 import '../nostr/nostr.dart';
 import '../services/cache_store.dart';

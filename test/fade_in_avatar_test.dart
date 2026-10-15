@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:sputnik/main.dart';
+import 'package:sputnik/app_state.dart';
 import 'package:sputnik/services/media_loader.dart';
 import 'package:sputnik/widgets/fade_in_avatar.dart';
 

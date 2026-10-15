@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../models/note.dart';
 import '../services/feed_loader.dart';
 import '../widgets/compact_tab_bar.dart';

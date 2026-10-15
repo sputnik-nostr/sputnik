@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:sputnik/main.dart';
+import 'package:sputnik/app_state.dart';
 import 'package:sputnik/models/identity.dart';
 import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/screens/edit_profile_screen.dart';

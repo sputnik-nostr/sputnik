@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../models/note.dart';
-import '../models/note_mapper.dart';
 import '../models/time_format.dart';
 import '../nostr/nip05.dart';
 import '../nostr/nostr.dart';
@@ -25,6 +24,9 @@ import 'identities_screen.dart';
 import 'image_viewer_screen.dart';
 import 'user_relays_screen.dart';
 import 'users_list_screen.dart';
+import '../services/profiles.dart';
+import '../services/note_hydration.dart';
+import '../services/follow_sync.dart';
 
 const _bannerHeight = 140.0 * 0.8;
 const _bannerMaxDecodeExtent = 1600;
@@ -146,13 +148,18 @@ class _ProfileScreenState extends State<ProfileScreen>
       return;
     }
 
-    RelayProfileRepository(client: widget.relayClient)
-        .fetchProfile(pubkeyHex, selectedRelaysNotifier.value);
+    loadProfile(
+      pubkeyHex,
+      selectedRelaysNotifier.value,
+      client: widget.relayClient,
+    );
     _loadAuthorPosts(pubkeyHex);
     _loadContacts(pubkeyHex);
     _loadPaymentTargets(pubkeyHex);
-    RelayContactsRepository(client: widget.relayClient)
-        .ensureMyFollowingLoaded(selectedRelaysNotifier.value);
+    ensureMyFollowingLoaded(
+      selectedRelaysNotifier.value,
+      relayClient: widget.relayClient,
+    );
   }
 
   Future<void> _loadAuthorPosts(String pubkeyHex) async {
@@ -197,6 +204,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       posts,
       relayUrls,
       knownMetadata: metadata == null ? const {} : {pubkeyHex: metadata},
+      client: widget.relayClient,
     );
   }
 
@@ -240,8 +248,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (pubkeyHex == null) return;
 
     await Future.wait([
-      RelayProfileRepository(client: widget.relayClient)
-          .fetchProfile(pubkeyHex, selectedRelaysNotifier.value, force: true),
+      loadProfile(
+        pubkeyHex,
+        selectedRelaysNotifier.value,
+        force: true,
+        client: widget.relayClient,
+      ),
       _loadAuthorPosts(pubkeyHex),
       _loadContacts(pubkeyHex, force: true),
       _loadPaymentTargets(pubkeyHex, force: true),

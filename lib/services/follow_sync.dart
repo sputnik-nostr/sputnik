@@ -3,7 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../nostr/nostr.dart';
 import 'settings_store.dart';
 
@@ -28,6 +28,38 @@ Timer? _timer;
 bool _syncRunning = false;
 int _failedAttempts = 0;
 RelayClient _syncClient = const RelayClient();
+
+/// The identity [myFollowingNotifier] was last loaded for.
+String? _myFollowingLoadedFor;
+
+/// The load in flight, so concurrent callers share one fetch.
+Future<void>? _myFollowingLoading;
+
+/// Populates [myFollowingNotifier] for the active identity, once per identity.
+Future<void> ensureMyFollowingLoaded(
+  Set<String> relayUrls, {
+  RelayClient relayClient = const RelayClient(),
+}) {
+  final myPubkeyHex = activeIdentityPubkeyNotifier.value;
+  if (myPubkeyHex == null) {
+    myFollowingNotifier.value = null;
+    _myFollowingLoadedFor = null;
+    return Future.value();
+  }
+  if (_myFollowingLoadedFor == myPubkeyHex &&
+      myFollowingNotifier.value != null) {
+    return Future.value();
+  }
+  return _myFollowingLoading ??= RelayContactsRepository(client: relayClient)
+      .fetchFollowingOrNull(myPubkeyHex, relayUrls)
+      .then((following) {
+        // Left unloaded on failure so the next call retries.
+        if (following == null) return;
+        myFollowingNotifier.value = following.toSet();
+        _myFollowingLoadedFor = myPubkeyHex;
+      })
+      .whenComplete(() => _myFollowingLoading = null);
+}
 
 /// Queues a follow change, published in a batch after a short debounce.
 void scheduleFollowingSync(

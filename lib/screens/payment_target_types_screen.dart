@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../widgets/payment_target_chip.dart';
 
 class PaymentTargetTypesScreen extends StatelessWidget {

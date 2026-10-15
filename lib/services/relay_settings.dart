@@ -1,4 +1,4 @@
-import '../main.dart';
+import '../app_state.dart';
 import '../models/relay.dart';
 
 void setRelaySelected(String relay, bool selected) {

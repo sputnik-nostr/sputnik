@@ -1,0 +1,38 @@
+import '../app_state.dart';
+import '../models/note.dart';
+import '../models/note_mapper.dart';
+import '../nostr/nostr.dart';
+import 'profiles.dart';
+
+/// Fetches profiles and reaction counts for [posts], then maps them to
+/// notes. [knownMetadata] skips the fetch for pubkeys it already covers.
+Future<List<Note>> hydratePosts(
+  List<NostrPost> posts,
+  Set<String> relayUrls, {
+  Map<String, NostrMetadata>? knownMetadata,
+  RelayClient client = const RelayClient(),
+}) async {
+  final known = knownMetadata ?? const <String, NostrMetadata>{};
+  final needed = {
+    for (final post in posts) post.author.pubkey,
+    for (final post in posts)
+      if (post.repostedByPubkey != null) post.repostedByPubkey!,
+  }..removeAll(known.keys);
+
+  final profilesFuture = needed.isEmpty
+      ? Future.value(known)
+      : loadProfiles(
+          needed,
+          relayUrls,
+          client: client,
+        ).then((fetched) => {...known, ...fetched});
+  final reactionsFuture = RelayReactionsRepository(client: client)
+      .fetchReactions(posts.map((post) => post.id).toList(), relayUrls);
+
+  final notes = notesFromPosts(posts, await profilesFuture);
+  return applyReactionCounts(
+    notes,
+    await reactionsFuture,
+    myPubkeyHex: activeIdentityPubkeyNotifier.value,
+  );
+}

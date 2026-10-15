@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../services/media_loader.dart';
 
 /// A circular avatar whose image fades in over [fallback] (e.g. initials).

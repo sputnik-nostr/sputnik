@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
 import 'post_cursor.dart';
+import 'note_hydration.dart';
+import 'follow_sync.dart';
 
 /// Tests swap this to feed the loaders without a network.
 RelayClient feedRelayClient = const RelayClient();
@@ -77,7 +79,7 @@ Future<void> loadFollowingFeed() async {
     return;
   }
 
-  await const RelayContactsRepository().ensureMyFollowingLoaded(relayUrls);
+  await ensureMyFollowingLoaded(relayUrls, relayClient: feedRelayClient);
   if (generation != _followingGeneration) return;
 
   _followingAuthors = {...?myFollowingNotifier.value, myPubkeyHex}.toList();
@@ -110,7 +112,12 @@ Future<void> _appendPosts(
   ];
 
   final hydrated = {
-    for (final note in await hydratePosts(posts, relayUrls)) note.id: note,
+    for (final note in await hydratePosts(
+      posts,
+      relayUrls,
+      client: feedRelayClient,
+    ))
+      note.id: note,
   };
   target.value = [
     for (final note in target.value ?? const <Note>[])
@@ -129,7 +136,12 @@ Future<void> _showPosts(
   target.value = notesFromPosts(posts, profileCacheNotifier.value);
 
   final hydrated = {
-    for (final note in await hydratePosts(posts, relayUrls)) note.id: note,
+    for (final note in await hydratePosts(
+      posts,
+      relayUrls,
+      client: feedRelayClient,
+    ))
+      note.id: note,
   };
   if (!isCurrent()) return;
   // Older pages may have been appended while this was hydrating.

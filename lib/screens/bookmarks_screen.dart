@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../models/note.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/placeholder_tab.dart';

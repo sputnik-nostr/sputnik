@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../models/identity.dart';
 import '../models/time_format.dart';
 import '../nostr/nostr.dart';

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../nostr/nip19.dart';
 import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';

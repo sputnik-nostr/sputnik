@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-import '../main.dart';
 import '../services/cache_store.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
@@ -24,12 +23,6 @@ void _noteContactList(String pubkeyHex, DateTime createdAt) {
   }
 }
 
-/// The identity [myFollowingNotifier] was last loaded for.
-String? _myFollowingLoadedForPubkeyHex;
-
-/// The load in flight, so concurrent callers share one fetch.
-Future<void>? _myFollowingLoadingFuture;
-
 List<String> _followedPubkeys(NostrEvent event) {
   return [
     for (final tag in event.tags)
@@ -49,11 +42,11 @@ class RelayContactsRepository {
     Set<String> relayUrls, {
     bool force = false,
   }) async =>
-      await _fetchFollowingOrNull(pubkeyHex, relayUrls, force: force) ??
+      await fetchFollowingOrNull(pubkeyHex, relayUrls, force: force) ??
       const <String>[];
 
   /// Null when nothing was found and some relay may still hold a list.
-  Future<List<String>?> _fetchFollowingOrNull(
+  Future<List<String>?> fetchFollowingOrNull(
     String pubkeyHex,
     Set<String> relayUrls, {
     bool force = false,
@@ -144,29 +137,6 @@ class RelayContactsRepository {
 
     await CacheStore.putFollowers(pubkeyHex, followers);
     return followers;
-  }
-
-  /// Populates myFollowingNotifier for the active identity, once per identity.
-  Future<void> ensureMyFollowingLoaded(Set<String> relayUrls) {
-    final myPubkeyHex = activeIdentityPubkeyNotifier.value;
-    if (myPubkeyHex == null) {
-      myFollowingNotifier.value = null;
-      _myFollowingLoadedForPubkeyHex = null;
-      return Future.value();
-    }
-    if (_myFollowingLoadedForPubkeyHex == myPubkeyHex &&
-        myFollowingNotifier.value != null) {
-      return Future.value();
-    }
-    return _myFollowingLoadingFuture ??=
-        _fetchFollowingOrNull(myPubkeyHex, relayUrls)
-            .then((following) {
-              // Left unloaded on failure so the next call retries.
-              if (following == null) return;
-              myFollowingNotifier.value = following.toSet();
-              _myFollowingLoadedForPubkeyHex = myPubkeyHex;
-            })
-            .whenComplete(() => _myFollowingLoadingFuture = null);
   }
 
   Future<({List<List<String>> tags, NostrEvent? event})?> _fetchOwnContactList(

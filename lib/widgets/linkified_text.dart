@@ -1,17 +1,17 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../models/note_mapper.dart';
 import '../nostr/http_urls.dart';
 import '../nostr/models/nostr_metadata.dart';
 import '../nostr/nip19.dart';
 import '../nostr/relay_client.dart';
 import '../nostr/relay_post_repository.dart';
-import '../nostr/relay_profile_repository.dart';
 import '../screens/post_screen.dart';
 import '../screens/profile_screen.dart';
 import 'open_url.dart';
+import '../services/profiles.dart';
 
 /// Matches HTTP(S) URLs, nostr: URIs, and bare npub/nprofile/note/nevent.
 final _linkPattern = RegExp(
@@ -130,9 +130,11 @@ class _LinkifiedTextState extends State<LinkifiedText> {
 
     _lookedUp.addAll(missing);
     // A failed lookup just leaves the short npub in place.
-    RelayProfileRepository(client: widget.relayClient)
-        .fetchProfiles(missing, selectedRelaysNotifier.value)
-        .ignore();
+    loadProfiles(
+      missing,
+      selectedRelaysNotifier.value,
+      client: widget.relayClient,
+    ).ignore();
   }
 
   @override
@@ -288,9 +290,11 @@ class _LinkifiedTextState extends State<LinkifiedText> {
       return;
     }
 
-    final authorMetadata = await RelayProfileRepository(
+    final authorMetadata = await loadProfile(
+      post.author.pubkey,
+      relayUrls,
       client: widget.relayClient,
-    ).fetchProfile(post.author.pubkey, relayUrls);
+    );
     if (!context.mounted) return;
 
     Navigator.push(

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../models/app_seed_color.dart';
 import '../models/identity.dart';
 import '../models/relay.dart';

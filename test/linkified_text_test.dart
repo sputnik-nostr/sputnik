@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:sputnik/main.dart';
+import 'package:sputnik/app_state.dart';
 import 'package:sputnik/nostr/bech32.dart';
 import 'package:sputnik/nostr/hex.dart';
 import 'package:sputnik/nostr/models/nostr_metadata.dart';

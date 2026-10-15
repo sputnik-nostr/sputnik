@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../nostr/nostr.dart';
 import '../widgets/placeholder_tab.dart';
 import '../widgets/profile_result_tile.dart';
+import '../services/profiles.dart';
+import '../services/follow_sync.dart';
 
 /// A list of users, rendered as profile tiles. Used for followers/following
 /// lists, as well as for who liked/reposted a post.
@@ -37,8 +39,10 @@ class _UsersListScreenState extends State<UsersListScreen> {
   @override
   void initState() {
     super.initState();
-    RelayContactsRepository(client: widget.relayClient)
-        .ensureMyFollowingLoaded(selectedRelaysNotifier.value);
+    ensureMyFollowingLoaded(
+      selectedRelaysNotifier.value,
+      relayClient: widget.relayClient,
+    );
   }
 
   void _ensureProfileRequested(String pubkeyHex) {
@@ -52,8 +56,11 @@ class _UsersListScreenState extends State<UsersListScreen> {
     if (_pending.isEmpty) return;
     final toFetch = Set<String>.of(_pending);
     _pending.clear();
-    RelayProfileRepository(client: widget.relayClient)
-        .fetchProfiles(toFetch, selectedRelaysNotifier.value);
+    loadProfiles(
+      toFetch,
+      selectedRelaysNotifier.value,
+      client: widget.relayClient,
+    );
   }
 
   @override

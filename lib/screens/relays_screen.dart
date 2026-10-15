@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../models/relay.dart';
 import '../nostr/nostr.dart';
 import '../services/relay_settings.dart';

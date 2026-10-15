@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:sputnik/app_state.dart';
 import 'package:sputnik/main.dart';
 import 'package:sputnik/screens/identities_screen.dart';
 import 'package:sputnik/services/settings_store.dart';

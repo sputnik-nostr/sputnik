@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sputnik/main.dart';
+import 'package:sputnik/app_state.dart';
 import 'package:sputnik/models/identity.dart';
 import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/services/follow_sync.dart';
@@ -116,8 +116,7 @@ void main() {
   test('a failed startup load is not mistaken for "follows nobody"', () async {
     final relay = _FlakyRelay(me, [alice, bob]);
     Future<void> load() =>
-        RelayContactsRepository(client: relay)
-            .ensureMyFollowingLoaded({'wss://relay.example'});
+        ensureMyFollowingLoaded({'wss://relay.example'}, relayClient: relay);
 
     await load();
     expect(myFollowingNotifier.value, isNull);
@@ -135,8 +134,9 @@ void main() {
     'following someone after a failed startup load keeps the real list',
     () async {
       final relay = _FlakyRelay(me, [alice, bob]);
-      await RelayContactsRepository(client: relay)
-          .ensureMyFollowingLoaded({'wss://relay.example'});
+      await ensureMyFollowingLoaded({
+        'wss://relay.example',
+      }, relayClient: relay);
 
       // The relays recover, then the user taps Follow.
       relay.relays = _Relays.up;

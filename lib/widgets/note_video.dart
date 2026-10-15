@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import '../main.dart';
+import '../app_state.dart';
 import '../nostr/models/nostr_media.dart';
 import '../services/blossom_servers.dart';
 import '../services/media_loader.dart';

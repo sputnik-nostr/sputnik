@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sputnik/main.dart';
+import 'package:sputnik/app_state.dart';
 import 'package:sputnik/nostr/nostr.dart';
+import 'package:sputnik/services/profiles.dart';
 
 import 'support/in_memory_relay_client.dart';
 
@@ -50,11 +51,11 @@ void main() {
       age: const Duration(days: 1),
     );
 
-    final profile = await RelayProfileRepository(
+    final profiles = await RelayProfileRepository(
       client: _IgnoresFilters([real, replayed]),
-    ).fetchProfile(alice.publicKeyHex, relays, force: true);
+    ).fetchProfiles({alice.publicKeyHex}, relays);
 
-    expect(profile?.name, 'alice');
+    expect(profiles[alice.publicKeyHex]?.name, 'alice');
   });
 
   test('profiles nobody asked for are neither returned nor cached', () async {
@@ -71,9 +72,12 @@ void main() {
       age: Duration.zero,
     );
 
-    final profiles = await RelayProfileRepository(
+    final profiles = await loadProfiles(
+      {alice.publicKeyHex},
+      relays,
+      force: true,
       client: _IgnoresFilters([asked, unasked]),
-    ).fetchProfiles({alice.publicKeyHex}, relays, force: true);
+    );
 
     expect(profiles.keys, [alice.publicKeyHex]);
     expect(profileCacheNotifier.value.keys, [alice.publicKeyHex]);
@@ -93,10 +97,10 @@ void main() {
       age: const Duration(days: 1),
     );
 
-    final profile = await RelayProfileRepository(
+    final profiles = await RelayProfileRepository(
       client: _IgnoresFilters([older, newer]),
-    ).fetchProfile(alice.publicKeyHex, relays, force: true);
+    ).fetchProfiles({alice.publicKeyHex}, relays);
 
-    expect(profile?.name, 'new');
+    expect(profiles[alice.publicKeyHex]?.name, 'new');
   });
 }
