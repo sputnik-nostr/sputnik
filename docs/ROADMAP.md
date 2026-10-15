@@ -62,7 +62,8 @@
 - [x] Load profile pictures and banners only once you turn it on (off by default)
 - [x] Check NIP-05 identifiers only on tap, or automatically once you turn it on (off by default)
 - [x] Reuse connections for images through one shared client that keeps the address checks
-- [ ] Bundle libmpv in the Linux AppImage, and document that Linux needs it
+- [x] Bundle libmpv in the Linux AppImage
+- [ ] Document that building from source on Linux needs libmpv
 
 ## Other things:
 
