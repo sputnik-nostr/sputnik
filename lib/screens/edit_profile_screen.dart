@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
-import '../models/identity.dart';
 import '../nostr/nip05.dart';
 import '../nostr/nostr.dart';
 import '../services/cache_store.dart';
-import '../services/settings_store.dart';
+import '../services/publishing.dart';
 import 'edit_payment_targets_screen.dart';
 
 bool _isWebUrl(String value) {
@@ -118,65 +117,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     });
   }
 
-  Future<bool> _confirmSave(int relayCount) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Update profile?'),
-        content: Text(
-          _baseConclusive
-              ? 'This publishes your profile to $relayCount relay(s).'
-              : 'This publishes your profile to $relayCount relay(s). Some '
-                    'relays did not respond, so your current profile could not '
-                    'be checked and fields you set elsewhere may be '
-                    'overwritten.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            key: const Key('confirmSaveProfileButton'),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    return confirmed ?? false;
-  }
-
   Future<void> _save() async {
     if (_loading || _saving) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    final pubkeyHex = activeIdentityPubkeyNotifier.value;
-    if (pubkeyHex == null) return;
-    final identity = identityWithPubkey(identitiesNotifier.value, pubkeyHex);
+    final identity = activeIdentity();
     if (identity == null) return;
+    final pubkeyHex = identity.pubkeyHex;
 
     final relayUrls = selectedRelaysNotifier.value;
-    if (!await _confirmSave(relayUrls.length) || !mounted) return;
+    final confirmed = await confirmAction(
+      context,
+      title: 'Update profile?',
+      message: _baseConclusive
+          ? 'This publishes your profile to ${relayUrls.length} relay(s).'
+          : 'This publishes your profile to ${relayUrls.length} relay(s). '
+                'Some relays did not respond, so your current profile could '
+                'not be checked and fields you set elsewhere may be '
+                'overwritten.',
+      action: 'Save',
+      actionKey: const Key('confirmSaveProfileButton'),
+    );
+    if (!confirmed || !mounted) return;
 
-    // Only touch secure storage once the user has actually confirmed.
-    final privkeyHex = await SettingsStore.loadPrivateKey(identity.pubkeyHex);
-    if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    if (privkeyHex == null) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text("Could not find this identity's private key"),
-        ),
-      );
-      return;
-    }
+    final privkeyHex = await loadPrivateKeyOrReport(identity, messenger);
+    if (privkeyHex == null || !mounted) return;
 
     setState(() => _saving = true);
     try {
       final published = await _profiles.publishProfile(
         seckeyHex: privkeyHex,
-        pubkeyHex: identity.pubkeyHex,
+        pubkeyHex: pubkeyHex,
         base: _base,
         fields: {
           'display_name': _displayNameController.text,
@@ -191,36 +163,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
       if (!mounted) return;
 
-      final results = published.results;
-      final accepted = results.values
-          .where((result) => result.outcome == RelayPublishOutcome.accepted)
-          .length;
-      if (accepted == 0) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Could not publish this profile update to any relay'),
-          ),
-        );
-        return;
-      }
+      final updated = reportPublishResults(
+        messenger,
+        published.results,
+        failure: 'Could not publish this profile update to any relay',
+        success: (counts) => 'Updated profile on $counts relays',
+      );
+      if (!updated) return;
 
-      final updated = NostrMetadata.fromContent(published.event.content);
+      final metadata = NostrMetadata.fromContent(published.event.content);
       profileCacheNotifier.value = {
         ...profileCacheNotifier.value,
-        pubkeyHex: updated,
+        pubkeyHex: metadata,
       };
-      await CacheStore.putProfiles({pubkeyHex: updated});
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            'Updated profile on $accepted/${results.length} relays',
-          ),
-        ),
-      );
+      await CacheStore.putProfiles({pubkeyHex: metadata});
       if (mounted) Navigator.pop(context);
-    } catch (e) {
+    } on ArgumentError {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not sign this profile update: $e')),
+        const SnackBar(content: Text('Could not sign this profile update')),
       );
     } finally {
       if (mounted) setState(() => _saving = false);

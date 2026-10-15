@@ -47,6 +47,21 @@ class RelayPublishResult {
   final String? message;
 }
 
+extension PublishResults on Map<String, RelayPublishResult> {
+  int get acceptedCount => values
+      .where((result) => result.outcome == RelayPublishOutcome.accepted)
+      .length;
+
+  /// The first non-empty message a relay gave with its reply.
+  String? get firstReason {
+    for (final result in values) {
+      final message = result.message;
+      if (message != null && message.isNotEmpty) return message;
+    }
+    return null;
+  }
+}
+
 /// More than one publish() can be in flight for the same event ID (e.g. a
 /// double-submit); resolve()/failAll() complete all of them rather than one
 /// overwriting another's slot.

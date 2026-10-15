@@ -1,38 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
-import '../models/identity.dart';
 import '../nostr/nostr.dart';
 import '../services/follow_sync.dart';
-
-Future<bool> _confirmFollowChange(
-  BuildContext context, {
-  required bool follow,
-}) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(follow ? 'Follow this person?' : 'Unfollow this person?'),
-      content: Text(
-        follow
-            ? 'This publishes your updated follow list to your relays.'
-            : 'This removes them from your follow list, published to your '
-                  'relays.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          child: Text(follow ? 'Follow' : 'Unfollow'),
-        ),
-      ],
-    ),
-  );
-  return confirmed ?? false;
-}
+import '../services/publishing.dart';
 
 /// Follows or unfollows [targetPubkeyHex] as the active identity.
 class FollowButton extends StatelessWidget {
@@ -50,10 +21,7 @@ class FollowButton extends StatelessWidget {
   final bool dense;
 
   Future<void> _toggle(BuildContext context) async {
-    final myPubkeyHex = activeIdentityPubkeyNotifier.value;
-    if (myPubkeyHex == null) return;
-    final identity = identityWithPubkey(identitiesNotifier.value, myPubkeyHex);
-    if (identity == null) return;
+    if (activeIdentity() == null) return;
 
     final target = targetPubkeyHex.toLowerCase();
     final currentlyFollowing =
@@ -61,7 +29,15 @@ class FollowButton extends StatelessWidget {
     final follow = !currentlyFollowing;
 
     if (confirmBeforeReactingNotifier.value) {
-      final confirmed = await _confirmFollowChange(context, follow: follow);
+      final confirmed = await confirmAction(
+        context,
+        title: follow ? 'Follow this person?' : 'Unfollow this person?',
+        message: follow
+            ? 'This publishes your updated follow list to your relays.'
+            : 'This removes them from your follow list, published to your '
+                  'relays.',
+        action: follow ? 'Follow' : 'Unfollow',
+      );
       if (!confirmed || !context.mounted) return;
     }
 

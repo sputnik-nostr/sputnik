@@ -1,117 +1,119 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
-import '../models/identity.dart';
 import '../models/note.dart';
 import '../nostr/nostr.dart';
-import 'settings_store.dart';
+import 'publishing.dart';
 
-Future<bool> _confirm(
+typedef _Publish = Future<Map<String, RelayPublishResult>> Function({
+  required String seckeyHex,
+  required String myPubkeyHex,
+  required NostrEvent target,
+  required Set<String> relayUrls,
+});
+
+/// Fetches the event to act on via [fetchTarget], confirms unless
+/// [alwaysConfirm] is false and confirmation is off, then signs and publishes
+/// via [publish].
+Future<bool> _publishAgainst(
   BuildContext context, {
-  required String title,
-  required String body,
+  required Future<NostrEvent?> Function(String myPubkeyHex, Set<String> relays)
+  fetchTarget,
+  required String notFoundMessage,
+  required String dialogTitle,
+  required String dialogBody,
+  required bool alwaysConfirm,
+  required _Publish publish,
 }) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(title),
-      content: Text(body),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          child: const Text('Continue'),
-        ),
-      ],
-    ),
+  final identity = activeIdentity();
+  if (identity == null) return false;
+
+  final relayUrls = selectedRelaysNotifier.value;
+  final messenger = ScaffoldMessenger.of(context);
+
+  final target = await fetchTarget(identity.pubkeyHex, relayUrls);
+  if (!context.mounted) return false;
+  if (target == null) {
+    messenger.showSnackBar(SnackBar(content: Text(notFoundMessage)));
+    return false;
+  }
+
+  if (alwaysConfirm || confirmBeforeReactingNotifier.value) {
+    final confirmed = await confirmAction(
+      context,
+      title: dialogTitle,
+      message: dialogBody,
+      action: 'Continue',
+    );
+    if (!confirmed || !context.mounted) return false;
+  }
+
+  final privkeyHex = await loadPrivateKeyOrReport(identity, messenger);
+  if (privkeyHex == null || !context.mounted) return false;
+
+  final results = await publish(
+    seckeyHex: privkeyHex,
+    myPubkeyHex: identity.pubkeyHex,
+    target: target,
+    relayUrls: relayUrls,
   );
-  return confirmed ?? false;
+  return reportPublishResults(
+    messenger,
+    results,
+    failure: 'Could not publish to any relay',
+  );
 }
 
-/// Fetches [note]'s signed event, confirms unless [alwaysConfirm] is false
-/// and confirmation is off, then signs and publishes it via [publish].
-Future<bool> _publishReaction(
+/// [_publishAgainst] with [note]'s own signed event as the target.
+Future<bool> _publishOnNote(
   BuildContext context,
   Note note, {
   required RelayClient relayClient,
   required String dialogTitle,
   required String dialogBody,
   required bool alwaysConfirm,
-  required Future<Map<String, RelayPublishResult>> Function({
-    required String seckeyHex,
-    required String myPubkeyHex,
-    required NostrEvent target,
-    required Set<String> relayUrls,
-  })
-  publish,
-}) async {
-  final myPubkeyHex = activeIdentityPubkeyNotifier.value;
-  if (myPubkeyHex == null) return false;
-  final identity = identityWithPubkey(identitiesNotifier.value, myPubkeyHex);
-  if (identity == null) return false;
-
-  final relayUrls = selectedRelaysNotifier.value;
-  final messenger = ScaffoldMessenger.of(context);
-
-  final target = await RelayPostRepository(
-    relayUrls: relayUrls,
-    client: relayClient,
-  ).fetchEventById(note.id);
-  if (!context.mounted) return false;
-  if (target == null) {
-    messenger.showSnackBar(
-      const SnackBar(content: Text('Could not load this note from relays')),
-    );
-    return false;
-  }
-
-  if (alwaysConfirm || confirmBeforeReactingNotifier.value) {
-    if (!await _confirm(context, title: dialogTitle, body: dialogBody) ||
-        !context.mounted) {
-      return false;
-    }
-  }
-
-  // Only touch secure storage once the user has actually confirmed.
-  final privkeyHex = await SettingsStore.loadPrivateKey(myPubkeyHex);
-  if (!context.mounted) return false;
-  if (privkeyHex == null) {
-    messenger.showSnackBar(
-      const SnackBar(
-        content: Text("Could not find this identity's private key"),
-      ),
-    );
-    return false;
-  }
-
-  final results = await publish(
-    seckeyHex: privkeyHex,
-    myPubkeyHex: myPubkeyHex,
-    target: target,
-    relayUrls: relayUrls,
+  required _Publish publish,
+}) {
+  return _publishAgainst(
+    context,
+    fetchTarget: (_, relayUrls) => RelayPostRepository(
+      relayUrls: relayUrls,
+      client: relayClient,
+    ).fetchEventById(note.id),
+    notFoundMessage: 'Could not load this note from relays',
+    dialogTitle: dialogTitle,
+    dialogBody: dialogBody,
+    alwaysConfirm: alwaysConfirm,
+    publish: publish,
   );
-  final accepted = results.values
-      .where((result) => result.outcome == RelayPublishOutcome.accepted)
-      .length;
-  if (accepted == 0) {
-    String? reason;
-    for (final result in results.values) {
-      if (result.message != null && result.message!.isNotEmpty) {
-        reason = result.message;
-        break;
-      }
-    }
-    if (context.mounted) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(reason ?? 'Could not publish to any relay')),
-      );
-    }
-    return false;
-  }
-  return true;
+}
+
+/// [_publishAgainst] with the caller's own kind [kind] reaction/repost of
+/// [note] as the target of a NIP-09 deletion.
+Future<bool> _retractReaction(
+  BuildContext context,
+  Note note, {
+  required RelayClient relayClient,
+  required int kind,
+  required String dialogTitle,
+  required String dialogBody,
+  required bool alwaysConfirm,
+}) {
+  final repository = RelayReactionsRepository(client: relayClient);
+  return _publishAgainst(
+    context,
+    fetchTarget: (myPubkeyHex, relayUrls) => repository.fetchOwnReaction(
+      myPubkeyHex: myPubkeyHex,
+      noteId: note.id,
+      kind: kind,
+      relayUrls: relayUrls,
+    ),
+    notFoundMessage: 'Could not find that on any of your relays',
+    dialogTitle: dialogTitle,
+    dialogBody: dialogBody,
+    alwaysConfirm: alwaysConfirm,
+    publish: repository.publishRetraction,
+  );
 }
 
 /// Publishes a NIP-25 like for [note].
@@ -120,7 +122,7 @@ Future<bool> likeNote(
   Note note, {
   RelayClient relayClient = const RelayClient(),
 }) {
-  return _publishReaction(
+  return _publishOnNote(
     context,
     note,
     relayClient: relayClient,
@@ -140,7 +142,7 @@ Future<bool> repostNote(
   Note note, {
   RelayClient relayClient = const RelayClient(),
 }) {
-  return _publishReaction(
+  return _publishOnNote(
     context,
     note,
     relayClient: relayClient,
@@ -152,87 +154,6 @@ Future<bool> repostNote(
         'can be removed later, but relays are not required to honor that.',
     publish: RelayReactionsRepository(client: relayClient).publishRepost,
   );
-}
-
-/// Fetches the caller's own kind [kind] reaction/repost of [note], confirms
-/// as in [_publishReaction], then publishes a NIP-09 deletion for it.
-Future<bool> _retractReaction(
-  BuildContext context,
-  Note note, {
-  required RelayClient relayClient,
-  required int kind,
-  required String dialogTitle,
-  required String dialogBody,
-  required bool alwaysConfirm,
-}) async {
-  final myPubkeyHex = activeIdentityPubkeyNotifier.value;
-  if (myPubkeyHex == null) return false;
-  final identity = identityWithPubkey(identitiesNotifier.value, myPubkeyHex);
-  if (identity == null) return false;
-
-  final relayUrls = selectedRelaysNotifier.value;
-  final messenger = ScaffoldMessenger.of(context);
-  final repository = RelayReactionsRepository(client: relayClient);
-
-  final own = await repository.fetchOwnReaction(
-    myPubkeyHex: myPubkeyHex,
-    noteId: note.id,
-    kind: kind,
-    relayUrls: relayUrls,
-  );
-  if (!context.mounted) return false;
-  if (own == null) {
-    messenger.showSnackBar(
-      const SnackBar(
-        content: Text('Could not find that on any of your relays'),
-      ),
-    );
-    return false;
-  }
-
-  if (alwaysConfirm || confirmBeforeReactingNotifier.value) {
-    if (!await _confirm(context, title: dialogTitle, body: dialogBody) ||
-        !context.mounted) {
-      return false;
-    }
-  }
-
-  final privkeyHex = await SettingsStore.loadPrivateKey(myPubkeyHex);
-  if (!context.mounted) return false;
-  if (privkeyHex == null) {
-    messenger.showSnackBar(
-      const SnackBar(
-        content: Text("Could not find this identity's private key"),
-      ),
-    );
-    return false;
-  }
-
-  final results = await repository.publishRetraction(
-    seckeyHex: privkeyHex,
-    myPubkeyHex: myPubkeyHex,
-    target: own,
-    relayUrls: relayUrls,
-  );
-  final accepted = results.values
-      .where((result) => result.outcome == RelayPublishOutcome.accepted)
-      .length;
-  if (accepted == 0) {
-    String? reason;
-    for (final result in results.values) {
-      if (result.message != null && result.message!.isNotEmpty) {
-        reason = result.message;
-        break;
-      }
-    }
-    if (context.mounted) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(reason ?? 'Could not publish to any relay')),
-      );
-    }
-    return false;
-  }
-  return true;
 }
 
 /// Removes a previously-published like for [note] (NIP-09).
@@ -250,7 +171,7 @@ Future<bool> unlikeNote(
     dialogTitle: 'Remove your like?',
     dialogBody:
         'This asks your relays to delete your reaction. Removal is not '
-        'guaranteed -- other relays or clients may still show it.',
+        'guaranteed; other relays or clients may still show it.',
   );
 }
 
@@ -270,7 +191,7 @@ Future<bool> unrepostNote(
     dialogTitle: 'Remove your repost?',
     dialogBody:
         'This asks your relays to delete your repost. Removal is not '
-        'guaranteed -- other relays or clients may still show it.',
+        'guaranteed; other relays or clients may still show it.',
   );
 }
 
@@ -291,7 +212,7 @@ Future<bool> deleteNote(
   Note note, {
   RelayClient relayClient = const RelayClient(),
 }) async {
-  final succeeded = await _publishReaction(
+  final succeeded = await _publishOnNote(
     context,
     note,
     relayClient: relayClient,

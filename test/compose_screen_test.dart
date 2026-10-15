@@ -229,7 +229,10 @@ void main() {
 
     expect(fakeClient.lastPublished, isNotNull);
     expect(find.byType(ComposeScreen), findsOneWidget);
-    expect(find.text('blocked: spam'), findsOneWidget);
+    expect(
+      find.text('Could not post this note to any relay: blocked: spam'),
+      findsOneWidget,
+    );
   });
 
   final quoted = Note(

@@ -88,10 +88,7 @@ Future<void> _runSync() async {
             changes: changes,
             relayUrls: selectedRelaysNotifier.value,
           );
-      final accepted = outcome.results.values.any(
-        (result) => result.outcome == RelayPublishOutcome.accepted,
-      );
-      if (!accepted) {
+      if (outcome.results.acceptedCount == 0) {
         _retryLater();
         return;
       }

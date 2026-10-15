@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
-import '../models/identity.dart';
 import '../models/relay.dart';
 import '../nostr/nostr.dart';
 import '../services/relay_settings.dart';
-import '../services/settings_store.dart';
+import '../services/publishing.dart';
 
 bool _isPlaintext(String relay) => Uri.tryParse(relay)?.scheme == 'ws';
 
@@ -220,37 +219,11 @@ class _MyRelayListState extends State<_MyRelayList> {
     });
   }
 
-  Future<bool> _confirm({
-    required String title,
-    required String message,
-    required String action,
-    required Key actionKey,
-  }) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            key: actionKey,
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(action),
-          ),
-        ],
-      ),
-    );
-    return confirmed ?? false;
-  }
-
   Future<void> _useList() async {
     final urls = [for (final entry in _entries) entry.url];
     final hasPlaintext = urls.any(_isPlaintext);
-    if (!await _confirm(
+    if (!await confirmAction(
+          context,
           title: 'Use your relay list?',
           message:
               'This replaces your selected relays with the ${urls.length} '
@@ -277,9 +250,7 @@ class _MyRelayListState extends State<_MyRelayList> {
   }
 
   Future<void> _publishSelection() async {
-    final pubkeyHex = activeIdentityPubkeyNotifier.value;
-    if (pubkeyHex == null) return;
-    final identity = identityWithPubkey(identitiesNotifier.value, pubkeyHex);
+    final identity = activeIdentity();
     if (identity == null) return;
 
     final selected = selectedRelaysNotifier.value;
@@ -295,7 +266,8 @@ class _MyRelayListState extends State<_MyRelayList> {
         '${removed.length} relay(s) in your published list will be removed.',
       if (selected.length > 4) 'Keeping the list to 2-4 relays is recommended.',
     ];
-    if (!await _confirm(
+    if (!await confirmAction(
+          context,
           title: 'Publish your relay list?',
           message:
               'This publishes your ${selected.length} selected relay(s) as '
@@ -307,18 +279,9 @@ class _MyRelayListState extends State<_MyRelayList> {
       return;
     }
 
-    // Only touch secure storage once the user has actually confirmed.
-    final privkeyHex = await SettingsStore.loadPrivateKey(identity.pubkeyHex);
-    if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    if (privkeyHex == null) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text("Could not find this identity's private key"),
-        ),
-      );
-      return;
-    }
+    final privkeyHex = await loadPrivateKeyOrReport(identity, messenger);
+    if (privkeyHex == null || !mounted) return;
 
     setState(() => _publishing = true);
     try {
@@ -338,33 +301,21 @@ class _MyRelayListState extends State<_MyRelayList> {
       );
       if (!mounted) return;
 
-      final accepted = published.results.values
-          .where((result) => result.outcome == RelayPublishOutcome.accepted)
-          .length;
-      if (accepted == 0) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Could not publish your relay list to any relay'),
-          ),
-        );
-        return;
-      }
+      final updated = reportPublishResults(
+        messenger,
+        published.results,
+        failure: 'Could not publish your relay list to any relay',
+        success: (counts) => 'Published relay list to $counts relays',
+      );
+      if (!updated) return;
 
       setState(() {
         _own = OwnEvent(event: published.event, conclusive: true);
         _entries = relayListFromEvent(published.event);
       });
+    } on ArgumentError {
       messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            'Published relay list to $accepted/${published.results.length} '
-            'relays',
-          ),
-        ),
-      );
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Could not sign your relay list: $e')),
+        const SnackBar(content: Text('Could not sign your relay list')),
       );
     } finally {
       if (mounted) setState(() => _publishing = false);

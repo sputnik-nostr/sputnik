@@ -5,7 +5,7 @@ import '../models/identity.dart';
 import '../models/note.dart';
 import '../nostr/nip10.dart';
 import '../nostr/nostr.dart';
-import '../services/settings_store.dart';
+import '../services/publishing.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/fade_in_avatar.dart';
 
@@ -60,7 +60,10 @@ class _ComposeScreenState extends State<ComposeScreen> {
     super.dispose();
   }
 
-  Future<bool> _confirmPost(int relayCount) async {
+  Future<void> _post() async {
+    final identity = activeIdentity();
+    if (identity == null) return;
+
     final isReply = widget.replyTo != null;
     final isQuote = widget.quoting != null;
     final noun = isReply
@@ -68,48 +71,23 @@ class _ComposeScreenState extends State<ComposeScreen> {
         : isQuote
         ? 'quote'
         : 'note';
-    final title = isReply
-        ? 'Post reply to relays?'
-        : isQuote
-        ? 'Post quote to relays?'
-        : 'Post to relays?';
     final plural = isReply
         ? 'Replies'
         : isQuote
         ? 'Quotes'
         : 'Notes';
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(
-          'This publishes your $noun to $relayCount relay(s). $plural on '
-          'Nostr are public and cannot be reliably deleted afterward.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            key: const Key('confirmPostButton'),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Post'),
-          ),
-        ],
-      ),
-    );
-    return confirmed ?? false;
-  }
-
-  Future<void> _post() async {
-    final pubkeyHex = activeIdentityPubkeyNotifier.value;
-    if (pubkeyHex == null) return;
-    final identity = identityWithPubkey(identitiesNotifier.value, pubkeyHex);
-    if (identity == null) return;
-
     final relayUrls = selectedRelaysNotifier.value;
-    if (!await _confirmPost(relayUrls.length) || !mounted) return;
+    final confirmed = await confirmAction(
+      context,
+      title: isReply || isQuote ? 'Post $noun to relays?' : 'Post to relays?',
+      message:
+          'This publishes your $noun to ${relayUrls.length} relay(s). '
+          '$plural on Nostr are public and cannot be reliably deleted '
+          'afterward.',
+      action: 'Post',
+      actionKey: const Key('confirmPostButton'),
+    );
+    if (!confirmed || !mounted) return;
 
     setState(() => _posting = true);
     try {
@@ -150,17 +128,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
       content = content.isEmpty ? reference : '$content\n\n$reference';
     }
 
-    // Only touch secure storage once the user has actually confirmed.
-    final privkeyHex = await SettingsStore.loadPrivateKey(identity.pubkeyHex);
-    if (!mounted) return;
-    if (privkeyHex == null) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text("Could not find this identity's private key"),
-        ),
-      );
-      return;
-    }
+    final privkeyHex = await loadPrivateKeyOrReport(identity, messenger);
+    if (privkeyHex == null || !mounted) return;
 
     final NostrEvent event;
     try {
@@ -171,9 +140,9 @@ class _ComposeScreenState extends State<ComposeScreen> {
         tags: tags,
         content: content,
       );
-    } catch (e) {
+    } on ArgumentError {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not sign this note: $e')),
+        const SnackBar(content: Text('Could not sign this note')),
       );
       return;
     }
@@ -181,32 +150,17 @@ class _ComposeScreenState extends State<ComposeScreen> {
     final results = await widget.relayClient.publish(event, relayUrls);
     if (!mounted) return;
 
-    final accepted = results.values
-        .where((result) => result.outcome == RelayPublishOutcome.accepted)
-        .length;
-
-    if (accepted > 0) {
-      final label = widget.replyTo != null
-          ? 'Reply posted to $accepted/${results.length} relays'
+    final posted = reportPublishResults(
+      messenger,
+      results,
+      failure: 'Could not post this note to any relay',
+      success: (counts) => widget.replyTo != null
+          ? 'Reply posted to $counts relays'
           : quoting != null
-          ? 'Quote posted to $accepted/${results.length} relays'
-          : 'Posted to $accepted/${results.length} relays';
-      messenger.showSnackBar(SnackBar(content: Text(label)));
-      Navigator.pop(context, event);
-    } else {
-      String? reason;
-      for (final result in results.values) {
-        if (result.message != null && result.message!.isNotEmpty) {
-          reason = result.message;
-          break;
-        }
-      }
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(reason ?? 'Could not post this note to any relay'),
-        ),
-      );
-    }
+          ? 'Quote posted to $counts relays'
+          : 'Posted to $counts relays',
+    );
+    if (posted) Navigator.pop(context, event);
   }
 
   @override

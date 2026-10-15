@@ -3,7 +3,11 @@ import 'models/nostr_filter.dart';
 import 'relay_connection_pool.dart';
 
 export 'relay_connection_pool.dart'
-    show RelayPublishOutcome, RelayPublishResult, RelayQueryResult;
+    show
+        PublishResults,
+        RelayPublishOutcome,
+        RelayPublishResult,
+        RelayQueryResult;
 
 /// Authors per filter, to stay within typical relay limits.
 const authorsChunkSize = 100;

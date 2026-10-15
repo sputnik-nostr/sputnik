@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
-import '../models/identity.dart';
 import '../theme/app_text_styles.dart';
 import '../nostr/nostr.dart';
 import '../services/cache_store.dart';
-import '../services/settings_store.dart';
+import '../services/publishing.dart';
 import '../widgets/payment_target_chip.dart';
 
 /// Maximum number of payment targets.
@@ -124,58 +123,31 @@ class _EditPaymentTargetsScreenState extends State<EditPaymentTargetsScreen> {
         original[2] == row.address.text.trim();
   }
 
-  Future<bool> _confirmSave(int relayCount) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Update payment targets?'),
-        content: Text(
-          _baseConclusive
-              ? 'This publishes your payment targets to $relayCount relay(s).'
-              : 'This publishes your payment targets to $relayCount relay(s). '
-                    'Some relays did not respond, so your current targets '
-                    'could not be checked and may be overwritten.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            key: const Key('confirmSavePaymentTargetsButton'),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    return confirmed ?? false;
-  }
-
   Future<void> _save() async {
     if (_loading || _saving) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    final pubkeyHex = activeIdentityPubkeyNotifier.value;
-    if (pubkeyHex == null) return;
-    final identity = identityWithPubkey(identitiesNotifier.value, pubkeyHex);
+    final identity = activeIdentity();
     if (identity == null) return;
 
     final relayUrls = selectedRelaysNotifier.value;
-    if (!await _confirmSave(relayUrls.length) || !mounted) return;
+    final confirmed = await confirmAction(
+      context,
+      title: 'Update payment targets?',
+      message: _baseConclusive
+          ? 'This publishes your payment targets to ${relayUrls.length} '
+                'relay(s).'
+          : 'This publishes your payment targets to ${relayUrls.length} '
+                'relay(s). Some relays did not respond, so your current '
+                'targets could not be checked and may be overwritten.',
+      action: 'Save',
+      actionKey: const Key('confirmSavePaymentTargetsButton'),
+    );
+    if (!confirmed || !mounted) return;
 
-    // Only touch secure storage once the user has actually confirmed.
-    final privkeyHex = await SettingsStore.loadPrivateKey(identity.pubkeyHex);
-    if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    if (privkeyHex == null) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text("Could not find this identity's private key"),
-        ),
-      );
-      return;
-    }
+    final privkeyHex = await loadPrivateKeyOrReport(identity, messenger);
+    if (privkeyHex == null || !mounted) return;
 
     setState(() => _saving = true);
     try {
@@ -188,36 +160,22 @@ class _EditPaymentTargetsScreenState extends State<EditPaymentTargetsScreen> {
       );
       if (!mounted) return;
 
-      final results = published.results;
-      final accepted = results.values
-          .where((result) => result.outcome == RelayPublishOutcome.accepted)
-          .length;
-      if (accepted == 0) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Could not publish your payment targets to any relay',
-            ),
-          ),
-        );
-        return;
-      }
+      final updated = reportPublishResults(
+        messenger,
+        published.results,
+        failure: 'Could not publish your payment targets to any relay',
+        success: (counts) => 'Updated payment targets on $counts relays',
+      );
+      if (!updated) return;
 
       await CacheStore.putPaymentTargets(
-        pubkeyHex,
+        identity.pubkeyHex,
         paymentTargetsFromEvent(published.event),
       );
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            'Updated payment targets on $accepted/${results.length} relays',
-          ),
-        ),
-      );
       if (mounted) Navigator.pop(context);
-    } catch (e) {
+    } on ArgumentError {
       messenger.showSnackBar(
-        SnackBar(content: Text('Could not sign your payment targets: $e')),
+        const SnackBar(content: Text('Could not sign your payment targets')),
       );
     } finally {
       if (mounted) setState(() => _saving = false);

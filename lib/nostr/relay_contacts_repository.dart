@@ -272,10 +272,7 @@ class RelayContactsRepository {
     );
     final results = await client.publish(event, relayUrls);
 
-    final accepted = results.values.any(
-      (result) => result.outcome == RelayPublishOutcome.accepted,
-    );
-    if (accepted) {
+    if (results.acceptedCount > 0) {
       _noteContactList(myPubkeyHex, event.createdAt);
       await CacheStore.putFollowing(myPubkeyHex, desiredFollowing.toList());
     }
