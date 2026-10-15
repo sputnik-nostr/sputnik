@@ -43,6 +43,25 @@ class _UserRelaysScreenState extends State<UserRelaysScreen> {
     }
   }
 
+  Widget _addButton(BuildContext context, String relay) {
+    if (selectedRelaysNotifier.value.contains(relay)) {
+      return IconButton(
+        icon: const Icon(Icons.check),
+        tooltip: 'Already added',
+        onPressed: null,
+        style: IconButton.styleFrom(
+          disabledForegroundColor: Theme.of(context).colorScheme.onSurface,
+        ),
+      );
+    }
+    return IconButton(
+      key: Key('addRelay-$relay'),
+      icon: const Icon(Icons.add),
+      tooltip: 'Add relay',
+      onPressed: () => _add(relay),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -75,22 +94,12 @@ class _UserRelaysScreenState extends State<UserRelaysScreen> {
                             tooltip: localNetworkRelayMessage,
                             onPressed: null,
                           )
-                        : selectedRelaysNotifier.value.contains(entry.url)
-                        ? IconButton(
-                            icon: const Icon(Icons.check),
-                            tooltip: 'Already added',
-                            onPressed: null,
-                            style: IconButton.styleFrom(
-                              disabledForegroundColor: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface,
-                            ),
-                          )
-                        : IconButton(
-                            key: Key('addRelay-${entry.url}'),
-                            icon: const Icon(Icons.add),
-                            tooltip: 'Add relay',
-                            onPressed: () => _add(entry.url),
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ?relayWarningIcon(context, entry.url),
+                              _addButton(context, entry.url),
+                            ],
                           ),
                   ),
               ],

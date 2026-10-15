@@ -14,7 +14,7 @@ const localNetworkRelayMessage =
     'Relays on local or private networks are not supported';
 
 /// Why [relay] is unreachable or unsafe, if it is.
-Widget? _relayWarningIcon(BuildContext context, String relay) {
+Widget? relayWarningIcon(BuildContext context, String relay) {
   final color = Theme.of(context).colorScheme.error;
   if (isLocalNetworkUrl(relay)) {
     return Tooltip(
@@ -156,7 +156,7 @@ class RelaysScreen extends StatelessWidget {
                   value: selected.contains(relay),
                   onChanged: (checked) =>
                       setRelaySelected(relay, checked ?? false),
-                  secondary: _relayWarningIcon(context, relay),
+                  secondary: relayWarningIcon(context, relay),
                 ),
               if (customRelays.isNotEmpty) ...[
                 const Divider(height: 1),
@@ -178,7 +178,7 @@ class RelaysScreen extends StatelessWidget {
                     secondary: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (_relayWarningIcon(context, relay)
+                        if (relayWarningIcon(context, relay)
                             case final warning?) ...[
                           warning,
                           const SizedBox(width: 4),
@@ -403,7 +403,7 @@ class _MyRelayListState extends State<_MyRelayList> {
               dense: true,
               title: Text(entry.url),
               subtitle: Text(entry.accessLabel),
-              trailing: _relayWarningIcon(context, entry.url),
+              trailing: relayWarningIcon(context, entry.url),
             ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),

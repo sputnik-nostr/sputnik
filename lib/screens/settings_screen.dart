@@ -206,7 +206,7 @@ class SettingsScreen extends StatelessWidget {
                       'Verify internet identifiers automatically',
                     ),
                     subtitle: const Text(
-                      "Can reveal your IP to a profile's NIP-05 domain.",
+                      "Can reveal your IP to the domain in a profile's identifier.",
                     ),
                     value: autoVerify,
                     onChanged: (value) => autoVerifyNip05Notifier.value = value,

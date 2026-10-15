@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../nostr/blossom.dart';
 import '../nostr/nip05.dart';
 import '../nostr/nostr.dart';
 import '../services/cache_store.dart';
@@ -22,10 +23,17 @@ String? _validateUrl(String? value) {
   return 'Enter a valid http:// or https:// URL';
 }
 
+/// Same rule the media loader applies, so a saved image always displays.
+String? _validateImageUrl(String? value) {
+  final trimmed = value?.trim() ?? '';
+  if (trimmed.isEmpty || isFetchableUrl(Uri.tryParse(trimmed))) return null;
+  return 'Enter a valid https:// URL';
+}
+
 String? _validateNip05(String? value) {
   final trimmed = value?.trim() ?? '';
   if (trimmed.isEmpty || parseNip05(trimmed) != null) return null;
-  return 'Enter an address, such as name@example.com';
+  return 'Enter an internet identifier, such as name@example.com';
 }
 
 class EditProfileScreen extends StatefulWidget {
@@ -254,7 +262,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           key: const Key('editPictureField'),
                           controller: _pictureController,
                           keyboardType: TextInputType.url,
-                          validator: _validateUrl,
+                          validator: _validateImageUrl,
                           decoration: const InputDecoration(
                             labelText: 'Picture URL',
                           ),
@@ -264,7 +272,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           key: const Key('editBannerField'),
                           controller: _bannerController,
                           keyboardType: TextInputType.url,
-                          validator: _validateUrl,
+                          validator: _validateImageUrl,
                           decoration: const InputDecoration(
                             labelText: 'Banner URL',
                           ),
@@ -276,7 +284,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           keyboardType: TextInputType.emailAddress,
                           validator: _validateNip05,
                           decoration: const InputDecoration(
-                            labelText: 'NIP-05 address',
+                            labelText: 'Internet identifier (NIP-05)',
                             hintText: 'name@example.com',
                           ),
                         ),

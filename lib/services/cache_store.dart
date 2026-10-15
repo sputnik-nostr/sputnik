@@ -20,8 +20,8 @@ class CacheStore {
   static late final Box<Map> _profiles;
   static late final Box<Map> _paymentTargets;
 
-  /// Memory only: follow lists on disk would hint at whose profiles were
-  /// viewed.
+  /// Memory only: these are fetched just for opened profiles, so on disk they
+  /// would list exactly which were viewed.
   static final _contacts = <String, ({List<String> pubkeys, int fetchedAt})>{};
 
   static bool _ready = false;
@@ -101,8 +101,7 @@ class CacheStore {
     });
   }
 
-  /// Empties every cache, including the follow lists that hint at who was
-  /// viewed.
+  /// Empties every cache, in memory and on disk.
   static Future<void> clearAll() async {
     _contacts.clear();
     if (!_ready) return;

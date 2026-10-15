@@ -75,7 +75,7 @@
 - [x] Publish your own relay list (NIP-65) and use it to set your relays
 - [x] Edit your own payment targets
 - [x] Keep the relay data cache in the app's own folder, and let Clear cached data wipe all of it
-- [x] Keep follow lists in memory only, so the disk does not show whose profiles you viewed
+- [x] Keep follow lists in memory only, so the disk does not keep an exact list of profiles you opened
 - [x] Say why relays on local or private networks can't be added, instead of failing silently
 - [x] Add payment targets support for Zano and Firo
 - [x] Keep bookmarks in their own store, one entry per bookmark, and clear out settings left by old versions

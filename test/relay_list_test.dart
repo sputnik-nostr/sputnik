@@ -291,6 +291,26 @@ void main() {
       expect(find.byIcon(Icons.check), findsNWidgets(2));
     });
 
+    testWidgets('warns about a plaintext relay before it is added', (
+      tester,
+    ) async {
+      client.events
+        ..clear()
+        ..add(
+          _listEvent(author, [
+            ['r', 'wss://a.example'],
+            ['r', 'ws://plain.example'],
+          ]),
+        );
+      await open(tester);
+
+      expect(find.byIcon(Icons.no_encryption_outlined), findsOneWidget);
+      expect(
+        find.byKey(const Key('addRelay-ws://plain.example')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('says when there is no list', (tester) async {
       client.events.clear();
       await open(tester);

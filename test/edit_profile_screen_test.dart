@@ -197,7 +197,24 @@ void main() {
     expect(client.published, isEmpty);
   });
 
-  testWidgets('an invalid NIP-05 address blocks saving', (tester) async {
+  testWidgets('an http:// picture blocks saving, since it would not load', (
+    tester,
+  ) async {
+    await openEditProfileScreen(tester);
+
+    await tester.enterText(
+      find.byKey(const Key('editPictureField')),
+      'http://example.com/me.png',
+    );
+    await tester.tap(find.byKey(const Key('saveProfileButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Enter a valid https:// URL'), findsOneWidget);
+    expect(find.text('Update profile?'), findsNothing);
+    expect(client.published, isEmpty);
+  });
+
+  testWidgets('an invalid internet identifier blocks saving', (tester) async {
     await openEditProfileScreen(tester);
 
     await tester.enterText(find.byKey(const Key('editNip05Field')), 'a b@c');
@@ -205,7 +222,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Enter an address, such as name@example.com'),
+      find.text('Enter an internet identifier, such as name@example.com'),
       findsOneWidget,
     );
     expect(client.published, isEmpty);
