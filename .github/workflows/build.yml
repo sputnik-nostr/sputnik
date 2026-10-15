@@ -4,50 +4,43 @@ on:
 permissions:
   contents: read
 jobs:
-  android-apk:
+  build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-      - uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: "21"
-          cache: gradle
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - run: flutter build apk --release --split-per-abi
-      - uses: actions/upload-artifact@v7
-        with:
-          name: sputnik-android-apk-armeabi-v7a
-          path: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-          compression-level: 0
-      - uses: actions/upload-artifact@v7
-        with:
-          name: sputnik-android-apk-arm64-v8a
-          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-          compression-level: 0
-      - uses: actions/upload-artifact@v7
-        with:
-          name: sputnik-android-apk-x86_64
-          path: build/app/outputs/flutter-apk/app-x86_64-release.apk
-          compression-level: 0
-  linux-appimage:
-    runs-on: ubuntu-latest
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
       # The same pinned container as a local `make dist`, so both match.
       - run: make dist
+      # Skipped until the release key is set up; the unsigned APKs still build.
+      - name: Sign APKs
+        if: env.ANDROID_KEYSTORE_BASE64 != ''
+        env:
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          keys="$RUNNER_TEMP/keys"
+          mkdir -m 700 "$keys"
+          trap 'rm -rf "$keys"' EXIT
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d >"$keys/release.jks"
+          for abi in armeabi-v7a arm64-v8a x86_64; do
+            docker run --rm -e OWNER="$(id -u):$(id -g)" \
+              -e KS_PASS -e KEY_PASS -e KEY_ALIAS \
+              -v "$keys:/keys:ro" -v "$PWD/dist:/out" sputnik-build \
+              sh -c '/opt/android-sdk/build-tools/36.0.0/apksigner sign \
+                --ks /keys/release.jks --ks-key-alias "$KEY_ALIAS" \
+                --ks-pass env:KS_PASS --key-pass env:KEY_PASS \
+                --v1-signing-enabled false --v4-signing-enabled false \
+                --out "/out/sputnik-$0.apk" "/out/sputnik-$0-unsigned.apk" \
+                && chown "$OWNER" "/out/sputnik-$0.apk"' "$abi"
+          done
+          (cd dist && sha256sum sputnik-*.apk sputnik-x86_64.AppImage >SHA256SUMS)
       - uses: actions/upload-artifact@v7
         with:
-          name: sputnik-linux-appimage
-          path: |
-            dist/sputnik-x86_64.AppImage
-            dist/SHA256SUMS
+          name: sputnik
+          path: dist/
           compression-level: 0
