@@ -24,7 +24,7 @@ void main() {
   testWidgets('does not build an Image when media loading is off', (
     tester,
   ) async {
-    loadMediaNotifier.value = false;
+    loadProfileImagesNotifier.value = false;
     await pumpAvatar(tester);
     await tester.pump();
 
@@ -35,7 +35,7 @@ void main() {
   testWidgets('no image URL means no Image regardless of the setting', (
     tester,
   ) async {
-    loadMediaNotifier.value = true;
+    loadProfileImagesNotifier.value = true;
     await tester.pumpWidget(
       const MaterialApp(
         home: FadeInAvatar(
@@ -51,7 +51,7 @@ void main() {
   });
 
   testWidgets('loads through the size-capped provider', (tester) async {
-    loadMediaNotifier.value = true;
+    loadProfileImagesNotifier.value = true;
     await pumpAvatar(tester);
 
     final image = tester.widget<Image>(find.byType(Image)).image;
@@ -60,7 +60,7 @@ void main() {
   });
 
   testWidgets('never fetches a plain http picture', (tester) async {
-    loadMediaNotifier.value = true;
+    loadProfileImagesNotifier.value = true;
     await pumpAvatar(tester, imageUrl: 'http://example.com/pic.png');
 
     expect(find.byType(Image), findsNothing);

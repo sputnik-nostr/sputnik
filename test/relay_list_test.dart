@@ -111,12 +111,11 @@ void main() {
           ['alt', 'kept'],
         ], id: '0a'),
       ]);
+      RelayClient.instance = client;
     });
 
     Future<void> openScreen(WidgetTester tester) async {
-      await tester.pumpWidget(
-        MaterialApp(home: RelaysScreen(relayClient: client)),
-      );
+      await tester.pumpWidget(MaterialApp(home: RelaysScreen()));
       await tester.pumpAndSettle();
     }
 
@@ -255,6 +254,7 @@ void main() {
           ['r', 'wss://read.example', 'read'],
         ]),
       ]);
+      RelayClient.instance = client;
     });
 
     Future<void> open(WidgetTester tester) async {
@@ -265,7 +265,7 @@ void main() {
             platform: TargetPlatform.linux,
             visualDensity: VisualDensity.compact,
           ),
-          home: UserRelaysScreen(pubkeyHex: author, relayClient: client),
+          home: UserRelaysScreen(pubkeyHex: author),
         ),
       );
       await tester.pumpAndSettle();

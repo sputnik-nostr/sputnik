@@ -56,9 +56,9 @@ Future<void> main() async {
       SettingsStore.saveActiveIdentityPubkey,
     ),
     bindPersisted(
-      loadMediaNotifier,
-      SettingsStore.loadLoadMedia,
-      SettingsStore.saveLoadMedia,
+      loadProfileImagesNotifier,
+      SettingsStore.loadLoadProfileImages,
+      SettingsStore.saveLoadProfileImages,
     ),
     bindPersisted(
       loadNoteImagesNotifier,

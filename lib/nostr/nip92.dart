@@ -10,7 +10,7 @@ const maxNoteMedia = 4;
 const maxFallbackUrls = 3;
 
 /// Formats Flutter can decode without a plugin.
-const _imageExtensions = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'};
+const imageExtensions = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'};
 const _imageMimeTypes = {
   'image/jpeg',
   'image/png',
@@ -49,7 +49,7 @@ MediaType? _typeOf(Uri uri, String? mimeType) {
     return mime.startsWith('video/') ? MediaType.video : null;
   }
   final extension = extensionOf(uri).replaceFirst('.', '').toLowerCase();
-  if (_imageExtensions.contains(extension)) return MediaType.image;
+  if (imageExtensions.contains(extension)) return MediaType.image;
   return _videoExtensions.contains(extension) ? MediaType.video : null;
 }
 

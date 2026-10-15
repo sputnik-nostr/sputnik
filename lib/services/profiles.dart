@@ -8,7 +8,6 @@ Future<Map<String, NostrMetadata>> loadProfiles(
   Set<String> pubkeys,
   Set<String> relayUrls, {
   bool force = false,
-  RelayClient client = const RelayClient(),
 }) async {
   final cached = <String, NostrMetadata>{};
   final toFetch = <String>{};
@@ -22,8 +21,10 @@ Future<Map<String, NostrMetadata>> loadProfiles(
   }
   if (toFetch.isEmpty) return cached;
 
-  final fetched = await RelayProfileRepository(client: client)
-      .fetchProfiles(toFetch, relayUrls);
+  final fetched = await RelayProfileRepository().fetchProfiles(
+    toFetch,
+    relayUrls,
+  );
   if (fetched.isNotEmpty) {
     profileCacheNotifier.value = {...profileCacheNotifier.value, ...fetched};
     await CacheStore.putProfiles(fetched);
@@ -44,13 +45,7 @@ Future<NostrMetadata?> loadProfile(
   String pubkey,
   Set<String> relayUrls, {
   bool force = false,
-  RelayClient client = const RelayClient(),
 }) async {
-  final profiles = await loadProfiles(
-    {pubkey},
-    relayUrls,
-    force: force,
-    client: client,
-  );
+  final profiles = await loadProfiles({pubkey}, relayUrls, force: force);
   return profiles[pubkey];
 }

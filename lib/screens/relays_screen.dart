@@ -108,9 +108,7 @@ class _AddRelayDialogState extends State<_AddRelayDialog> {
 }
 
 class RelaysScreen extends StatelessWidget {
-  const RelaysScreen({super.key, this.relayClient = const RelayClient()});
-
-  final RelayClient relayClient;
+  const RelaysScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -144,10 +142,7 @@ class RelaysScreen extends StatelessWidget {
           return ListView(
             children: [
               if (activeIdentityPubkeyNotifier.value != null) ...[
-                _MyRelayList(
-                  key: ValueKey(activeIdentityPubkeyNotifier.value),
-                  relayClient: relayClient,
-                ),
+                _MyRelayList(key: ValueKey(activeIdentityPubkeyNotifier.value)),
                 const Divider(height: 1),
               ],
               for (final relay in defaultRelays)
@@ -202,9 +197,7 @@ class RelaysScreen extends StatelessWidget {
 
 /// The active identity's published relay list (NIP-65).
 class _MyRelayList extends StatefulWidget {
-  const _MyRelayList({super.key, required this.relayClient});
-
-  final RelayClient relayClient;
+  const _MyRelayList({super.key});
 
   @override
   State<_MyRelayList> createState() => _MyRelayListState();
@@ -216,8 +209,7 @@ class _MyRelayListState extends State<_MyRelayList> {
   bool _loading = true;
   bool _publishing = false;
 
-  RelayListRepository get _repository =>
-      RelayListRepository(client: widget.relayClient);
+  RelayListRepository get _repository => RelayListRepository();
 
   @override
   void initState() {
@@ -321,42 +313,33 @@ class _MyRelayListState extends State<_MyRelayList> {
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _publishing = true);
     try {
-      await withSecretKey<void>(
+      final event = await signAndPublish(
         identity,
         messenger,
         signFailure: 'Could not sign your relay list',
-        use: (secretKey) async {
-          if (!mounted) return;
-          final published = await _repository.publish(
-            secretKey: secretKey,
-            pubkeyHex: identity.pubkeyHex,
-            base: _own?.event,
-            entries: [
-              for (final url in selected.toList()..sort())
-                RelayListEntry(
-                  url: url,
-                  read: existing[url]?.read ?? true,
-                  write: existing[url]?.write ?? true,
-                ),
-            ],
-            relayUrls: selected,
-          );
-          if (!mounted) return;
-
-          final updated = reportPublishResults(
-            messenger,
-            published.results,
-            failure: 'Could not publish your relay list to any relay',
-            success: (counts) => 'Published relay list to $counts relays',
-          );
-          if (!updated) return;
-
-          setState(() {
-            _own = OwnEvent(event: published.event, conclusive: true);
-            _entries = relayListFromEvent(published.event);
-          });
-        },
+        failure: 'Could not publish your relay list to any relay',
+        success: (counts) => 'Published relay list to $counts relays',
+        publish: (secretKey) => _repository.publish(
+          secretKey: secretKey,
+          pubkeyHex: identity.pubkeyHex,
+          base: _own?.event,
+          entries: [
+            for (final url in selected.toList()..sort())
+              RelayListEntry(
+                url: url,
+                read: existing[url]?.read ?? true,
+                write: existing[url]?.write ?? true,
+              ),
+          ],
+          relayUrls: selected,
+        ),
       );
+      if (event == null || !mounted) return;
+
+      setState(() {
+        _own = OwnEvent(event: event, conclusive: true);
+        _entries = relayListFromEvent(event);
+      });
     } finally {
       if (mounted) setState(() => _publishing = false);
     }

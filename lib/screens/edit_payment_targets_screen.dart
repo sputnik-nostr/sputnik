@@ -32,12 +32,7 @@ class _Row {
 }
 
 class EditPaymentTargetsScreen extends StatefulWidget {
-  const EditPaymentTargetsScreen({
-    super.key,
-    this.relayClient = const RelayClient(),
-  });
-
-  final RelayClient relayClient;
+  const EditPaymentTargetsScreen({super.key});
 
   @override
   State<EditPaymentTargetsScreen> createState() =>
@@ -54,7 +49,7 @@ class _EditPaymentTargetsScreenState extends State<EditPaymentTargetsScreen> {
   bool _saving = false;
 
   RelayPaymentTargetsRepository get _repository =>
-      RelayPaymentTargetsRepository(client: widget.relayClient);
+      RelayPaymentTargetsRepository();
 
   @override
   void initState() {
@@ -149,36 +144,27 @@ class _EditPaymentTargetsScreenState extends State<EditPaymentTargetsScreen> {
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _saving = true);
     try {
-      await withSecretKey<void>(
+      final event = await signAndPublish(
         identity,
         messenger,
         signFailure: 'Could not sign your payment targets',
-        use: (secretKey) async {
-          if (!mounted) return;
-          final published = await _repository.publishPaymentTargets(
-            secretKey: secretKey,
-            pubkeyHex: identity.pubkeyHex,
-            base: _base,
-            paytoTags: _paytoTags(),
-            relayUrls: relayUrls,
-          );
-          if (!mounted) return;
-
-          final updated = reportPublishResults(
-            messenger,
-            published.results,
-            failure: 'Could not publish your payment targets to any relay',
-            success: (counts) => 'Updated payment targets on $counts relays',
-          );
-          if (!updated) return;
-
-          await CacheStore.putPaymentTargets(
-            identity.pubkeyHex,
-            paymentTargetsFromEvent(published.event),
-          );
-          if (mounted) Navigator.pop(context);
-        },
+        failure: 'Could not publish your payment targets to any relay',
+        success: (counts) => 'Updated payment targets on $counts relays',
+        publish: (secretKey) => _repository.publishPaymentTargets(
+          secretKey: secretKey,
+          pubkeyHex: identity.pubkeyHex,
+          base: _base,
+          paytoTags: _paytoTags(),
+          relayUrls: relayUrls,
+        ),
       );
+      if (event == null) return;
+
+      await CacheStore.putPaymentTargets(
+        identity.pubkeyHex,
+        paymentTargetsFromEvent(event),
+      );
+      if (mounted) Navigator.pop(context);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

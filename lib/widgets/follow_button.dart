@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
-import '../nostr/nostr.dart';
 import '../services/follow_sync.dart';
 import '../services/publishing.dart';
 
@@ -10,12 +9,10 @@ class FollowButton extends StatelessWidget {
   const FollowButton({
     super.key,
     required this.targetPubkeyHex,
-    this.relayClient = const RelayClient(),
     this.dense = false,
   });
 
   final String targetPubkeyHex;
-  final RelayClient relayClient;
 
   /// List-row-sized rendering instead of a full-size button.
   final bool dense;
@@ -49,7 +46,7 @@ class FollowButton extends StatelessWidget {
     }
     myFollowingNotifier.value = updated;
 
-    scheduleFollowingSync(target, follow: follow, relayClient: relayClient);
+    scheduleFollowingSync(target, follow: follow);
   }
 
   @override

@@ -7,6 +7,7 @@ import 'package:sputnik/nostr/bech32.dart';
 import 'package:sputnik/nostr/hex.dart';
 import 'package:sputnik/nostr/models/nostr_media.dart';
 import 'package:sputnik/nostr/nip19.dart';
+import 'package:sputnik/nostr/relay_client.dart';
 import 'package:sputnik/screens/post_screen.dart';
 import 'package:sputnik/widgets/note_content.dart';
 import 'package:sputnik/widgets/quoted_note.dart';
@@ -35,12 +36,11 @@ Future<void> _pump(
   Note note,
   InMemoryRelayClient client,
 ) async {
+  RelayClient.instance = client;
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
-        body: SingleChildScrollView(
-          child: NoteContent(note: note, relayClient: client),
-        ),
+        body: SingleChildScrollView(child: NoteContent(note: note)),
       ),
     ),
   );

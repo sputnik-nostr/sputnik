@@ -47,12 +47,12 @@ void main() {
     followingNotesNotifier.value = null;
   });
 
-  tearDown(() => feedRelayClient = const RelayClient());
+  tearDown(() => RelayClient.instance = const RelayClient());
 
   testWidgets('the global feed loads older posts as it is scrolled', (
     tester,
   ) async {
-    feedRelayClient = InMemoryRelayClient(_notes(100));
+    RelayClient.instance = InMemoryRelayClient(_notes(100));
     await tester.pumpWidget(
       const MaterialApp(home: Scaffold(body: HomeScreen())),
     );
@@ -77,7 +77,7 @@ void main() {
   testWidgets('the feed stops asking once everything is loaded', (
     tester,
   ) async {
-    feedRelayClient = InMemoryRelayClient(_notes(40));
+    RelayClient.instance = InMemoryRelayClient(_notes(40));
     await tester.pumpWidget(
       const MaterialApp(home: Scaffold(body: HomeScreen())),
     );
@@ -101,10 +101,9 @@ void main() {
 
   testWidgets('a profile loads older posts as it is scrolled', (tester) async {
     final client = InMemoryRelayClient(_notes(260));
+    RelayClient.instance = client;
     await tester.pumpWidget(
-      MaterialApp(
-        home: ProfileScreen(pubkeyHex: _author, relayClient: client),
-      ),
+      MaterialApp(home: ProfileScreen(pubkeyHex: _author)),
     );
     await _settle(tester);
     expect(find.text('note 250', skipOffstage: false), findsNothing);

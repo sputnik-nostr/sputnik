@@ -99,10 +99,8 @@ void main() {
       client: client,
     );
 
-    final posts = await repository.fetchReposts(
-      [reposterPubkey],
-      {'wss://relay.example'},
-    );
+    final page = await repository.fetchRepostPage(authors: [reposterPubkey]);
+    final posts = page.posts;
 
     expect(posts.length, 2);
     final byOriginalId = {for (final post in posts) post.id: post};

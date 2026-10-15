@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../models/note.dart';
-import '../nostr/nostr.dart';
 import '../services/reaction_actions.dart';
 import 'note_action_button.dart';
 
@@ -13,13 +12,11 @@ class DeleteButton extends StatefulWidget {
   const DeleteButton({
     super.key,
     required this.note,
-    this.relayClient = const RelayClient(),
     this.onDeleted,
     this.size = 16,
   });
 
   final Note note;
-  final RelayClient relayClient;
 
   /// Called once the deletion request has been published successfully.
   final VoidCallback? onDeleted;
@@ -34,11 +31,7 @@ class _DeleteButtonState extends State<DeleteButton> {
 
   Future<void> _tap() async {
     setState(() => _pending = true);
-    final succeeded = await deleteNote(
-      context,
-      widget.note,
-      relayClient: widget.relayClient,
-    );
+    final succeeded = await deleteNote(context, widget.note);
     if (!mounted) return;
     setState(() => _pending = false);
     if (succeeded) widget.onDeleted?.call();

@@ -7,9 +7,9 @@ import '../models/note.dart';
 import '../nostr/http_urls.dart';
 import '../nostr/models/nostr_media.dart';
 import '../nostr/nip27.dart';
-import '../nostr/relay_client.dart';
 import '../screens/image_viewer_screen.dart';
 import '../services/blossom_servers.dart';
+import '../services/bounded_cache.dart';
 import 'linkified_text.dart';
 import 'media_frame.dart';
 import 'note_video.dart';
@@ -18,8 +18,7 @@ import 'platform.dart';
 import 'quoted_note.dart';
 
 /// URLs tapped this session, so a tile scrolled back into view stays loaded.
-final _approved = <String>{};
-const _maxApproved = 500;
+final _approved = BoundedSet<String>(500);
 
 /// How tall each tile is when a note has several and they scroll sideways.
 const _rowHeight = 200.0;
@@ -62,13 +61,11 @@ class NoteContent extends StatelessWidget {
     required this.note,
     this.style,
     this.selectable = true,
-    this.relayClient = const RelayClient(),
   });
 
   final Note note;
   final TextStyle? style;
   final bool selectable;
-  final RelayClient relayClient;
 
   @override
   Widget build(BuildContext context) {
@@ -78,12 +75,7 @@ class NoteContent extends StatelessWidget {
     if (note.media.isEmpty) {
       return hasQuotes
           ? _body(parts, const [])
-          : LinkifiedText(
-              note.content,
-              style: style,
-              selectable: selectable,
-              relayClient: relayClient,
-            );
+          : LinkifiedText(note.content, style: style, selectable: selectable);
     }
 
     return ValueListenableBuilder<bool>(
@@ -144,21 +136,13 @@ class NoteContent extends StatelessWidget {
             eventIdHex: quote.eventIdHex,
             reference: note.content.substring(quote.start, quote.end),
             selectable: selectable,
-            relayClient: relayClient,
           ),
         );
         continue;
       }
       final text = urls.isEmpty ? part.text! : withoutUrls(part.text!, urls);
       if (text.isNotEmpty) {
-        children.add(
-          LinkifiedText(
-            text,
-            style: style,
-            selectable: selectable,
-            relayClient: relayClient,
-          ),
-        );
+        children.add(LinkifiedText(text, style: style, selectable: selectable));
       }
     }
     children.addAll(media);
@@ -267,7 +251,6 @@ class _ImageTileState extends State<_ImageTile> {
   late bool _tapped = _approved.contains(widget.media.url);
 
   void _load() {
-    if (_approved.length >= _maxApproved) _approved.clear();
     _approved.add(widget.media.url);
     setState(() => _tapped = true);
   }

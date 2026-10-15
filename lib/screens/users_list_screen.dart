@@ -15,12 +15,10 @@ class UsersListScreen extends StatefulWidget {
     super.key,
     required this.title,
     required this.pubkeys,
-    this.relayClient = const RelayClient(),
   });
 
   final String title;
   final List<String> pubkeys;
-  final RelayClient relayClient;
 
   @override
   State<UsersListScreen> createState() => _UsersListScreenState();
@@ -37,10 +35,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
   @override
   void initState() {
     super.initState();
-    ensureMyFollowingLoaded(
-      selectedRelaysNotifier.value,
-      relayClient: widget.relayClient,
-    );
+    ensureMyFollowingLoaded(selectedRelaysNotifier.value);
   }
 
   void _ensureProfileRequested(String pubkeyHex) {
@@ -54,11 +49,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
     if (_pending.isEmpty) return;
     final toFetch = Set<String>.of(_pending);
     _pending.clear();
-    loadProfiles(
-      toFetch,
-      selectedRelaysNotifier.value,
-      client: widget.relayClient,
-    );
+    loadProfiles(toFetch, selectedRelaysNotifier.value);
   }
 
   @override
@@ -84,16 +75,18 @@ class _UsersListScreenState extends State<UsersListScreen> {
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final pubkeyHex = widget.pubkeys[index];
-                    _ensureProfileRequested(pubkeyHex);
                     final myPubkeyHex = activeIdentityPubkeyNotifier.value;
                     final isSelf =
                         myPubkeyHex != null &&
                         pubkeyHex.toLowerCase() == myPubkeyHex.toLowerCase();
-                    return ProfileResultTile(
-                      pubkeyHex: pubkeyHex,
-                      metadata: profileCache[pubkeyHex],
-                      showFollowButton: !isSelf && myPubkeyHex != null,
-                      relayClient: widget.relayClient,
+                    return _UserRow(
+                      key: ValueKey(pubkeyHex),
+                      onCreated: () => _ensureProfileRequested(pubkeyHex),
+                      child: ProfileResultTile(
+                        pubkeyHex: pubkeyHex,
+                        metadata: profileCache[pubkeyHex],
+                        showFollowButton: !isSelf && myPubkeyHex != null,
+                      ),
                     );
                   },
                 );
@@ -101,4 +94,26 @@ class _UsersListScreenState extends State<UsersListScreen> {
             ),
     );
   }
+}
+
+/// Asks for its profile once, when the list first builds the row.
+class _UserRow extends StatefulWidget {
+  const _UserRow({super.key, required this.onCreated, required this.child});
+
+  final VoidCallback onCreated;
+  final Widget child;
+
+  @override
+  State<_UserRow> createState() => _UserRowState();
+}
+
+class _UserRowState extends State<_UserRow> {
+  @override
+  void initState() {
+    super.initState();
+    widget.onCreated();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

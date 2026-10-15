@@ -71,12 +71,12 @@ void main() {
       content: '{"name":"mallory"}',
       age: Duration.zero,
     );
+    RelayClient.instance = _IgnoresFilters([asked, unasked]);
 
     final profiles = await loadProfiles(
       {alice.publicKeyHex},
       relays,
       force: true,
-      client: _IgnoresFilters([asked, unasked]),
     );
 
     expect(profiles.keys, [alice.publicKeyHex]);

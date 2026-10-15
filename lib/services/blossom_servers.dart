@@ -3,29 +3,27 @@ import 'dart:async';
 import '../app_state.dart';
 import '../nostr/models/nostr_media.dart';
 import '../nostr/relay_blossom_list_repository.dart';
-import '../nostr/relay_client.dart';
+import 'bounded_cache.dart';
 import 'media_loader.dart';
 
-const _maxCached = 200;
-
-final _known = <String, List<String>>{};
+final _known = BoundedMap<String, List<String>>(200);
 final _inFlight = <String, Future<List<String>>>{};
 
 /// [pubkeyHex]'s Blossom servers; only found lists are remembered.
 Future<List<String>> blossomServersFor(
   String pubkeyHex,
-  Set<String> relayUrls, {
-  RelayClient client = const RelayClient(),
-}) {
+  Set<String> relayUrls,
+) {
   final known = _known[pubkeyHex];
   if (known != null) return Future.value(known);
 
   return _inFlight[pubkeyHex] ??= () async {
     try {
-      final servers = await RelayBlossomListRepository(client: client)
-          .fetchServers(pubkeyHex, relayUrls);
+      final servers = await RelayBlossomListRepository().fetchServers(
+        pubkeyHex,
+        relayUrls,
+      );
       if (servers.isNotEmpty) {
-        if (_known.length >= _maxCached) _known.clear();
         _known[pubkeyHex] = servers;
       }
       return servers;

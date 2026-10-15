@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../models/note.dart';
-import '../nostr/nostr.dart';
 import '../screens/compose_screen.dart';
 import '../services/reaction_actions.dart';
 import 'note_action_button.dart';
@@ -11,13 +10,11 @@ class LikeButton extends StatelessWidget {
   const LikeButton({
     super.key,
     required this.note,
-    this.relayClient = const RelayClient(),
     this.showCount = true,
     this.size = 16,
   });
 
   final Note note;
-  final RelayClient relayClient;
   final bool showCount;
   final double size;
 
@@ -30,9 +27,8 @@ class LikeButton extends StatelessWidget {
       size: size,
       icon: (liked) => liked ? Icons.favorite : Icons.favorite_border,
       tooltip: (liked) => liked ? 'Liked' : 'Like',
-      toggle: (liked) => liked
-          ? unlikeNote(context, note, relayClient: relayClient)
-          : likeNote(context, note, relayClient: relayClient),
+      toggle: (liked) =>
+          liked ? unlikeNote(context, note) : likeNote(context, note),
     );
   }
 }
@@ -42,13 +38,11 @@ class RepostButton extends StatelessWidget {
   const RepostButton({
     super.key,
     required this.note,
-    this.relayClient = const RelayClient(),
     this.showCount = true,
     this.size = 16,
   });
 
   final Note note;
-  final RelayClient relayClient;
   final bool showCount;
   final double size;
 
@@ -62,11 +56,9 @@ class RepostButton extends StatelessWidget {
       icon: (_) => Icons.repeat,
       tooltip: (reposted) =>
           '${reposted ? 'Reposted' : 'Repost'} (hold to quote)',
-      toggle: (reposted) => reposted
-          ? unrepostNote(context, note, relayClient: relayClient)
-          : repostNote(context, note, relayClient: relayClient),
-      onLongPress: () =>
-          openQuoteComposer(context, note, relayClient: relayClient),
+      toggle: (reposted) =>
+          reposted ? unrepostNote(context, note) : repostNote(context, note),
+      onLongPress: () => openQuoteComposer(context, note),
     );
   }
 }

@@ -49,6 +49,7 @@ void main() {
       content: 'my own note',
     );
     client = InMemoryRelayClient([ownPost]);
+    RelayClient.instance = client;
     notesNotifier.value = [_noteOf(ownPost)];
     followingNotesNotifier.value = [_noteOf(ownPost)];
   });
@@ -67,7 +68,6 @@ void main() {
                     client: client,
                     reactionsRepository: const NoReactions(),
                   ),
-                  relayClient: client,
                 ),
               ),
             ),
@@ -101,7 +101,6 @@ void main() {
             client: othersClient,
             reactionsRepository: const NoReactions(),
           ),
-          relayClient: othersClient,
         ),
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/nostr/blossom.dart';
 import 'package:sputnik/nostr/relay_blossom_list_repository.dart';
+import 'package:sputnik/nostr/relay_client.dart';
 import 'package:sputnik/services/blossom_servers.dart';
 
 import 'support/in_memory_relay_client.dart';
@@ -140,6 +141,7 @@ void main() {
           ],
         ),
       ]);
+      RelayClient.instance = client;
 
       final servers = await RelayBlossomListRepository(client: client)
           .fetchServers('aa'.padRight(64, '0'), {'wss://r.example'});
@@ -163,11 +165,10 @@ void main() {
           ],
         ),
       ]);
+      RelayClient.instance = client;
 
-      await blossomServersFor(author, {'wss://r'}, client: client);
-      final again = await blossomServersFor(author, {
-        'wss://r',
-      }, client: client);
+      await blossomServersFor(author, {'wss://r'});
+      final again = await blossomServersFor(author, {'wss://r'});
 
       expect(again, ['https://one.example']);
       expect(client.queries, hasLength(1));
@@ -175,19 +176,21 @@ void main() {
 
     test('does not remember an empty answer', () async {
       final client = InMemoryRelayClient();
+      RelayClient.instance = client;
 
-      await blossomServersFor(author, {'wss://r'}, client: client);
-      await blossomServersFor(author, {'wss://r'}, client: client);
+      await blossomServersFor(author, {'wss://r'});
+      await blossomServersFor(author, {'wss://r'});
 
       expect(client.queries, hasLength(2));
     });
 
     test('shares one query between simultaneous lookups', () async {
       final client = InMemoryRelayClient();
+      RelayClient.instance = client;
 
       await Future.wait([
-        blossomServersFor(author, {'wss://r'}, client: client),
-        blossomServersFor(author, {'wss://r'}, client: client),
+        blossomServersFor(author, {'wss://r'}),
+        blossomServersFor(author, {'wss://r'}),
       ]);
 
       expect(client.queries, hasLength(1));

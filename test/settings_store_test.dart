@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sputnik/app_state.dart';
 import 'package:sputnik/services/settings_store.dart';
 
 import 'support/fake_secret_store.dart';
@@ -149,24 +150,26 @@ void main() {
     expect(prefs.getKeys(), unorderedEquals(['theme_mode', 'load_media']));
   });
 
-  test('load media defaults to off, the private choice', () async {
+  test('profile images default to off, the private choice', () async {
     SharedPreferences.setMockInitialValues({});
 
-    expect(await SettingsStore.loadLoadMedia(), isFalse);
+    expect(await SettingsStore.loadLoadProfileImages(), isNull);
+    expect(loadProfileImagesNotifier.defaultValue, isFalse);
   });
 
-  test('load media persists once saved', () async {
+  test('profile image loading persists once saved', () async {
     SharedPreferences.setMockInitialValues({});
 
-    await SettingsStore.saveLoadMedia(true);
+    await SettingsStore.saveLoadProfileImages(true);
 
-    expect(await SettingsStore.loadLoadMedia(), isTrue);
+    expect(await SettingsStore.loadLoadProfileImages(), isTrue);
   });
 
   test('note images default to tap to load, the private choice', () async {
     SharedPreferences.setMockInitialValues({});
 
-    expect(await SettingsStore.loadLoadNoteImages(), isFalse);
+    expect(await SettingsStore.loadLoadNoteImages(), isNull);
+    expect(loadNoteImagesNotifier.defaultValue, isFalse);
   });
 
   test('note image loading persists once saved', () async {
@@ -180,7 +183,8 @@ void main() {
   test('hidden payment target types default to none hidden', () async {
     SharedPreferences.setMockInitialValues({});
 
-    expect(await SettingsStore.loadHiddenPaymentTargetTypes(), isEmpty);
+    expect(await SettingsStore.loadHiddenPaymentTargetTypes(), isNull);
+    expect(hiddenPaymentTargetTypesNotifier.defaultValue, isEmpty);
   });
 
   test('hidden payment target types persist once saved', () async {

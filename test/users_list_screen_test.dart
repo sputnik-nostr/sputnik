@@ -105,6 +105,7 @@ void main() {
         ['p', followedPubkeyHex],
       ],
     );
+    RelayClient.instance = fakeClient;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -115,7 +116,6 @@ void main() {
             notFollowedPubkeyHex,
             identity.pubkeyHex,
           ],
-          relayClient: fakeClient,
         ),
       ),
     );
@@ -131,13 +131,13 @@ void main() {
     tester,
   ) async {
     final fakeClient = _FakeRelayClient(seckeyHex: seckeyHex);
+    RelayClient.instance = fakeClient;
 
     await tester.pumpWidget(
       MaterialApp(
         home: UsersListScreen(
           title: 'Followers',
           pubkeys: [notFollowedPubkeyHex],
-          relayClient: fakeClient,
         ),
       ),
     );
@@ -148,13 +148,11 @@ void main() {
     expect(find.text('Following'), findsOneWidget);
 
     // A fresh FollowButton for the same person, as on a new profile page.
+    RelayClient.instance = fakeClient;
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: FollowButton(
-            targetPubkeyHex: notFollowedPubkeyHex,
-            relayClient: fakeClient,
-          ),
+          body: FollowButton(targetPubkeyHex: notFollowedPubkeyHex),
         ),
       ),
     );
@@ -170,13 +168,13 @@ void main() {
       seckeyHex: seckeyHex,
       followingQueryGate: gate,
     );
+    RelayClient.instance = fakeClient;
 
     await tester.pumpWidget(
       MaterialApp(
         home: UsersListScreen(
           title: 'Followers',
           pubkeys: [followedPubkeyHex, notFollowedPubkeyHex],
-          relayClient: fakeClient,
         ),
       ),
     );
@@ -195,13 +193,13 @@ void main() {
   ) async {
     activeIdentityPubkeyNotifier.value = null;
     final fakeClient = _FakeRelayClient(seckeyHex: seckeyHex);
+    RelayClient.instance = fakeClient;
 
     await tester.pumpWidget(
       MaterialApp(
         home: UsersListScreen(
           title: 'Followers',
           pubkeys: [followedPubkeyHex, notFollowedPubkeyHex],
-          relayClient: fakeClient,
         ),
       ),
     );

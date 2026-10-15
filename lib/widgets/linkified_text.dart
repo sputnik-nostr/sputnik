@@ -6,9 +6,9 @@ import '../nostr/http_urls.dart';
 import '../nostr/models/nostr_metadata.dart';
 import '../nostr/nip19.dart';
 import '../nostr/nip27.dart';
-import '../nostr/relay_client.dart';
 import '../screens/post_screen.dart';
 import '../screens/profile_screen.dart';
+import '../services/bounded_cache.dart';
 import '../services/note_hydration.dart';
 import '../services/profiles.dart';
 import 'open_url.dart';
@@ -21,7 +21,7 @@ const _maxMentionNameLength = 40;
 
 /// Pubkeys already looked up this session, so a missing profile is not
 /// requested again each time its note scrolls into view.
-final _lookedUp = <String>{};
+final _lookedUp = BoundedSet<String>(2000);
 
 void clearMentionLookups() => _lookedUp.clear();
 
@@ -42,7 +42,6 @@ class LinkifiedText extends StatefulWidget {
     this.style,
     this.selectable = true,
     this.maxLines,
-    this.relayClient = const RelayClient(),
   });
 
   final String text;
@@ -53,8 +52,6 @@ class LinkifiedText extends StatefulWidget {
 
   /// Ends the text with an ellipsis past this many lines.
   final int? maxLines;
-
-  final RelayClient relayClient;
 
   @override
   State<LinkifiedText> createState() => _LinkifiedTextState();
@@ -114,7 +111,6 @@ class _LinkifiedTextState extends State<LinkifiedText> {
 
   /// Names arrive through the profile cache, which the build listens to.
   void _lookUpMentions() {
-    if (_lookedUp.length > 2000) _lookedUp.clear();
     final missing = <String>{
       for (final link in _linksFor(widget.text))
         if (link.target?.pubkeyHex case final pubkey?)
@@ -124,13 +120,9 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     }.take(_maxMentionLookups).toSet();
     if (missing.isEmpty) return;
 
-    _lookedUp.addAll(missing);
+    missing.forEach(_lookedUp.add);
     // A failed lookup just leaves the short npub in place.
-    loadProfiles(
-      missing,
-      selectedRelaysNotifier.value,
-      client: widget.relayClient,
-    ).ignore();
+    loadProfiles(missing, selectedRelaysNotifier.value).ignore();
   }
 
   @override
@@ -273,11 +265,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
   }
 
   Future<void> _openNote(BuildContext context, String eventIdHex) async {
-    final note = await loadNote(
-      eventIdHex,
-      selectedRelaysNotifier.value,
-      client: widget.relayClient,
-    );
+    final note = await loadNote(eventIdHex, selectedRelaysNotifier.value);
     if (!context.mounted) return;
 
     if (note == null) {
@@ -288,9 +276,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => PostScreen(note: note, relayClient: widget.relayClient),
-      ),
+      MaterialPageRoute(builder: (_) => PostScreen(note: note)),
     );
   }
 }

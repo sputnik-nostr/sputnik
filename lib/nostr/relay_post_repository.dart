@@ -16,14 +16,16 @@ class RelayPostRepository {
   const RelayPostRepository({
     required this.relayUrls,
     this.limit = 30,
-    this.client = const RelayClient(),
+    this._client,
   });
 
   final Set<String> relayUrls;
 
   /// Notes per page.
   final int limit;
-  final RelayClient client;
+  final RelayClient? _client;
+
+  RelayClient get client => _client ?? RelayClient.instance;
 
   /// Like [fetchEventById], as a [NostrPost].
   Future<NostrPost?> fetchPostById(String id) async {
@@ -34,7 +36,7 @@ class RelayPostRepository {
   /// The kind 1 note with [id], or null if no relay returns it.
   Future<NostrEvent?> fetchEventById(String id) async {
     final wantedId = id.toLowerCase();
-    return (await _fetchEventsByIds({wantedId}, relayUrls))[wantedId];
+    return (await fetchEventsByIds({wantedId}))[wantedId];
   }
 
   /// Like [fetchEventById], with a relay that returned it ('' if unknown).
@@ -55,13 +57,7 @@ class RelayPostRepository {
   }
 
   /// The kind 1 notes among [ids] that some relay returns, by ID.
-  Future<Map<String, NostrEvent>> fetchEventsByIds(Set<String> ids) =>
-      _fetchEventsByIds(ids, relayUrls);
-
-  Future<Map<String, NostrEvent>> _fetchEventsByIds(
-    Set<String> ids,
-    Set<String> relayUrls,
-  ) async {
+  Future<Map<String, NostrEvent>> fetchEventsByIds(Set<String> ids) async {
     if (ids.isEmpty) return const {};
     final events = await client.query(
       relayUrls,
@@ -153,14 +149,15 @@ class RelayPostRepository {
     return PostPage(kept.map(nostrPostFromEvent).toList(), next);
   }
 
-  /// Fetches up to [limit] reposts (kind 6) by [authors], resolving each to
-  /// the kind 1 note it points at. Drops any whose note can't be resolved.
-  Future<List<NostrPost>> fetchReposts(
-    List<String> authors,
-    Set<String> relayUrls, {
+  /// Up to [limit] reposts (kind 6) by [authors] older than [until], each
+  /// resolved to the kind 1 note it points at; unresolvable ones are dropped.
+  ///
+  /// Pass the previous page's [PostPage.next] as [until] for the next page.
+  Future<PostPage> fetchRepostPage({
+    required List<String> authors,
     DateTime? until,
   }) async {
-    if (authors.isEmpty) return const [];
+    if (authors.isEmpty) return const PostPage([], null);
     final wanted = {for (final author in authors) author.toLowerCase()};
 
     final eventsByChunk = await Future.wait(
@@ -188,12 +185,12 @@ class RelayPostRepository {
       for (final repost in kept) repost.id: ?_embeddedTarget(repost),
     };
     // One query for every target that was not embedded, not one per repost.
-    final fetched = await _fetchEventsByIds({
+    final fetched = await fetchEventsByIds({
       for (final repost in kept)
         if (!embedded.containsKey(repost.id)) ?_repostTargetId(repost),
-    }, relayUrls);
+    });
 
-    return [
+    final posts = [
       for (final repost in kept)
         if (embedded[repost.id] ?? fetched[_repostTargetId(repost)]
             case final original?)
@@ -203,6 +200,9 @@ class RelayPostRepository {
             at: repost.createdAt,
           ),
     ];
+    // Paged by the reposts' own times, which unresolvable ones still count.
+    final next = kept.length >= limit ? kept.last.createdAt : null;
+    return PostPage(posts, next);
   }
 
   /// The kind 1 note embedded in [repost]'s content, if it is usable.

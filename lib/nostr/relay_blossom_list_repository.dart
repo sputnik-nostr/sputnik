@@ -3,9 +3,11 @@ import 'relay_client.dart';
 import 'replaceable_events.dart';
 
 class RelayBlossomListRepository {
-  const RelayBlossomListRepository({this.client = const RelayClient()});
+  const RelayBlossomListRepository({this._client});
 
-  final RelayClient client;
+  final RelayClient? _client;
+
+  RelayClient get client => _client ?? RelayClient.instance;
 
   /// The HTTPS servers in [pubkeyHex]'s kind:10063 list, or none.
   Future<List<String>> fetchServers(

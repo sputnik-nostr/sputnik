@@ -31,18 +31,14 @@ List<String> _followedPubkeys(NostrEvent event) {
 }
 
 class RelayContactsRepository {
-  const RelayContactsRepository({this.client = const RelayClient()});
+  const RelayContactsRepository({this._client});
 
-  final RelayClient client;
+  final RelayClient? _client;
 
-  /// The pubkeys a person follows, read from their own kind:3 contact list.
-  Future<List<String>> fetchFollowing(
-    String pubkeyHex,
-    Set<String> relayUrls,
-  ) async =>
-      await fetchFollowingOrNull(pubkeyHex, relayUrls) ?? const <String>[];
+  RelayClient get client => _client ?? RelayClient.instance;
 
-  /// Null when nothing was found and some relay may still hold a list.
+  /// The pubkeys a person follows, from their own kind:3 contact list; null
+  /// when nothing was found and some relay may still hold one.
   Future<List<String>?> fetchFollowingOrNull(
     String pubkeyHex,
     Set<String> relayUrls,

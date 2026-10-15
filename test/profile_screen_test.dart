@@ -102,13 +102,9 @@ void main() {
 
   testWidgets("viewing someone else's profile with no active identity shows no "
       'follow button', (tester) async {
+    RelayClient.instance = _FakeRelayClient();
     await tester.pumpWidget(
-      MaterialApp(
-        home: ProfileScreen(
-          pubkeyHex: 'b' * 64,
-          relayClient: _FakeRelayClient(),
-        ),
-      ),
+      MaterialApp(home: ProfileScreen(pubkeyHex: 'b' * 64)),
     );
     await tester.pumpAndSettle();
 
@@ -132,14 +128,10 @@ void main() {
         repostedAt: now.subtract(const Duration(hours: 2)),
       ),
     ];
+    RelayClient.instance = _FakeRelayClient();
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: ProfileScreen(
-          pubkeyHex: pubkeyHex,
-          relayClient: _FakeRelayClient(),
-        ),
-      ),
+      MaterialApp(home: ProfileScreen(pubkeyHex: pubkeyHex)),
     );
     await tester.pumpAndSettle();
 
@@ -166,13 +158,9 @@ void main() {
         note('1', 'a top-level post', isReply: false),
         note('2', 'a reply to someone', isReply: true),
       ];
+      RelayClient.instance = _FakeRelayClient();
       await tester.pumpWidget(
-        MaterialApp(
-          home: ProfileScreen(
-            pubkeyHex: pubkeyHex,
-            relayClient: _FakeRelayClient(),
-          ),
-        ),
+        MaterialApp(home: ProfileScreen(pubkeyHex: pubkeyHex)),
       );
       await tester.pumpAndSettle();
     }
@@ -234,13 +222,9 @@ void main() {
         for (var i = 0; i < 30; i++)
           note('$i', 'post number $i', isReply: false),
       ];
+      RelayClient.instance = _FakeRelayClient();
       await tester.pumpWidget(
-        MaterialApp(
-          home: ProfileScreen(
-            pubkeyHex: pubkeyHex,
-            relayClient: _FakeRelayClient(),
-          ),
-        ),
+        MaterialApp(home: ProfileScreen(pubkeyHex: pubkeyHex)),
       );
       await tester.pumpAndSettle();
 
@@ -265,10 +249,9 @@ void main() {
     testWidgets('pulling down refreshes the profile', (tester) async {
       final client = _FakeRelayClient();
       notesNotifier.value = [note('1', 'a top-level post', isReply: false)];
+      RelayClient.instance = client;
       await tester.pumpWidget(
-        MaterialApp(
-          home: ProfileScreen(pubkeyHex: pubkeyHex, relayClient: client),
-        ),
+        MaterialApp(home: ProfileScreen(pubkeyHex: pubkeyHex)),
       );
       await tester.pumpAndSettle();
       final before = client.queryCount;
@@ -285,13 +268,9 @@ void main() {
 
     testWidgets('an empty tab says so', (tester) async {
       notesNotifier.value = [note('1', 'only a post', isReply: false)];
+      RelayClient.instance = _FakeRelayClient();
       await tester.pumpWidget(
-        MaterialApp(
-          home: ProfileScreen(
-            pubkeyHex: pubkeyHex,
-            relayClient: _FakeRelayClient(),
-          ),
-        ),
+        MaterialApp(home: ProfileScreen(pubkeyHex: pubkeyHex)),
       );
       await tester.pumpAndSettle();
 
@@ -312,11 +291,10 @@ void main() {
         ['payto', 'monero', '4Aexample'],
       ],
     );
+    RelayClient.instance = fakeClient;
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: ProfileScreen(pubkeyHex: 'b' * 64, relayClient: fakeClient),
-      ),
+      MaterialApp(home: ProfileScreen(pubkeyHex: 'b' * 64)),
     );
     await tester.pumpAndSettle();
 
@@ -333,13 +311,9 @@ void main() {
       profileCacheNotifier.value = {
         pubkeyHex: const NostrMetadata(nip05: 'bob@example.com'),
       };
+      RelayClient.instance = _FakeRelayClient();
       await tester.pumpWidget(
-        MaterialApp(
-          home: ProfileScreen(
-            pubkeyHex: pubkeyHex,
-            relayClient: _FakeRelayClient(),
-          ),
-        ),
+        MaterialApp(home: ProfileScreen(pubkeyHex: pubkeyHex)),
       );
       await tester.pump();
     }
@@ -381,11 +355,10 @@ void main() {
           ['payto', 'bitcoin', 'bc1qexample'],
         ],
       );
+      RelayClient.instance = fakeClient;
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: ProfileScreen(pubkeyHex: pubkeyHex, relayClient: fakeClient),
-        ),
+        MaterialApp(home: ProfileScreen(pubkeyHex: pubkeyHex)),
       );
       await tester.pumpAndSettle();
 
@@ -409,11 +382,10 @@ void main() {
           ['payto', 'monero', '4Areal'],
         ],
       );
+      RelayClient.instance = fakeClient;
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: ProfileScreen(pubkeyHex: pubkeyHex, relayClient: fakeClient),
-        ),
+        MaterialApp(home: ProfileScreen(pubkeyHex: pubkeyHex)),
       );
       await tester.pumpAndSettle();
 
@@ -430,14 +402,10 @@ void main() {
       profileCacheNotifier.value = {
         pubkeyHex: const NostrMetadata(legacyMoneroAddress: '4Alegacy'),
       };
+      RelayClient.instance = _FakeRelayClient();
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: ProfileScreen(
-            pubkeyHex: pubkeyHex,
-            relayClient: _FakeRelayClient(),
-          ),
-        ),
+        MaterialApp(home: ProfileScreen(pubkeyHex: pubkeyHex)),
       );
       await tester.pumpAndSettle();
 
@@ -472,13 +440,9 @@ void main() {
       'double-tap, with no confirm dialog',
       (tester) async {
         final fakeClient = _FakeRelayClient();
+        RelayClient.instance = fakeClient;
         await tester.pumpWidget(
-          MaterialApp(
-            home: ProfileScreen(
-              pubkeyHex: targetPubkeyHex,
-              relayClient: fakeClient,
-            ),
-          ),
+          MaterialApp(home: ProfileScreen(pubkeyHex: targetPubkeyHex)),
         );
         await tester.pumpAndSettle();
 
@@ -509,13 +473,9 @@ void main() {
       tester,
     ) async {
       final fakeClient = _FakeRelayClient();
+      RelayClient.instance = fakeClient;
       await tester.pumpWidget(
-        MaterialApp(
-          home: ProfileScreen(
-            pubkeyHex: targetPubkeyHex,
-            relayClient: fakeClient,
-          ),
-        ),
+        MaterialApp(home: ProfileScreen(pubkeyHex: targetPubkeyHex)),
       );
       await tester.pumpAndSettle();
 
@@ -539,13 +499,11 @@ void main() {
         final fakeClient = _FakeRelayClient(
           publishOutcome: RelayPublishOutcome.rejected,
         );
+        RelayClient.instance = fakeClient;
         await tester.pumpWidget(
           MaterialApp(
             navigatorKey: navigatorKey,
-            home: ProfileScreen(
-              pubkeyHex: targetPubkeyHex,
-              relayClient: fakeClient,
-            ),
+            home: ProfileScreen(pubkeyHex: targetPubkeyHex),
           ),
         );
         await tester.pumpAndSettle();
@@ -570,13 +528,9 @@ void main() {
         addTearDown(() => confirmBeforeReactingNotifier.value = false);
 
         final fakeClient = _FakeRelayClient();
+        RelayClient.instance = fakeClient;
         await tester.pumpWidget(
-          MaterialApp(
-            home: ProfileScreen(
-              pubkeyHex: targetPubkeyHex,
-              relayClient: fakeClient,
-            ),
-          ),
+          MaterialApp(home: ProfileScreen(pubkeyHex: targetPubkeyHex)),
         );
         await tester.pumpAndSettle();
 

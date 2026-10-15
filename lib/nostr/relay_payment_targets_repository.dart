@@ -5,9 +5,11 @@ import 'relay_client.dart';
 import 'replaceable_events.dart';
 
 class RelayPaymentTargetsRepository {
-  const RelayPaymentTargetsRepository({this.client = const RelayClient()});
+  const RelayPaymentTargetsRepository({this._client});
 
-  final RelayClient client;
+  final RelayClient? _client;
+
+  RelayClient get client => _client ?? RelayClient.instance;
 
   /// The payment targets [pubkeyHex] has published, uncached.
   Future<List<NostrPaymentTarget>> fetchPaymentTargets(

@@ -5,9 +5,11 @@ import 'relay_list.dart';
 import 'replaceable_events.dart';
 
 class RelayListRepository {
-  const RelayListRepository({this.client = const RelayClient()});
+  const RelayListRepository({this._client});
 
-  final RelayClient client;
+  final RelayClient? _client;
+
+  RelayClient get client => _client ?? RelayClient.instance;
 
   /// Uncached: a relay list is only read when someone opens it.
   Future<OwnEvent> fetch(String pubkeyHex, Set<String> relayUrls) {

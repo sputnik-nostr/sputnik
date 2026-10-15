@@ -37,7 +37,7 @@ void main() {
     identitiesNotifier.value = [identity];
     activeIdentityPubkeyNotifier.value = identity.pubkeyHex;
     selectedRelaysNotifier.value = const {};
-    loadMediaNotifier.value = true;
+    loadProfileImagesNotifier.value = true;
 
     SettingsStore.secretStore = FakeSecretStore();
     await SettingsStore.savePrivateKey(
@@ -60,6 +60,7 @@ void main() {
         ],
       );
       client = InMemoryRelayClient([parent]);
+      RelayClient.instance = client;
       selectedRelaysNotifier.value = {'wss://relay.example'};
     });
 
@@ -71,10 +72,8 @@ void main() {
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ComposeScreen(
-                    relayClient: client,
-                    replyTo: replyTo ?? _noteOf(parent),
-                  ),
+                  builder: (_) =>
+                      ComposeScreen(replyTo: replyTo ?? _noteOf(parent)),
                 ),
               ),
               child: const Text('open'),
@@ -208,6 +207,7 @@ void main() {
         ],
       );
       client = InMemoryRelayClient([root, mid, focus, child, grandchild]);
+      RelayClient.instance = client;
     });
 
     Future<void> openPost(WidgetTester tester) async {
@@ -219,7 +219,6 @@ void main() {
               client: client,
               reactionsRepository: const NoReactions(),
             ),
-            relayClient: client,
           ),
         ),
       );

@@ -1,25 +1,22 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
-import '../models/avatar_initial.dart';
 import '../models/note.dart';
-import '../models/time_format.dart';
 import '../nostr/http_urls.dart';
-import '../nostr/nostr.dart';
 import '../screens/post_screen.dart';
+import '../services/bounded_cache.dart';
 import '../services/note_hydration.dart';
 import '../theme/app_text_styles.dart';
-import 'fade_in_avatar.dart';
 import 'linkified_text.dart';
+import 'note_author_line.dart';
 
-const _maxCached = 200;
 const _previewLines = 6;
 
 /// A lookup that found nothing is retried after this.
 const _missRetry = Duration(minutes: 2);
 
-final _notes = <String, Note>{};
-final _misses = <String, DateTime>{};
+final _notes = BoundedMap<String, Note>(200);
+final _misses = BoundedMap<String, DateTime>(200);
 final _pending = <String, Future<Note?>>{};
 
 /// Forgets every looked-up note.
@@ -29,32 +26,26 @@ void clearQuotedNoteCache() {
   _pending.clear();
 }
 
-Future<Note?> _fetch(String id, RelayClient client) {
+Future<Note?> _fetch(String id) {
   final missedAt = _misses[id];
   if (missedAt != null && DateTime.now().difference(missedAt) < _missRetry) {
     return Future.value();
   }
-  return _pending[id] ??= _load(id, client).whenComplete(() {
+  return _pending[id] ??= _load(id).whenComplete(() {
     // A block body: returning the removed future would make it await itself.
     _pending.remove(id);
   });
 }
 
-Future<Note?> _load(String id, RelayClient client) async {
+Future<Note?> _load(String id) async {
   try {
-    final note = await loadNote(
-      id,
-      selectedRelaysNotifier.value,
-      client: client,
-    );
+    final note = await loadNote(id, selectedRelaysNotifier.value);
     if (note != null) {
-      if (_notes.length >= _maxCached) _notes.clear();
       return _notes[id] = note;
     }
   } catch (_) {
     // A failed lookup is a miss, so the reference stays a plain link.
   }
-  if (_misses.length >= _maxCached) _misses.clear();
   _misses[id] = DateTime.now();
   return null;
 }
@@ -66,13 +57,11 @@ class QuotedNote extends StatefulWidget {
     required this.eventIdHex,
     required this.reference,
     this.selectable = true,
-    this.relayClient = const RelayClient(),
   });
 
   final String eventIdHex;
   final String reference;
   final bool selectable;
-  final RelayClient relayClient;
 
   @override
   State<QuotedNote> createState() => _QuotedNoteState();
@@ -100,7 +89,7 @@ class _QuotedNoteState extends State<QuotedNote> {
 
   Future<void> _resolve() async {
     final id = widget.eventIdHex;
-    final note = await _fetch(id, widget.relayClient);
+    final note = await _fetch(id);
     if (!mounted || id != widget.eventIdHex) return;
     setState(() {
       _note = note;
@@ -111,20 +100,14 @@ class _QuotedNoteState extends State<QuotedNote> {
   void _open(Note note) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => PostScreen(note: note, relayClient: widget.relayClient),
-      ),
+      MaterialPageRoute(builder: (_) => PostScreen(note: note)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     if (_missed) {
-      return LinkifiedText(
-        widget.reference,
-        selectable: widget.selectable,
-        relayClient: widget.relayClient,
-      );
+      return LinkifiedText(widget.reference, selectable: widget.selectable);
     }
 
     final note = _note;
@@ -137,7 +120,7 @@ class _QuotedNoteState extends State<QuotedNote> {
           padding: const EdgeInsets.all(12),
           child: note == null
               ? Text('Loading note...', style: Theme.of(context).metadata)
-              : _Preview(note: note, relayClient: widget.relayClient),
+              : _Preview(note: note),
         ),
       ),
     );
@@ -145,10 +128,9 @@ class _QuotedNoteState extends State<QuotedNote> {
 }
 
 class _Preview extends StatelessWidget {
-  const _Preview({required this.note, required this.relayClient});
+  const _Preview({required this.note});
 
   final Note note;
-  final RelayClient relayClient;
 
   @override
   Widget build(BuildContext context) {
@@ -161,30 +143,7 @@ class _Preview extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            FadeInAvatar(
-              radius: 10,
-              imageUrl: note.pictureUrl,
-              backgroundColor: theme.colorScheme.primaryContainer,
-              fallback: Text(
-                avatarInitial(note.displayName),
-                style: theme.avatarFallback.copyWith(fontSize: 11),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                note.displayName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.avatarName,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(relativeTime(note.createdAt), style: theme.metadata),
-          ],
-        ),
+        NoteAuthorLine(note: note, showTime: true),
         if (text.isNotEmpty) ...[
           const SizedBox(height: 6),
           LinkifiedText(
@@ -192,7 +151,6 @@ class _Preview extends StatelessWidget {
             style: theme.textTheme.bodyMedium,
             selectable: false,
             maxLines: _previewLines,
-            relayClient: relayClient,
           ),
         ],
         if (note.media.isNotEmpty) ...[

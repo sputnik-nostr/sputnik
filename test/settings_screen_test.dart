@@ -8,29 +8,34 @@ import 'package:sputnik/models/relay.dart';
 import 'package:sputnik/screens/payment_target_types_screen.dart';
 import 'package:sputnik/screens/settings_screen.dart';
 
+SwitchListTile _switchIn(WidgetTester tester, Finder finder) =>
+    tester.widget<SwitchListTile>(
+      find.descendant(of: finder, matching: find.byType(SwitchListTile)),
+    );
+
 void main() {
   setUp(() {
-    loadMediaNotifier.value = false;
+    loadProfileImagesNotifier.value = false;
     loadNoteImagesNotifier.value = false;
     hiddenPaymentTargetTypesNotifier.value = const {};
     identitiesNotifier.value = const [];
     confirmBeforeReactingNotifier.value = false;
   });
 
-  testWidgets('the media switch reflects and updates loadMediaNotifier', (
+  testWidgets('the profile images switch reflects and updates its notifier', (
     tester,
   ) async {
     await tester.pumpWidget(const MaterialApp(home: SettingsScreen()));
     await tester.pumpAndSettle();
 
-    final switchFinder = find.byKey(const Key('loadMediaSwitch'));
-    expect(tester.widget<SwitchListTile>(switchFinder).value, isFalse);
+    final switchFinder = find.byKey(const Key('loadProfileImagesSwitch'));
+    expect(_switchIn(tester, switchFinder).value, isFalse);
 
     await tester.tap(switchFinder);
     await tester.pumpAndSettle();
 
-    expect(loadMediaNotifier.value, isTrue);
-    expect(tester.widget<SwitchListTile>(switchFinder).value, isTrue);
+    expect(loadProfileImagesNotifier.value, isTrue);
+    expect(_switchIn(tester, switchFinder).value, isTrue);
   });
 
   testWidgets('the note images switch reflects and updates its notifier', (
@@ -40,13 +45,13 @@ void main() {
     await tester.pumpAndSettle();
 
     final switchFinder = find.byKey(const Key('loadNoteImagesSwitch'));
-    expect(tester.widget<SwitchListTile>(switchFinder).value, isFalse);
+    expect(_switchIn(tester, switchFinder).value, isFalse);
 
     await tester.tap(switchFinder);
     await tester.pumpAndSettle();
 
     expect(loadNoteImagesNotifier.value, isTrue);
-    expect(tester.widget<SwitchListTile>(switchFinder).value, isTrue);
+    expect(_switchIn(tester, switchFinder).value, isTrue);
   });
 
   testWidgets(
@@ -56,13 +61,13 @@ void main() {
       await tester.pumpAndSettle();
 
       final switchFinder = find.byKey(const Key('confirmBeforeReactingSwitch'));
-      expect(tester.widget<SwitchListTile>(switchFinder).value, isFalse);
+      expect(_switchIn(tester, switchFinder).value, isFalse);
 
       await tester.tap(switchFinder);
       await tester.pumpAndSettle();
 
       expect(confirmBeforeReactingNotifier.value, isTrue);
-      expect(tester.widget<SwitchListTile>(switchFinder).value, isTrue);
+      expect(_switchIn(tester, switchFinder).value, isTrue);
     },
   );
 
@@ -106,7 +111,7 @@ void main() {
     themeModeNotifier.value = ThemeMode.dark;
     seedColorNotifier.value = AppSeedColor.red;
     selectedRelaysNotifier.value = {'wss://custom.example'};
-    loadMediaNotifier.value = true;
+    loadProfileImagesNotifier.value = true;
     loadNoteImagesNotifier.value = true;
     autoVerifyNip05Notifier.value = true;
     hiddenPaymentTargetTypesNotifier.value = {'monero'};
@@ -133,7 +138,7 @@ void main() {
     expect(themeModeNotifier.value, ThemeMode.system);
     expect(seedColorNotifier.value, AppSeedColor.blue);
     expect(selectedRelaysNotifier.value, defaultRelays.toSet());
-    expect(loadMediaNotifier.value, isFalse);
+    expect(loadProfileImagesNotifier.value, isFalse);
     expect(loadNoteImagesNotifier.value, isFalse);
     expect(autoVerifyNip05Notifier.value, isFalse);
     expect(hiddenPaymentTargetTypesNotifier.value, isEmpty);

@@ -29,7 +29,6 @@ String? _pendingFor;
 Timer? _timer;
 bool _syncRunning = false;
 int _failedAttempts = 0;
-RelayClient _syncClient = const RelayClient();
 
 /// The identity [myFollowingNotifier] was last loaded for.
 String? _myFollowingLoadedFor;
@@ -39,10 +38,7 @@ String? _myFollowingLoadedFor;
 ({String pubkeyHex, Future<void> future})? _myFollowingLoading;
 
 /// Populates [myFollowingNotifier] for the active identity, once per identity.
-Future<void> ensureMyFollowingLoaded(
-  Set<String> relayUrls, {
-  RelayClient relayClient = const RelayClient(),
-}) {
+Future<void> ensureMyFollowingLoaded(Set<String> relayUrls) {
   final myPubkeyHex = activeIdentityPubkeyNotifier.value;
   if (myPubkeyHex == null) {
     myFollowingNotifier.value = null;
@@ -65,7 +61,7 @@ Future<void> ensureMyFollowingLoaded(
   }
 
   late final Future<void> future;
-  future = loadFollowingOrNull(myPubkeyHex, relayUrls, client: relayClient)
+  future = loadFollowingOrNull(myPubkeyHex, relayUrls)
       .then((following) {
         // Left unloaded on failure so the next call retries.
         if (following == null) return;
@@ -84,11 +80,7 @@ Future<void> ensureMyFollowingLoaded(
 }
 
 /// Queues a follow change, published in a batch after a short debounce.
-void scheduleFollowingSync(
-  String targetPubkeyHex, {
-  required bool follow,
-  RelayClient relayClient = const RelayClient(),
-}) {
+void scheduleFollowingSync(String targetPubkeyHex, {required bool follow}) {
   final myPubkeyHex = activeIdentityPubkeyNotifier.value;
   if (myPubkeyHex == null) return;
 
@@ -96,7 +88,6 @@ void scheduleFollowingSync(
   _pendingFor = myPubkeyHex;
   _pending[targetPubkeyHex.toLowerCase()] = follow;
 
-  _syncClient = relayClient;
   _timer?.cancel();
   _timer = Timer(_debounceDuration, _runSync);
 }
@@ -140,13 +131,12 @@ Future<void> _runSync() async {
       final ({Map<String, RelayPublishResult> results, Set<String> following})
       outcome;
       try {
-        outcome = await RelayContactsRepository(client: _syncClient)
-            .applyFollowChanges(
-              secretKey: secretKey,
-              myPubkeyHex: myPubkeyHex,
-              changes: changes,
-              relayUrls: selectedRelaysNotifier.value,
-            );
+        outcome = await RelayContactsRepository().applyFollowChanges(
+          secretKey: secretKey,
+          myPubkeyHex: myPubkeyHex,
+          changes: changes,
+          relayUrls: selectedRelaysNotifier.value,
+        );
       } finally {
         secretKey.wipe();
       }

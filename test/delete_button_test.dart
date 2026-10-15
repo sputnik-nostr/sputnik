@@ -90,7 +90,8 @@ void main() {
   testWidgets('tapping delete asks for confirmation and does not publish until '
       'confirmed', (tester) async {
     final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
-    await pumpButton(tester, DeleteButton(note: note, relayClient: fakeClient));
+    RelayClient.instance = fakeClient;
+    await pumpButton(tester, DeleteButton(note: note));
 
     await tester.tap(find.byIcon(Icons.delete_outline));
     await tester.pumpAndSettle();
@@ -111,7 +112,8 @@ void main() {
 
   testWidgets('canceling the confirmation never publishes', (tester) async {
     final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
-    await pumpButton(tester, DeleteButton(note: note, relayClient: fakeClient));
+    RelayClient.instance = fakeClient;
+    await pumpButton(tester, DeleteButton(note: note));
 
     await tester.tap(find.byIcon(Icons.delete_outline));
     await tester.pumpAndSettle();
@@ -125,7 +127,8 @@ void main() {
     tester,
   ) async {
     final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
-    await pumpButton(tester, DeleteButton(note: note, relayClient: fakeClient));
+    RelayClient.instance = fakeClient;
+    await pumpButton(tester, DeleteButton(note: note));
 
     await tester.tap(find.byIcon(Icons.delete_outline));
     await tester.pumpAndSettle();
@@ -139,13 +142,10 @@ void main() {
   testWidgets('a successful delete calls onDeleted', (tester) async {
     final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
     var deleted = false;
+    RelayClient.instance = fakeClient;
     await pumpButton(
       tester,
-      DeleteButton(
-        note: note,
-        relayClient: fakeClient,
-        onDeleted: () => deleted = true,
-      ),
+      DeleteButton(note: note, onDeleted: () => deleted = true),
     );
 
     await tester.tap(find.byIcon(Icons.delete_outline));
@@ -161,13 +161,10 @@ void main() {
     (tester) async {
       final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.rejected);
       var deleted = false;
+      RelayClient.instance = fakeClient;
       await pumpButton(
         tester,
-        DeleteButton(
-          note: note,
-          relayClient: fakeClient,
-          onDeleted: () => deleted = true,
-        ),
+        DeleteButton(note: note, onDeleted: () => deleted = true),
       );
 
       await tester.tap(find.byIcon(Icons.delete_outline));

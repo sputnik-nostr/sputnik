@@ -54,6 +54,7 @@ void main() {
       }),
     );
     client = InMemoryRelayClient([published0]);
+    RelayClient.instance = client;
 
     SettingsStore.secretStore = FakeSecretStore();
     await SettingsStore.savePrivateKey(
@@ -63,9 +64,7 @@ void main() {
   });
 
   Future<void> openEditProfileScreen(WidgetTester tester) async {
-    await tester.pumpWidget(
-      MaterialApp(home: EditProfileScreen(relayClient: client)),
-    );
+    await tester.pumpWidget(MaterialApp(home: EditProfileScreen()));
     await tester.pumpAndSettle();
   }
 

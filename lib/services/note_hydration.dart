@@ -5,21 +5,11 @@ import '../nostr/nostr.dart';
 import 'profiles.dart';
 
 /// The note [id] with its author's profile, or null if no relay returns it.
-Future<Note?> loadNote(
-  String id,
-  Set<String> relayUrls, {
-  RelayClient client = const RelayClient(),
-}) async {
-  final post = await RelayPostRepository(
-    relayUrls: relayUrls,
-    client: client,
-  ).fetchPostById(id);
+Future<Note?> loadNote(String id, Set<String> relayUrls) async {
+  final post = await RelayPostRepository(relayUrls: relayUrls)
+      .fetchPostById(id);
   if (post == null) return null;
-  final metadata = await loadProfile(
-    post.authorPubkey,
-    relayUrls,
-    client: client,
-  );
+  final metadata = await loadProfile(post.authorPubkey, relayUrls);
   return noteFromNostrPost(post, authorMetadata: metadata);
 }
 
@@ -29,7 +19,6 @@ Future<List<Note>> hydratePosts(
   List<NostrPost> posts,
   Set<String> relayUrls, {
   Map<String, NostrMetadata>? knownMetadata,
-  RelayClient client = const RelayClient(),
 }) async {
   final known = knownMetadata ?? const <String, NostrMetadata>{};
   final needed = {
@@ -43,10 +32,11 @@ Future<List<Note>> hydratePosts(
       : loadProfiles(
           needed,
           relayUrls,
-          client: client,
         ).then((fetched) => {...known, ...fetched});
-  final reactionsFuture = RelayReactionsRepository(client: client)
-      .fetchReactions(posts.map((post) => post.id).toList(), relayUrls);
+  final reactionsFuture = RelayReactionsRepository().fetchReactions(
+    posts.map((post) => post.id).toList(),
+    relayUrls,
+  );
 
   final notes = notesFromPosts(posts, await profilesFuture);
   return applyReactionCounts(

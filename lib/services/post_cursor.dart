@@ -19,13 +19,16 @@ class PostCursor {
   bool _loading = false;
   int _generation = 0;
 
-  /// Starts over from the newest post.
-  Future<List<NostrPost>> first() async {
+  /// Bumped by [first], so a load can tell whether a newer one replaced it.
+  int get generation => _generation;
+
+  /// Starts over from the newest post; null if a newer call replaced this one.
+  Future<List<NostrPost>?> first() async {
     final generation = ++_generation;
     _loading = true;
     try {
       final page = await _fetchPage(null);
-      if (generation != _generation) return page.posts;
+      if (generation != _generation) return null;
       _seen.clear();
       return _take(page);
     } finally {

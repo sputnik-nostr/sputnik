@@ -7,9 +7,11 @@ import 'relay_client.dart';
 import 'replaceable_events.dart';
 
 class RelayProfileRepository {
-  const RelayProfileRepository({this.client = const RelayClient()});
+  const RelayProfileRepository({this._client});
 
-  final RelayClient client;
+  final RelayClient? _client;
+
+  RelayClient get client => _client ?? RelayClient.instance;
 
   /// The newest metadata each of [pubkeys] has published, uncached.
   Future<Map<String, NostrMetadata>> fetchProfiles(

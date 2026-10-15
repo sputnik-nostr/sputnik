@@ -44,8 +44,8 @@ void main() {
     await CacheStore.clearAll();
 
     expect(CacheStore.loadAllProfiles(), isEmpty);
-    expect(CacheStore.getFollowing('a' * 64), isNull);
-    expect(CacheStore.getFollowers('a' * 64), isNull);
-    expect(CacheStore.getPaymentTargets('a' * 64), isNull);
+    expect(CacheStore.freshFollowing('a' * 64), isNull);
+    expect(CacheStore.freshFollowers('a' * 64), isNull);
+    expect(CacheStore.freshPaymentTargets('a' * 64), isNull);
   });
 }

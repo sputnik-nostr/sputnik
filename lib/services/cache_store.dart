@@ -108,17 +108,13 @@ class CacheStore {
     await Future.wait([_profiles.clear(), _paymentTargets.clear()]);
   }
 
-  static List<String>? getFollowing(String pubkeyHex) =>
-      _getList('$pubkeyHex:following');
+  /// Null unless fetched within [staleAfter].
+  static List<String>? freshFollowing(String pubkeyHex) =>
+      _freshList('$pubkeyHex:following');
 
-  static List<String>? getFollowers(String pubkeyHex) =>
-      _getList('$pubkeyHex:followers');
-
-  static bool isFollowingFresh(String pubkeyHex) =>
-      _isFresh(_contacts['$pubkeyHex:following']?.fetchedAt);
-
-  static bool isFollowersFresh(String pubkeyHex) =>
-      _isFresh(_contacts['$pubkeyHex:followers']?.fetchedAt);
+  /// Null unless fetched within [staleAfter].
+  static List<String>? freshFollowers(String pubkeyHex) =>
+      _freshList('$pubkeyHex:followers');
 
   static void putFollowing(String pubkeyHex, List<String> pubkeys) =>
       _putList('$pubkeyHex:following', pubkeys);
@@ -126,9 +122,10 @@ class CacheStore {
   static void putFollowers(String pubkeyHex, List<String> pubkeys) =>
       _putList('$pubkeyHex:followers', pubkeys);
 
-  static List<String>? _getList(String key) {
-    final pubkeys = _contacts[key]?.pubkeys;
-    return pubkeys == null ? null : List.of(pubkeys);
+  static List<String>? _freshList(String key) {
+    final entry = _contacts[key];
+    if (entry == null || !_isFresh(entry.fetchedAt)) return null;
+    return List.of(entry.pubkeys);
   }
 
   static void _putList(String key, List<String> pubkeys) {
@@ -140,19 +137,16 @@ class CacheStore {
     );
   }
 
-  static List<NostrPaymentTarget>? getPaymentTargets(String pubkeyHex) {
+  /// Null unless fetched within [staleAfter].
+  static List<NostrPaymentTarget>? freshPaymentTargets(String pubkeyHex) {
     if (!_ready) return null;
-    final data = _paymentTargets.get(pubkeyHex)?['data'] as List?;
-    if (data == null) return null;
+    final entry = _paymentTargets.get(pubkeyHex);
+    final data = entry?['data'] as List?;
+    if (data == null || !_isFresh(entry?['fetchedAt'] as int?)) return null;
     return [
       for (final item in data)
         NostrPaymentTarget.fromJson(Map<String, dynamic>.from(item as Map)),
     ];
-  }
-
-  static bool isPaymentTargetsFresh(String pubkeyHex) {
-    if (!_ready) return false;
-    return _isFresh(_paymentTargets.get(pubkeyHex)?['fetchedAt'] as int?);
   }
 
   static Future<void> putPaymentTargets(

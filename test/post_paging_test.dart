@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/services/post_cursor.dart';
@@ -188,7 +190,7 @@ void main() {
       final repository = _repository(client);
       final cursor = PostCursor((until) => repository.fetchPage(until: until));
 
-      final shown = [...await cursor.first()];
+      final shown = [...?await cursor.first()];
       expect(cursor.hasMore.value, isTrue);
       while (cursor.hasMore.value) {
         shown.addAll(await cursor.more());
@@ -211,8 +213,22 @@ void main() {
       await cursor.more();
       final again = await cursor.first();
 
-      expect(again.map((p) => p.content), ['note 0', 'note 1', 'note 2']);
+      expect(again!.map((p) => p.content), ['note 0', 'note 1', 'note 2']);
       expect(cursor.hasMore.value, isTrue);
+    });
+
+    test('a start that a newer one replaced returns null', () async {
+      final pages = [Completer<PostPage>(), Completer<PostPage>()];
+      var calls = 0;
+      final cursor = PostCursor((until) => pages[calls++].future);
+
+      final older = cursor.first();
+      final newer = cursor.first();
+      pages[1].complete(const PostPage([], null));
+      pages[0].complete(const PostPage([], null));
+
+      expect(await newer, isEmpty);
+      expect(await older, isNull);
     });
 
     test('stops paging once it has a bounded number of posts', () async {
@@ -223,7 +239,7 @@ void main() {
       final repository = _repository(client, limit: 100);
       final cursor = PostCursor((until) => repository.fetchPage(until: until));
 
-      var total = (await cursor.first()).length;
+      var total = (await cursor.first())!.length;
       while (cursor.hasMore.value) {
         total += (await cursor.more()).length;
       }

@@ -37,9 +37,7 @@ String? _validateNip05(String? value) {
 }
 
 class EditProfileScreen extends StatefulWidget {
-  const EditProfileScreen({super.key, this.relayClient = const RelayClient()});
-
-  final RelayClient relayClient;
+  const EditProfileScreen({super.key});
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -61,8 +59,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _baseConclusive = true;
   bool _saving = false;
 
-  RelayProfileRepository get _profiles =>
-      RelayProfileRepository(client: widget.relayClient);
+  RelayProfileRepository get _profiles => RelayProfileRepository();
 
   @override
   void initState() {
@@ -149,46 +146,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _saving = true);
     try {
-      await withSecretKey<void>(
+      final event = await signAndPublish(
         identity,
         messenger,
         signFailure: 'Could not sign this profile update',
-        use: (secretKey) async {
-          if (!mounted) return;
-          final published = await _profiles.publishProfile(
-            secretKey: secretKey,
-            pubkeyHex: pubkeyHex,
-            base: _base,
-            fields: {
-              'display_name': _displayNameController.text,
-              'name': _nameController.text,
-              'about': _bioController.text,
-              'picture': _pictureController.text,
-              'banner': _bannerController.text,
-              'nip05': _nip05Controller.text,
-              'website': _websiteController.text,
-            },
-            relayUrls: relayUrls,
-          );
-          if (!mounted) return;
-
-          final updated = reportPublishResults(
-            messenger,
-            published.results,
-            failure: 'Could not publish this profile update to any relay',
-            success: (counts) => 'Updated profile on $counts relays',
-          );
-          if (!updated) return;
-
-          final metadata = NostrMetadata.fromContent(published.event.content);
-          profileCacheNotifier.value = {
-            ...profileCacheNotifier.value,
-            pubkeyHex: metadata,
-          };
-          await CacheStore.putProfiles({pubkeyHex: metadata});
-          if (mounted) Navigator.pop(context);
-        },
+        failure: 'Could not publish this profile update to any relay',
+        success: (counts) => 'Updated profile on $counts relays',
+        publish: (secretKey) => _profiles.publishProfile(
+          secretKey: secretKey,
+          pubkeyHex: pubkeyHex,
+          base: _base,
+          fields: {
+            'display_name': _displayNameController.text,
+            'name': _nameController.text,
+            'about': _bioController.text,
+            'picture': _pictureController.text,
+            'banner': _bannerController.text,
+            'nip05': _nip05Controller.text,
+            'website': _websiteController.text,
+          },
+          relayUrls: relayUrls,
+        ),
       );
+      if (event == null) return;
+
+      final metadata = NostrMetadata.fromContent(event.content);
+      profileCacheNotifier.value = {
+        ...profileCacheNotifier.value,
+        pubkeyHex: metadata,
+      };
+      await CacheStore.putProfiles({pubkeyHex: metadata});
+      if (mounted) Navigator.pop(context);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -311,9 +299,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => EditPaymentTargetsScreen(
-                          relayClient: widget.relayClient,
-                        ),
+                        builder: (_) => EditPaymentTargetsScreen(),
                       ),
                     ),
                   ),

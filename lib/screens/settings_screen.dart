@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../models/app_seed_color.dart';
 import '../models/identity.dart';
-import '../models/relay.dart';
 import '../services/blossom_servers.dart';
 import '../services/cache_store.dart';
 import '../services/nip05_verification.dart';
@@ -52,14 +51,9 @@ Future<void> _confirmResetPreferences(BuildContext context) async {
   );
   if (!confirmed) return;
 
-  themeModeNotifier.value = ThemeMode.system;
-  seedColorNotifier.value = AppSeedColor.blue;
-  selectedRelaysNotifier.value = defaultRelays.toSet();
-  loadMediaNotifier.value = false;
-  loadNoteImagesNotifier.value = false;
-  autoVerifyNip05Notifier.value = false;
-  hiddenPaymentTargetTypesNotifier.value = const {};
-  confirmBeforeReactingNotifier.value = false;
+  for (final preference in preferences) {
+    preference.reset();
+  }
 
   if (context.mounted) {
     ScaffoldMessenger.of(context)
@@ -165,69 +159,35 @@ class SettingsScreen extends StatelessWidget {
                 },
               ),
               const Divider(height: 1),
-              ValueListenableBuilder<bool>(
-                valueListenable: loadMediaNotifier,
-                builder: (context, loadMedia, _) {
-                  return SwitchListTile(
-                    key: const Key('loadMediaSwitch'),
-                    secondary: const Icon(Icons.image_outlined),
-                    title: const Text('Load profile images automatically'),
-                    subtitle: const Text(
-                      "Can reveal your IP to a profile's image host.",
-                    ),
-                    value: loadMedia,
-                    onChanged: (value) => loadMediaNotifier.value = value,
-                  );
-                },
+              _PreferenceSwitch(
+                key: const Key('loadProfileImagesSwitch'),
+                preference: loadProfileImagesNotifier,
+                icon: Icons.image_outlined,
+                title: 'Load profile images automatically',
+                subtitle: "Can reveal your IP to a profile's image host.",
               ),
-              ValueListenableBuilder<bool>(
-                valueListenable: loadNoteImagesNotifier,
-                builder: (context, loadNoteImages, _) {
-                  return SwitchListTile(
-                    key: const Key('loadNoteImagesSwitch'),
-                    secondary: const Icon(Icons.photo_library_outlined),
-                    title: const Text('Load images in notes automatically'),
-                    subtitle: const Text(
-                      'Can reveal your IP to an image host. '
-                      'Videos always wait for a tap.',
-                    ),
-                    value: loadNoteImages,
-                    onChanged: (value) => loadNoteImagesNotifier.value = value,
-                  );
-                },
+              _PreferenceSwitch(
+                key: const Key('loadNoteImagesSwitch'),
+                preference: loadNoteImagesNotifier,
+                icon: Icons.photo_library_outlined,
+                title: 'Load images in notes automatically',
+                subtitle:
+                    'Can reveal your IP to an image host. '
+                    'Videos always wait for a tap.',
               ),
-              ValueListenableBuilder<bool>(
-                valueListenable: autoVerifyNip05Notifier,
-                builder: (context, autoVerify, _) {
-                  return SwitchListTile(
-                    key: const Key('autoVerifyNip05Switch'),
-                    secondary: const Icon(Icons.verified_outlined),
-                    title: const Text(
-                      'Verify internet identifiers automatically',
-                    ),
-                    subtitle: const Text(
-                      "Can reveal your IP to the domain in a profile's identifier.",
-                    ),
-                    value: autoVerify,
-                    onChanged: (value) => autoVerifyNip05Notifier.value = value,
-                  );
-                },
+              _PreferenceSwitch(
+                key: const Key('autoVerifyNip05Switch'),
+                preference: autoVerifyNip05Notifier,
+                icon: Icons.verified_outlined,
+                title: 'Verify internet identifiers automatically',
+                subtitle: "Can reveal your IP to the domain in a profile's identifier.",
               ),
-              ValueListenableBuilder<bool>(
-                valueListenable: confirmBeforeReactingNotifier,
-                builder: (context, confirmBeforeReacting, _) {
-                  return SwitchListTile(
-                    key: const Key('confirmBeforeReactingSwitch'),
-                    secondary: const Icon(Icons.help_outline),
-                    title: const Text('Confirm before reacting or following'),
-                    subtitle: const Text(
-                      'Posting and reposting always ask first regardless.',
-                    ),
-                    value: confirmBeforeReacting,
-                    onChanged: (value) =>
-                        confirmBeforeReactingNotifier.value = value,
-                  );
-                },
+              _PreferenceSwitch(
+                key: const Key('confirmBeforeReactingSwitch'),
+                preference: confirmBeforeReactingNotifier,
+                icon: Icons.help_outline,
+                title: 'Confirm before reacting or following',
+                subtitle: 'Posting and reposting always ask first regardless.',
               ),
               ValueListenableBuilder<Set<String>>(
                 valueListenable: hiddenPaymentTargetTypesNotifier,
@@ -293,6 +253,35 @@ class SettingsScreen extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _PreferenceSwitch extends StatelessWidget {
+  const _PreferenceSwitch({
+    super.key,
+    required this.preference,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final Preference<bool> preference;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: preference,
+      builder: (context, value, _) => SwitchListTile(
+        secondary: Icon(icon),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        value: value,
+        onChanged: (value) => preference.value = value,
       ),
     );
   }

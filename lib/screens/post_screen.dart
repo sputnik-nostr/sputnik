@@ -26,12 +26,10 @@ class PostScreen extends StatefulWidget {
     super.key,
     required this.note,
     this.threadRepository = const RelayThreadRepository(),
-    this.relayClient = const RelayClient(),
   });
 
   final Note note;
   final RelayThreadRepository threadRepository;
-  final RelayClient relayClient;
 
   @override
   State<PostScreen> createState() => _PostScreenState();
@@ -42,15 +40,13 @@ class _PostThread {
     required this.ancestors,
     required this.replyToId,
     required this.replies,
-    required this.depths,
     required this.directReplyCount,
     required this.reactions,
   });
 
   final List<Note> ancestors;
   final String? replyToId;
-  final List<Note> replies;
-  final List<int> depths;
+  final List<({Note note, int depth})> replies;
   final int directReplyCount;
   final PostReactions reactions;
 }
@@ -108,6 +104,7 @@ class _PostScreenState extends State<PostScreen> {
       reportError('loading a thread', error, stack);
     }
     if (!mounted || generation != _loadGeneration) return;
+    if (thread != null) _syncFeedCounts(thread);
     setState(() {
       _thread = thread ?? _thread;
       _loading = false;
@@ -127,11 +124,32 @@ class _PostScreenState extends State<PostScreen> {
       extraEvents: _publishedReplies,
     );
 
-    void applyCounts(ValueNotifier<List<Note>?> notifier) {
+    final posts = [
+      ...thread.ancestors,
+      for (final reply in thread.replies) reply.post,
+    ];
+    final notes = await hydratePosts(posts, relayUrls);
+    final ancestorCount = thread.ancestors.length;
+
+    return _PostThread(
+      ancestors: notes.sublist(0, ancestorCount),
+      replyToId: thread.replyToId,
+      replies: [
+        for (var i = 0; i < thread.replies.length; i++)
+          (note: notes[ancestorCount + i], depth: thread.replies[i].depth),
+      ],
+      directReplyCount: thread.directReplyCount,
+      reactions: thread.reactions,
+    );
+  }
+
+  /// Gives the feeds this note's fresh counts, so going back shows them too.
+  void _syncFeedCounts(_PostThread thread) {
+    for (final notifier in [notesNotifier, followingNotesNotifier]) {
       final notes = notifier.value;
       // Reassigning rebuilds the whole feed, so only do it when it changes.
       if (notes == null || !notes.any((note) => note.id == widget.note.id)) {
-        return;
+        continue;
       }
       notifier.value = [
         for (final note in notes)
@@ -144,37 +162,10 @@ class _PostScreenState extends State<PostScreen> {
               : note,
       ];
     }
-
-    applyCounts(notesNotifier);
-    applyCounts(followingNotesNotifier);
-
-    final posts = [
-      ...thread.ancestors,
-      for (final reply in thread.replies) reply.post,
-    ];
-    final notes = await hydratePosts(
-      posts,
-      relayUrls,
-      client: widget.relayClient,
-    );
-    final ancestorCount = thread.ancestors.length;
-
-    return _PostThread(
-      ancestors: notes.sublist(0, ancestorCount),
-      replyToId: thread.replyToId,
-      replies: notes.sublist(ancestorCount),
-      depths: [for (final reply in thread.replies) reply.depth],
-      directReplyCount: thread.directReplyCount,
-      reactions: thread.reactions,
-    );
   }
 
   Future<void> _reply(Note target) async {
-    final published = await openReplyComposer(
-      context,
-      target,
-      relayClient: widget.relayClient,
-    );
+    final published = await openReplyComposer(context, target);
     if (published == null || !mounted) return;
     _publishedReplies.add(published);
     unawaited(_refreshThread());
@@ -185,7 +176,7 @@ class _PostScreenState extends State<PostScreen> {
     final thread = _thread;
     final loading = _loading;
     final ancestors = thread?.ancestors ?? const <Note>[];
-    final replies = thread?.replies ?? const <Note>[];
+    final replies = thread?.replies ?? const <({Note note, int depth})>[];
 
     return Scaffold(
       appBar: AppBar(),
@@ -223,7 +214,6 @@ class _PostScreenState extends State<PostScreen> {
                   ),
                 _PostHeader(
                   note: widget.note,
-                  relayClient: widget.relayClient,
                   replyCount: thread?.directReplyCount,
                   likerPubkeys: thread?.reactions.likerPubkeys,
                   reposterPubkeys: thread?.reactions.reposterPubkeys,
@@ -249,8 +239,8 @@ class _PostScreenState extends State<PostScreen> {
             SliverList.builder(
               itemCount: replies.length,
               itemBuilder: (context, index) => _NestedReply(
-                note: replies[index],
-                depth: thread!.depths[index],
+                note: replies[index].note,
+                depth: replies[index].depth,
               ),
             ),
         ],
@@ -298,7 +288,6 @@ class _NestedReply extends StatelessWidget {
 class _PostHeader extends StatelessWidget {
   const _PostHeader({
     required this.note,
-    required this.relayClient,
     required this.replyCount,
     required this.likerPubkeys,
     required this.reposterPubkeys,
@@ -307,7 +296,6 @@ class _PostHeader extends StatelessWidget {
   });
 
   final Note note;
-  final RelayClient relayClient;
   final VoidCallback onReply;
 
   /// Called once this note itself has been deleted.
@@ -424,26 +412,11 @@ class _PostHeader extends StatelessWidget {
                 tooltip: 'Reply',
                 onPressed: onReply,
               ),
-              RepostButton(
-                note: reactionNote,
-                relayClient: relayClient,
-                showCount: false,
-                size: 20,
-              ),
-              LikeButton(
-                note: reactionNote,
-                relayClient: relayClient,
-                showCount: false,
-                size: 20,
-              ),
+              RepostButton(note: reactionNote, showCount: false, size: 20),
+              LikeButton(note: reactionNote, showCount: false, size: 20),
               BookmarkButton(note: note, size: 20),
               if (note.pubkey.toLowerCase() == myPubkeyHex)
-                DeleteButton(
-                  note: note,
-                  relayClient: relayClient,
-                  size: 20,
-                  onDeleted: onDeleted,
-                ),
+                DeleteButton(note: note, size: 20, onDeleted: onDeleted),
             ],
           ),
         ),

@@ -5,6 +5,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:gal/gal.dart';
 
 import '../nostr/blossom.dart';
+import '../nostr/nip92.dart';
 import 'media_loader.dart';
 
 enum SaveOutcome { saved, cancelled, denied, failed }
@@ -26,8 +27,6 @@ class SaveDenied implements Exception {
 /// Stores [bytes] where the user can find them; null if they cancel.
 typedef SaveBackend = Future<String?> Function(Uint8List bytes, String name);
 
-const _imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
-
 /// The gallery on phones, and a file the user picks on desktop.
 Future<String?> saveToDevice(Uint8List bytes, String name) async {
   if (Platform.isAndroid || Platform.isIOS) {
@@ -47,8 +46,8 @@ Future<String?> saveToDevice(Uint8List bytes, String name) async {
 
   final location = await getSaveLocation(
     suggestedName: name,
-    acceptedTypeGroups: const [
-      XTypeGroup(label: 'Images', extensions: _imageExtensions),
+    acceptedTypeGroups: [
+      XTypeGroup(label: 'Images', extensions: imageExtensions.toList()),
     ],
   );
   if (location == null) return null;
@@ -89,7 +88,7 @@ String imageFileName(String url, List<int> bytes) {
   final urlExtension = uri == null ? '' : extensionOf(uri).toLowerCase();
   final extension =
       _sniffedExtension(bytes) ??
-      (_imageExtensions.contains(urlExtension.replaceFirst('.', ''))
+      (imageExtensions.contains(urlExtension.replaceFirst('.', ''))
           ? urlExtension
           : '');
   return '$stem$extension';

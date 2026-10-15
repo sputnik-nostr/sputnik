@@ -45,7 +45,7 @@ void main() {
   final hostileName = 'A' * 5000;
 
   setUp(() {
-    loadMediaNotifier.value = true;
+    loadProfileImagesNotifier.value = true;
     // Home opens on the following feed, which needs an identity.
     activeIdentityPubkeyNotifier.value = 'a' * 64;
     followingNotesNotifier.value = [

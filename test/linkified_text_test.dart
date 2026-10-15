@@ -6,6 +6,7 @@ import 'package:sputnik/nostr/bech32.dart';
 import 'package:sputnik/nostr/hex.dart';
 import 'package:sputnik/nostr/models/nostr_metadata.dart';
 import 'package:sputnik/nostr/nip19.dart';
+import 'package:sputnik/nostr/relay_client.dart';
 import 'package:sputnik/screens/post_screen.dart';
 import 'package:sputnik/widgets/linkified_text.dart';
 
@@ -300,10 +301,9 @@ void main() {
       String text,
       InMemoryRelayClient client,
     ) async {
+      RelayClient.instance = client;
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(body: LinkifiedText(text, relayClient: client)),
-        ),
+        MaterialApp(home: Scaffold(body: LinkifiedText(text))),
       );
       await tester.tapAt(
         tester.getTopLeft(find.byType(RichText).first) + const Offset(8, 8),

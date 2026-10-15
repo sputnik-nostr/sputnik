@@ -14,7 +14,6 @@ class ProfileResultTile extends StatelessWidget {
     required this.pubkeyHex,
     required this.metadata,
     this.showFollowButton = false,
-    this.relayClient = const RelayClient(),
   });
 
   final String pubkeyHex;
@@ -22,7 +21,6 @@ class ProfileResultTile extends StatelessWidget {
 
   /// False hides the follow button (no active identity, or this is you).
   final bool showFollowButton;
-  final RelayClient relayClient;
 
   @override
   Widget build(BuildContext context) {
@@ -62,11 +60,7 @@ class ProfileResultTile extends StatelessWidget {
       ),
       trailing: !showFollowButton
           ? null
-          : FollowButton(
-              targetPubkeyHex: pubkeyHex,
-              relayClient: relayClient,
-              dense: true,
-            ),
+          : FollowButton(targetPubkeyHex: pubkeyHex, dense: true),
       onTap: () => openProfile(context, pubkeyHex),
     );
   }

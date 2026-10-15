@@ -50,12 +50,14 @@ const _maxAncestors = 8;
 
 class RelayThreadRepository {
   const RelayThreadRepository({
-    this.client = const RelayClient(),
+    this._client,
     this.reactionsRepository = const RelayReactionsRepository(),
   });
 
-  final RelayClient client;
+  final RelayClient? _client;
   final RelayReactionsRepository reactionsRepository;
+
+  RelayClient get client => _client ?? RelayClient.instance;
 
   /// Fetches the thread around [postId]: its ancestors, replies and reactions.
   ///

@@ -204,7 +204,6 @@ Future<void> _showNsec(BuildContext context, Identity identity) async {
   }
 
   final nsec = nsecFromHex(privkeyHex);
-  if (!context.mounted) return;
 
   await showDialog<void>(
     context: context,

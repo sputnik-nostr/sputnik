@@ -6,9 +6,9 @@ import '../models/note.dart';
 import '../services/feed_loader.dart';
 import '../widgets/compact_tab_bar.dart';
 import '../widgets/load_more_footer.dart';
+import '../widgets/no_identity_prompt.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/placeholder_tab.dart';
-import 'identities_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -117,25 +117,9 @@ class _FollowingFeed extends StatelessWidget {
       ]),
       builder: (context, _) {
         if (activeIdentityPubkeyNotifier.value == null) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const PlaceholderTab(
-                  icon: Icons.people_outline,
-                  label: 'No identity yet',
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  key: const Key('createIdentityFromFeedButton'),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const IdentitiesScreen()),
-                  ),
-                  child: const Text('Create or import an identity'),
-                ),
-              ],
-            ),
+          return const NoIdentityPrompt(
+            icon: Icons.people_outline,
+            buttonKey: Key('createIdentityFromFeedButton'),
           );
         }
 

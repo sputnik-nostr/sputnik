@@ -68,6 +68,34 @@ Future<T?> withSecretKey<T>(
   }
 }
 
+/// Runs [publish] with [identity]'s key and snackbars how it went; the
+/// published event, or null if no relay accepted it.
+Future<NostrEvent?> signAndPublish(
+  Identity identity,
+  ScaffoldMessengerState messenger, {
+  required String signFailure,
+  required String failure,
+  required String Function(String counts) success,
+  required Future<({NostrEvent event, Map<String, RelayPublishResult> results})>
+  Function(SecretKey secretKey)
+  publish,
+}) async {
+  final published = await withSecretKey(
+    identity,
+    messenger,
+    signFailure: signFailure,
+    use: publish,
+  );
+  if (published == null) return null;
+  final accepted = reportPublishResults(
+    messenger,
+    published.results,
+    failure: failure,
+    success: success,
+  );
+  return accepted ? published.event : null;
+}
+
 /// Snackbars how [results] went and returns whether any relay accepted.
 ///
 /// [success] gets an "accepted/total" count; null shows nothing on success.

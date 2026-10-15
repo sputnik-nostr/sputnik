@@ -30,6 +30,9 @@ List<List<T>> chunked<T>(List<T> values, int size) {
 class RelayClient {
   const RelayClient({this.timeout = const Duration(seconds: 5)});
 
+  /// What repositories use when not given a client; tests swap in a fake.
+  static RelayClient instance = const RelayClient();
+
   /// How long each call waits for relay responses before giving up.
   final Duration timeout;
 

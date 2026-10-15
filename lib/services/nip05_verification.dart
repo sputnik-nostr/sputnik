@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../nostr/nip05.dart';
+import 'bounded_cache.dart';
 import 'ssrf_guard.dart';
 
 const _fetchTimeout = Duration(seconds: 6);
@@ -82,7 +83,7 @@ class _CacheEntry {
   final DateTime checkedAt;
 }
 
-final _cache = <String, _CacheEntry>{};
+final _cache = BoundedMap<String, _CacheEntry>(500);
 
 void clearNip05Cache() => _cache.clear();
 

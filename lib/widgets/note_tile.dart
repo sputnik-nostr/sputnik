@@ -149,15 +149,11 @@ class NoteTile extends StatelessWidget {
 }
 
 /// Opens the composer for a reply and returns the published reply, if any.
-Future<NostrEvent?> openReplyComposer(
-  BuildContext context,
-  Note note, {
-  RelayClient relayClient = const RelayClient(),
-}) {
+Future<NostrEvent?> openReplyComposer(BuildContext context, Note note) {
   return Navigator.push<NostrEvent>(
     context,
     MaterialPageRoute(
-      builder: (_) => ComposeScreen(replyTo: note, relayClient: relayClient),
+      builder: (_) => ComposeScreen(replyTo: note),
       fullscreenDialog: true,
     ),
   );

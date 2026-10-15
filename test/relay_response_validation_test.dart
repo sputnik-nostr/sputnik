@@ -206,7 +206,10 @@ void main() {
         ]),
       );
 
-      expect(await repository.fetchFollowing(victim, {'wss://r'}), isEmpty);
+      expect(
+        await repository.fetchFollowingOrNull(victim, {'wss://r'}),
+        isEmpty,
+      );
     });
 
     test('keeps the contact list the author signed themselves', () async {
@@ -222,7 +225,9 @@ void main() {
         ]),
       );
 
-      expect(await repository.fetchFollowing(victim, {'wss://r'}), [other]);
+      expect(await repository.fetchFollowingOrNull(victim, {'wss://r'}), [
+        other,
+      ]);
     });
 
     test('drops p tags that are not 32-byte hex', () async {
@@ -241,7 +246,9 @@ void main() {
         ]),
       );
 
-      expect(await repository.fetchFollowing(victim, {'wss://r'}), [other]);
+      expect(await repository.fetchFollowingOrNull(victim, {'wss://r'}), [
+        other,
+      ]);
     });
 
     test('a mention in a note does not make someone a follower', () async {

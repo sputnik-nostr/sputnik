@@ -46,12 +46,11 @@ void main() {
         ],
       ),
     ]);
+    RelayClient.instance = client;
   });
 
   Future<void> open(WidgetTester tester) async {
-    await tester.pumpWidget(
-      MaterialApp(home: EditPaymentTargetsScreen(relayClient: client)),
-    );
+    await tester.pumpWidget(MaterialApp(home: EditPaymentTargetsScreen()));
     await tester.pumpAndSettle();
   }
 
@@ -172,9 +171,7 @@ void main() {
   });
 
   testWidgets('the edit profile screen links to it', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(home: EditProfileScreen(relayClient: client)),
-    );
+    await tester.pumpWidget(MaterialApp(home: EditProfileScreen()));
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(

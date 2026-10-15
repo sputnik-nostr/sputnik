@@ -10,14 +10,9 @@ import 'relays_screen.dart';
 
 /// The relays published in a user's NIP-65 relay list.
 class UserRelaysScreen extends StatefulWidget {
-  const UserRelaysScreen({
-    super.key,
-    required this.pubkeyHex,
-    this.relayClient = const RelayClient(),
-  });
+  const UserRelaysScreen({super.key, required this.pubkeyHex});
 
   final String pubkeyHex;
-  final RelayClient relayClient;
 
   @override
   State<UserRelaysScreen> createState() => _UserRelaysScreenState();
@@ -27,8 +22,10 @@ class _UserRelaysScreenState extends State<UserRelaysScreen> {
   late final Future<List<RelayListEntry>> _entries = _load();
 
   Future<List<RelayListEntry>> _load() async {
-    final own = await RelayListRepository(client: widget.relayClient)
-        .fetch(widget.pubkeyHex, selectedRelaysNotifier.value);
+    final own = await RelayListRepository().fetch(
+      widget.pubkeyHex,
+      selectedRelaysNotifier.value,
+    );
     final event = own.event;
     return event == null ? const [] : relayListFromEvent(event);
   }

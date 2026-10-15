@@ -157,14 +157,11 @@ void main() {
       me: [alice],
       other: [bob, carol],
     }, held: me);
+    RelayClient.instance = relay;
 
-    final first = ensureMyFollowingLoaded({
-      'wss://relay.example',
-    }, relayClient: relay);
+    final first = ensureMyFollowingLoaded({'wss://relay.example'});
     activeIdentityPubkeyNotifier.value = other;
-    final second = ensureMyFollowingLoaded({
-      'wss://relay.example',
-    }, relayClient: relay);
+    final second = ensureMyFollowingLoaded({'wss://relay.example'});
     relay.release.complete();
     await Future.wait([first, second]);
 
@@ -174,20 +171,21 @@ void main() {
   test('a list loaded for one identity is not reused for the next', () async {
     final other = 'dd' * 32;
     final relay = _FlakyRelay(me, [alice, bob])..relays = _Relays.up;
-    await ensureMyFollowingLoaded({'wss://relay.example'}, relayClient: relay);
+    RelayClient.instance = relay;
+    await ensureMyFollowingLoaded({'wss://relay.example'});
     expect(myFollowingNotifier.value, {alice, bob});
 
     activeIdentityPubkeyNotifier.value = other;
     relay.relays = _Relays.down;
-    await ensureMyFollowingLoaded({'wss://relay.example'}, relayClient: relay);
+    await ensureMyFollowingLoaded({'wss://relay.example'});
 
     expect(myFollowingNotifier.value, isNull);
   });
 
   test('a failed startup load is not mistaken for "follows nobody"', () async {
     final relay = _FlakyRelay(me, [alice, bob]);
-    Future<void> load() =>
-        ensureMyFollowingLoaded({'wss://relay.example'}, relayClient: relay);
+    RelayClient.instance = relay;
+    Future<void> load() => ensureMyFollowingLoaded({'wss://relay.example'});
 
     await load();
     expect(myFollowingNotifier.value, isNull);
@@ -205,14 +203,13 @@ void main() {
     'following someone after a failed startup load keeps the real list',
     () async {
       final relay = _FlakyRelay(me, [alice, bob]);
-      await ensureMyFollowingLoaded({
-        'wss://relay.example',
-      }, relayClient: relay);
+      RelayClient.instance = relay;
+      await ensureMyFollowingLoaded({'wss://relay.example'});
 
       // The relays recover, then the user taps Follow.
       relay.relays = _Relays.up;
       myFollowingNotifier.value = {carol};
-      scheduleFollowingSync(carol, follow: true, relayClient: relay);
+      scheduleFollowingSync(carol, follow: true);
       await _waitForSync();
 
       expect([
@@ -225,8 +222,9 @@ void main() {
   test('a follow made while relays are unreachable is retried until it '
       'goes through', () async {
     final relay = _FlakyRelay(me, [alice, bob]);
+    RelayClient.instance = relay;
 
-    scheduleFollowingSync(carol, follow: true, relayClient: relay);
+    scheduleFollowingSync(carol, follow: true);
     await _waitForSync();
     expect(relay.lastPublished, isNull);
 
@@ -241,8 +239,9 @@ void main() {
   test('a relay saying "nothing here" is not trusted while another may '
       'still hold the list', () async {
     final relay = _FlakyRelay(me, [alice, bob])..relays = _Relays.partiallyDown;
+    RelayClient.instance = relay;
 
-    scheduleFollowingSync(carol, follow: true, relayClient: relay);
+    scheduleFollowingSync(carol, follow: true);
     await _waitForSync();
     expect(relay.lastPublished, isNull);
 
@@ -256,9 +255,10 @@ void main() {
 
   test('changes made in a row are all applied', () async {
     final relay = _FlakyRelay(me, [alice, bob])..relays = _Relays.up;
+    RelayClient.instance = relay;
 
-    scheduleFollowingSync(carol, follow: true, relayClient: relay);
-    scheduleFollowingSync(alice, follow: false, relayClient: relay);
+    scheduleFollowingSync(carol, follow: true);
+    scheduleFollowingSync(alice, follow: false);
     await _waitForSync();
 
     expect([

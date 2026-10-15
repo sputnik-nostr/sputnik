@@ -68,15 +68,14 @@ void main() {
     WidgetTester tester,
     RelayClient relayClient,
   ) async {
+    RelayClient.instance = relayClient;
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
           builder: (context) => ElevatedButton(
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => ComposeScreen(relayClient: relayClient),
-              ),
+              MaterialPageRoute(builder: (_) => ComposeScreen()),
             ),
             child: const Text('open'),
           ),
@@ -92,6 +91,7 @@ void main() {
     RelayClient relayClient,
     Note quoting,
   ) async {
+    RelayClient.instance = relayClient;
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
@@ -99,8 +99,7 @@ void main() {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) =>
-                    ComposeScreen(quoting: quoting, relayClient: relayClient),
+                builder: (_) => ComposeScreen(quoting: quoting),
               ),
             ),
             child: const Text('open'),

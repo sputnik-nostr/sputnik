@@ -26,11 +26,11 @@ import '../widgets/linkified_text.dart';
 import '../widgets/load_more_footer.dart';
 import '../widgets/media_frame.dart';
 import '../widgets/nip05_badge.dart';
+import '../widgets/no_identity_prompt.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/payment_target_chip.dart';
 import '../widgets/placeholder_tab.dart';
 import 'edit_profile_screen.dart';
-import 'identities_screen.dart';
 import 'image_viewer_screen.dart';
 import 'user_relays_screen.dart';
 import 'users_list_screen.dart';
@@ -57,14 +57,9 @@ void openProfile(BuildContext context, String pubkeyHex) {
 
 class ProfileScreen extends StatefulWidget {
   /// [pubkeyHex] null means "my profile" (whichever identity is active).
-  const ProfileScreen({
-    super.key,
-    this.pubkeyHex,
-    this.relayClient = const RelayClient(),
-  });
+  const ProfileScreen({super.key, this.pubkeyHex});
 
   final String? pubkeyHex;
-  final RelayClient relayClient;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -85,27 +80,17 @@ class _ProfileScreenState extends State<ProfileScreen>
   late final PostCursor _cursor = PostCursor(
     (until) => RelayPostRepository(
       relayUrls: selectedRelaysNotifier.value,
-      client: widget.relayClient,
       limit: _profileEventLimit,
     ).fetchPage(authors: [_resolvedPubkeyHex!], until: until),
   );
 
-  /// Reposts this profile has made, paged separately since they're a
-  /// different kind of relay query.
-  late final PostCursor _repostCursor = PostCursor((until) async {
-    final relayUrls = selectedRelaysNotifier.value;
-    final reposts = await RelayPostRepository(
-      relayUrls: relayUrls,
-      client: widget.relayClient,
+  /// Reposts are a different relay query, so they page separately.
+  late final PostCursor _repostCursor = PostCursor(
+    (until) => RelayPostRepository(
+      relayUrls: selectedRelaysNotifier.value,
       limit: _profileEventLimit,
-    ).fetchReposts([_resolvedPubkeyHex!], relayUrls, until: until);
-    final next = reposts.length >= _profileEventLimit
-        ? reposts
-              .map((post) => post.repostedAt!)
-              .reduce((a, b) => a.isBefore(b) ? a : b)
-        : null;
-    return PostPage(reposts, next);
-  });
+    ).fetchRepostPage(authors: [_resolvedPubkeyHex!], until: until),
+  );
   List<String>? _following;
   List<String>? _followers;
   List<NostrPaymentTarget>? _paymentTargets;
@@ -164,30 +149,22 @@ class _ProfileScreenState extends State<ProfileScreen>
     profileCacheNotifier.addListener(_maybeAutoVerifyNip05);
     autoVerifyNip05Notifier.addListener(_maybeAutoVerifyNip05);
     _maybeAutoVerifyNip05();
-    loadProfile(
-      pubkeyHex,
-      selectedRelaysNotifier.value,
-      client: widget.relayClient,
-    );
+    loadProfile(pubkeyHex, selectedRelaysNotifier.value);
     _loadAuthorPosts(pubkeyHex);
     _loadContacts(pubkeyHex);
     _loadPaymentTargets(pubkeyHex);
-    ensureMyFollowingLoaded(
-      selectedRelaysNotifier.value,
-      relayClient: widget.relayClient,
-    );
+    ensureMyFollowingLoaded(selectedRelaysNotifier.value);
   }
 
   Future<void> _loadAuthorPosts(String pubkeyHex) async {
     final relayUrls = selectedRelaysNotifier.value;
     final fetched = await Future.wait([_cursor.first(), _repostCursor.first()]);
-    if (!mounted) return;
+    final posts = fetched[0];
+    final reposts = fetched[1];
+    // A newer refresh replaced this one.
+    if (!mounted || posts == null || reposts == null) return;
 
-    final notes = await _hydrate(
-      [...fetched[0], ...fetched[1]],
-      pubkeyHex,
-      relayUrls,
-    );
+    final notes = await _hydrate([...posts, ...reposts], pubkeyHex, relayUrls);
     if (!mounted) return;
 
     setState(() {
@@ -220,24 +197,13 @@ class _ProfileScreenState extends State<ProfileScreen>
       posts,
       relayUrls,
       knownMetadata: metadata == null ? const {} : {pubkeyHex: metadata},
-      client: widget.relayClient,
     );
   }
 
   Future<void> _loadContacts(String pubkeyHex, {bool force = false}) async {
     final relayUrls = selectedRelaysNotifier.value;
-    final followingFuture = loadFollowing(
-      pubkeyHex,
-      relayUrls,
-      force: force,
-      client: widget.relayClient,
-    );
-    final followersFuture = loadFollowers(
-      pubkeyHex,
-      relayUrls,
-      force: force,
-      client: widget.relayClient,
-    );
+    final followingFuture = loadFollowing(pubkeyHex, relayUrls, force: force);
+    final followersFuture = loadFollowers(pubkeyHex, relayUrls, force: force);
 
     final following = await followingFuture;
     if (mounted) setState(() => _following = following);
@@ -254,7 +220,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       pubkeyHex,
       selectedRelaysNotifier.value,
       force: force,
-      client: widget.relayClient,
     );
     if (mounted) setState(() => _paymentTargets = targets);
   }
@@ -264,12 +229,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (pubkeyHex == null) return;
 
     await Future.wait([
-      loadProfile(
-        pubkeyHex,
-        selectedRelaysNotifier.value,
-        force: true,
-        client: widget.relayClient,
-      ),
+      loadProfile(pubkeyHex, selectedRelaysNotifier.value, force: true),
       _loadAuthorPosts(pubkeyHex),
       _loadContacts(pubkeyHex, force: true),
       _loadPaymentTargets(pubkeyHex, force: true),
@@ -314,9 +274,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   Future<void> _editProfile(String pubkeyHex) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => EditProfileScreen(relayClient: widget.relayClient),
-      ),
+      MaterialPageRoute(builder: (_) => EditProfileScreen()),
     );
     if (mounted) unawaited(_loadPaymentTargets(pubkeyHex));
   }
@@ -324,7 +282,15 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   Widget build(BuildContext context) {
     final pubkeyHex = _resolvedPubkeyHex;
-    if (pubkeyHex == null) return const _NoIdentity();
+    if (pubkeyHex == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: const NoIdentityPrompt(
+          icon: Icons.person_outline,
+          buttonKey: Key('createIdentityFromProfileButton'),
+        ),
+      );
+    }
 
     return Scaffold(
       body: AnimatedBuilder(
@@ -332,7 +298,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           profileCacheNotifier,
           notesNotifier,
           activeIdentityPubkeyNotifier,
-          loadMediaNotifier,
+          loadProfileImagesNotifier,
           hiddenPaymentTargetTypesNotifier,
         ]),
         builder: (context, _) {
@@ -363,10 +329,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                               )
                             : activeIdentityPubkeyNotifier.value == null
                             ? null
-                            : FollowButton(
-                                targetPubkeyHex: pubkeyHex,
-                                relayClient: widget.relayClient,
-                              ),
+                            : FollowButton(targetPubkeyHex: pubkeyHex),
                       ),
                       _ProfileDetails(
                         pubkeyHex: pubkeyHex,
@@ -383,7 +346,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                         following: _following,
                         followers: _followers,
                         paymentTargets: _visiblePaymentTargets(metadata),
-                        relayClient: widget.relayClient,
                       ),
                       CompactTabBar(
                         controller: _tabController,
@@ -459,37 +421,6 @@ class _ProfileScreenState extends State<ProfileScreen>
               index == notes.length ? footer() : NoteTile(note: notes[index]),
         );
       },
-    );
-  }
-}
-
-class _NoIdentity extends StatelessWidget {
-  const _NoIdentity();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const PlaceholderTab(
-              icon: Icons.person_outline,
-              label: 'No identity yet',
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              key: const Key('createIdentityFromProfileButton'),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const IdentitiesScreen()),
-              ),
-              child: const Text('Create or import an identity'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -606,7 +537,7 @@ class _Banner extends StatelessWidget {
                 ),
               ),
             ),
-            if (url != null && loadMediaNotifier.value)
+            if (url != null && loadProfileImagesNotifier.value)
               Image(
                 image: ResizeImage(
                   BoundedNetworkImage(profileImageSource(url)),
@@ -661,7 +592,6 @@ class _ProfileDetails extends StatelessWidget {
     required this.following,
     required this.followers,
     required this.paymentTargets,
-    required this.relayClient,
   });
 
   final String pubkeyHex;
@@ -673,7 +603,6 @@ class _ProfileDetails extends StatelessWidget {
   final List<String>? following;
   final List<String>? followers;
   final List<NostrPaymentTarget> paymentTargets;
-  final RelayClient relayClient;
 
   @override
   Widget build(BuildContext context) {
@@ -728,7 +657,7 @@ class _ProfileDetails extends StatelessWidget {
                 title: 'Followers',
               ),
               const Spacer(),
-              _RelaysButton(pubkeyHex: pubkeyHex, relayClient: relayClient),
+              _RelaysButton(pubkeyHex: pubkeyHex),
             ],
           ),
           if (paymentTargets.isNotEmpty) ...[
@@ -812,10 +741,9 @@ class _ContactsCount extends StatelessWidget {
 }
 
 class _RelaysButton extends StatelessWidget {
-  const _RelaysButton({required this.pubkeyHex, required this.relayClient});
+  const _RelaysButton({required this.pubkeyHex});
 
   final String pubkeyHex;
-  final RelayClient relayClient;
 
   @override
   Widget build(BuildContext context) {
@@ -832,10 +760,7 @@ class _RelaysButton extends StatelessWidget {
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => UserRelaysScreen(
-              pubkeyHex: pubkeyHex,
-              relayClient: relayClient,
-            ),
+            builder: (_) => UserRelaysScreen(pubkeyHex: pubkeyHex),
           ),
         ),
         child: Padding(

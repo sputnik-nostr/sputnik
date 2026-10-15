@@ -49,9 +49,11 @@ Map<String, List<String>> _authorsByTaggedPost(
 }
 
 class RelayReactionsRepository {
-  const RelayReactionsRepository({this.client = const RelayClient()});
+  const RelayReactionsRepository({this._client});
 
-  final RelayClient client;
+  final RelayClient? _client;
+
+  RelayClient get client => _client ?? RelayClient.instance;
 
   /// Fetches likes and reposts for many posts, a few posts per pair of relay
   /// queries (one for kind 7, one for kind 6) rather than one pair per post.

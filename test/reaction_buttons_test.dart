@@ -100,7 +100,8 @@ void main() {
   testWidgets('with confirmation off (the default), tapping like publishes '
       'immediately with no dialog', (tester) async {
     final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
-    await pumpButton(tester, LikeButton(note: note, relayClient: fakeClient));
+    RelayClient.instance = fakeClient;
+    await pumpButton(tester, LikeButton(note: note));
 
     await tester.tap(find.byIcon(Icons.favorite_border));
     await tester.pumpAndSettle();
@@ -115,7 +116,8 @@ void main() {
       'confirmed', (tester) async {
     confirmBeforeReactingNotifier.value = true;
     final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
-    await pumpButton(tester, LikeButton(note: note, relayClient: fakeClient));
+    RelayClient.instance = fakeClient;
+    await pumpButton(tester, LikeButton(note: note));
 
     await tester.tap(find.byIcon(Icons.favorite_border));
     await tester.pumpAndSettle();
@@ -129,7 +131,8 @@ void main() {
   ) async {
     confirmBeforeReactingNotifier.value = true;
     final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
-    await pumpButton(tester, LikeButton(note: note, relayClient: fakeClient));
+    RelayClient.instance = fakeClient;
+    await pumpButton(tester, LikeButton(note: note));
 
     await tester.tap(find.byIcon(Icons.favorite_border));
     await tester.pumpAndSettle();
@@ -145,7 +148,8 @@ void main() {
   ) async {
     confirmBeforeReactingNotifier.value = true;
     final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
-    await pumpButton(tester, LikeButton(note: note, relayClient: fakeClient));
+    RelayClient.instance = fakeClient;
+    await pumpButton(tester, LikeButton(note: note));
 
     await tester.tap(find.byIcon(Icons.favorite_border));
     await tester.pumpAndSettle();
@@ -162,7 +166,8 @@ void main() {
     'liking then tapping again un-likes it, via a NIP-09 deletion request',
     (tester) async {
       final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
-      await pumpButton(tester, LikeButton(note: note, relayClient: fakeClient));
+      RelayClient.instance = fakeClient;
+      await pumpButton(tester, LikeButton(note: note));
 
       await tester.tap(find.byIcon(Icons.favorite_border));
       await tester.pumpAndSettle();
@@ -203,10 +208,8 @@ void main() {
       ownReaction: myLike,
     );
     final likedNote = note.copyWith(likeCount: 1, likedByMe: true);
-    await pumpButton(
-      tester,
-      LikeButton(note: likedNote, relayClient: fakeClient),
-    );
+    RelayClient.instance = fakeClient;
+    await pumpButton(tester, LikeButton(note: likedNote));
     expect(find.byIcon(Icons.favorite), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.favorite));
@@ -227,10 +230,8 @@ void main() {
     (tester) async {
       final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
       final likedNote = note.copyWith(likeCount: 1, likedByMe: true);
-      await pumpButton(
-        tester,
-        LikeButton(note: likedNote, relayClient: fakeClient),
-      );
+      RelayClient.instance = fakeClient;
+      await pumpButton(tester, LikeButton(note: likedNote));
 
       await tester.tap(find.byIcon(Icons.favorite));
       await tester.pumpAndSettle();
@@ -248,7 +249,8 @@ void main() {
       'confirmed, even though confirmation-before-reacting is off (repost '
       'always confirms)', (tester) async {
     final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
-    await pumpButton(tester, RepostButton(note: note, relayClient: fakeClient));
+    RelayClient.instance = fakeClient;
+    await pumpButton(tester, RepostButton(note: note));
 
     await tester.tap(find.byIcon(Icons.repeat));
     await tester.pumpAndSettle();
@@ -273,10 +275,8 @@ void main() {
     'since repost always asks',
     (tester) async {
       final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
-      await pumpButton(
-        tester,
-        RepostButton(note: note, relayClient: fakeClient),
-      );
+      RelayClient.instance = fakeClient;
+      await pumpButton(tester, RepostButton(note: note));
 
       await tester.tap(find.byIcon(Icons.repeat));
       await tester.pumpAndSettle();
@@ -305,10 +305,8 @@ void main() {
     'holding down repost opens the quote composer instead of reposting',
     (tester) async {
       final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
-      await pumpButton(
-        tester,
-        RepostButton(note: note, relayClient: fakeClient),
-      );
+      RelayClient.instance = fakeClient;
+      await pumpButton(tester, RepostButton(note: note));
 
       await tester.longPress(find.byIcon(Icons.repeat));
       await tester.pumpAndSettle();

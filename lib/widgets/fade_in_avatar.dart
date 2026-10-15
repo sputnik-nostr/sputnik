@@ -9,7 +9,7 @@ import 'media_frame.dart';
 /// A circular avatar whose image fades in over [fallback] (e.g. initials).
 ///
 /// The fallback is hidden once the image loads so it can't show through a
-/// transparent picture. Images load only when [loadMediaNotifier] is true,
+/// transparent picture. Images load only when [loadProfileImagesNotifier] is true,
 /// since fetching one reveals the viewer's IP to the image host.
 class FadeInAvatar extends StatefulWidget {
   const FadeInAvatar({
@@ -82,10 +82,10 @@ class _FadeInAvatarState extends State<FadeInAvatar> {
               ),
             ),
             ValueListenableBuilder<bool>(
-              valueListenable: loadMediaNotifier,
-              builder: (context, loadMedia, _) {
+              valueListenable: loadProfileImagesNotifier,
+              builder: (context, loadProfileImages, _) {
                 final url = fetchableUrlOrNull(widget.imageUrl);
-                if (url == null || !loadMedia) {
+                if (url == null || !loadProfileImages) {
                   _markLoaded(false);
                   return const SizedBox.shrink();
                 }

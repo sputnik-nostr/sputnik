@@ -36,14 +36,17 @@ class _SecureSecretStore implements SecretStore {
   Future<void> delete(String key) => _storage.delete(key: key);
 }
 
-/// Loads [notifier]'s value; on failure it is left unsaved, so bad data stays.
+/// Loads [notifier]'s value, keeping its default when [load] finds nothing.
+///
+/// On failure it is left unsaved, so bad data stays.
 Future<void> bindPersisted<T>(
   ValueNotifier<T> notifier,
-  Future<T> Function() load,
+  Future<T?> Function() load,
   Future<void> Function(T value) save,
 ) async {
   try {
-    notifier.value = await load();
+    final loaded = await load();
+    if (loaded != null) notifier.value = loaded;
   } catch (error, stack) {
     reportError('loading persisted $T', error, stack);
     return;
@@ -71,7 +74,8 @@ class SettingsStore {
   static const _identitiesKey = 'identities';
   static const _activeIdentityPubkeyKey = 'active_identity_pubkey';
   static const _identitySecretPrefix = 'identity_secret_';
-  static const _loadMediaKey = 'load_media';
+  // Named before note images had their own switch; kept so the setting stays.
+  static const _loadProfileImagesKey = 'load_media';
   static const _loadNoteImagesKey = 'load_note_images';
   static const _autoVerifyNip05Key = 'auto_verify_nip05';
   static const _hiddenPaymentTargetTypesKey = 'hidden_payment_target_types';
@@ -89,10 +93,9 @@ class SettingsStore {
   @visibleForTesting
   static SecretStore secretStore = const _SecureSecretStore();
 
-  /// A switch that is off unless the user turned it on.
-  static Future<bool> _loadFlag(String key) async {
+  static Future<bool?> _loadFlag(String key) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(key) ?? false;
+    return prefs.getBool(key);
   }
 
   static Future<void> _saveFlag(String key, bool value) async {
@@ -108,12 +111,13 @@ class SettingsStore {
     }
   }
 
-  static Future<ThemeMode> loadThemeMode() async {
+  static Future<ThemeMode?> loadThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
     return switch (prefs.getString(_themeModeKey)) {
       'light' => ThemeMode.light,
       'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
+      'system' => ThemeMode.system,
+      _ => null,
     };
   }
 
@@ -126,13 +130,9 @@ class SettingsStore {
     });
   }
 
-  static Future<AppSeedColor> loadSeedColor() async {
+  static Future<AppSeedColor?> loadSeedColor() async {
     final prefs = await SharedPreferences.getInstance();
-    final name = prefs.getString(_seedColorKey);
-    return AppSeedColor.values.firstWhere(
-      (color) => color.name == name,
-      orElse: () => AppSeedColor.blue,
-    );
+    return AppSeedColor.values.asNameMap()[prefs.getString(_seedColorKey)];
   }
 
   static Future<void> saveSeedColor(AppSeedColor color) async {
@@ -259,30 +259,31 @@ class SettingsStore {
     return secretStore.delete('$_identitySecretPrefix$pubkeyHex');
   }
 
-  static Future<bool> loadLoadMedia() => _loadFlag(_loadMediaKey);
+  static Future<bool?> loadLoadProfileImages() =>
+      _loadFlag(_loadProfileImagesKey);
 
-  static Future<void> saveLoadMedia(bool value) =>
-      _saveFlag(_loadMediaKey, value);
+  static Future<void> saveLoadProfileImages(bool value) =>
+      _saveFlag(_loadProfileImagesKey, value);
 
-  static Future<bool> loadLoadNoteImages() => _loadFlag(_loadNoteImagesKey);
+  static Future<bool?> loadLoadNoteImages() => _loadFlag(_loadNoteImagesKey);
 
   static Future<void> saveLoadNoteImages(bool value) =>
       _saveFlag(_loadNoteImagesKey, value);
 
-  static Future<bool> loadAutoVerifyNip05() => _loadFlag(_autoVerifyNip05Key);
+  static Future<bool?> loadAutoVerifyNip05() => _loadFlag(_autoVerifyNip05Key);
 
   static Future<void> saveAutoVerifyNip05(bool value) =>
       _saveFlag(_autoVerifyNip05Key, value);
 
-  static Future<bool> loadConfirmBeforeReacting() =>
+  static Future<bool?> loadConfirmBeforeReacting() =>
       _loadFlag(_confirmBeforeReactingKey);
 
   static Future<void> saveConfirmBeforeReacting(bool value) =>
       _saveFlag(_confirmBeforeReactingKey, value);
 
-  static Future<Set<String>> loadHiddenPaymentTargetTypes() async {
+  static Future<Set<String>?> loadHiddenPaymentTargetTypes() async {
     final prefs = await SharedPreferences.getInstance();
-    return (prefs.getStringList(_hiddenPaymentTargetTypesKey) ?? []).toSet();
+    return prefs.getStringList(_hiddenPaymentTargetTypesKey)?.toSet();
   }
 
   static Future<void> saveHiddenPaymentTargetTypes(Set<String> types) async {

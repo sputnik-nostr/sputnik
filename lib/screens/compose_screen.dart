@@ -10,16 +10,42 @@ import '../services/profiles.dart';
 import '../services/publishing.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/fade_in_avatar.dart';
+import '../widgets/note_author_line.dart';
+
+enum _ComposeKind {
+  note('note', 'Notes', 'Post to relays?', 'Posted', 'Post a note'),
+  reply(
+    'reply',
+    'Replies',
+    'Post reply to relays?',
+    'Reply posted',
+    'Post your reply',
+  ),
+  quote(
+    'quote',
+    'Quotes',
+    'Post quote to relays?',
+    'Quote posted',
+    'Add a comment',
+  );
+
+  const _ComposeKind(
+    this.noun,
+    this.plural,
+    this.confirmTitle,
+    this.postedLabel,
+    this.hint,
+  );
+
+  final String noun;
+  final String plural;
+  final String confirmTitle;
+  final String postedLabel;
+  final String hint;
+}
 
 class ComposeScreen extends StatefulWidget {
-  const ComposeScreen({
-    super.key,
-    this.relayClient = const RelayClient(),
-    this.replyTo,
-    this.quoting,
-  });
-
-  final RelayClient relayClient;
+  const ComposeScreen({super.key, this.replyTo, this.quoting});
 
   /// The note being replied to, or null for a new top-level note.
   final Note? replyTo;
@@ -40,10 +66,14 @@ class _ComposeScreenState extends State<ComposeScreen> {
   /// The parent's tags decide how a reply is threaded, so it is fetched early.
   Future<NostrEvent?>? _parentFuture;
 
-  RelayPostRepository get _posts => RelayPostRepository(
-    relayUrls: selectedRelaysNotifier.value,
-    client: widget.relayClient,
-  );
+  _ComposeKind get _kind => widget.replyTo != null
+      ? _ComposeKind.reply
+      : widget.quoting != null
+      ? _ComposeKind.quote
+      : _ComposeKind.note;
+
+  RelayPostRepository get _posts =>
+      RelayPostRepository(relayUrls: selectedRelaysNotifier.value);
 
   @override
   void initState() {
@@ -66,25 +96,14 @@ class _ComposeScreenState extends State<ComposeScreen> {
     final identity = activeIdentity();
     if (identity == null) return;
 
-    final isReply = widget.replyTo != null;
-    final isQuote = widget.quoting != null;
-    final noun = isReply
-        ? 'reply'
-        : isQuote
-        ? 'quote'
-        : 'note';
-    final plural = isReply
-        ? 'Replies'
-        : isQuote
-        ? 'Quotes'
-        : 'Notes';
+    final kind = _kind;
     final relayUrls = selectedRelaysNotifier.value;
     final confirmed = await confirmAction(
       context,
-      title: isReply || isQuote ? 'Post $noun to relays?' : 'Post to relays?',
+      title: kind.confirmTitle,
       message:
-          'This publishes your $noun to ${relayUrls.length} relay(s). '
-          '$plural on Nostr are public and cannot be reliably deleted '
+          'This publishes your ${kind.noun} to ${relayUrls.length} relay(s). '
+          '${kind.plural} on Nostr are public and cannot be reliably deleted '
           'afterward.',
       action: 'Post',
       actionKey: const Key('confirmPostButton'),
@@ -145,18 +164,14 @@ class _ComposeScreenState extends State<ComposeScreen> {
     );
     if (event == null || !mounted) return;
 
-    final results = await widget.relayClient.publish(event, relayUrls);
+    final results = await RelayClient.instance.publish(event, relayUrls);
     if (!mounted) return;
 
     final posted = reportPublishResults(
       messenger,
       results,
       failure: 'Could not post this note to any relay',
-      success: (counts) => widget.replyTo != null
-          ? 'Reply posted to $counts relays'
-          : quoting != null
-          ? 'Quote posted to $counts relays'
-          : 'Posted to $counts relays',
+      success: (counts) => '${_kind.postedLabel} to $counts relays',
     );
     if (posted) Navigator.pop(context, event);
   }
@@ -239,13 +254,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                   style: theme.textTheme.bodyLarge,
                   cursorHeight:
                       (theme.textTheme.bodyLarge?.fontSize ?? 16) * 1.2,
-                  decoration: InputDecoration.collapsed(
-                    hintText: replyTo != null
-                        ? 'Post your reply'
-                        : quoting != null
-                        ? 'Add a comment'
-                        : 'Post a note',
-                  ),
+                  decoration: InputDecoration.collapsed(hintText: _kind.hint),
                 ),
               ),
             ],
@@ -258,15 +267,11 @@ class _ComposeScreenState extends State<ComposeScreen> {
 }
 
 /// Opens the composer to quote [note] and returns the published note, if any.
-Future<NostrEvent?> openQuoteComposer(
-  BuildContext context,
-  Note note, {
-  RelayClient relayClient = const RelayClient(),
-}) {
+Future<NostrEvent?> openQuoteComposer(BuildContext context, Note note) {
   return Navigator.push<NostrEvent>(
     context,
     MaterialPageRoute(
-      builder: (_) => ComposeScreen(quoting: note, relayClient: relayClient),
+      builder: (_) => ComposeScreen(quoting: note),
       fullscreenDialog: true,
     ),
   );
@@ -334,28 +339,7 @@ class _QuoteContext extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  FadeInAvatar(
-                    radius: 10,
-                    imageUrl: note.pictureUrl,
-                    backgroundColor: theme.colorScheme.primaryContainer,
-                    fallback: Text(
-                      avatarInitial(note.displayName),
-                      style: theme.avatarFallback.copyWith(fontSize: 11),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      note.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.avatarName,
-                    ),
-                  ),
-                ],
-              ),
+              NoteAuthorLine(note: note),
               const SizedBox(height: 6),
               Text(
                 note.content,
