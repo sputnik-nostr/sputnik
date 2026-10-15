@@ -93,13 +93,13 @@ class _ComposeScreenState extends State<ComposeScreen> {
 
     setState(() => _posting = true);
     try {
-      await _sign(identity, relayUrls);
+      await _publish(identity, relayUrls);
     } finally {
       if (mounted) setState(() => _posting = false);
     }
   }
 
-  Future<void> _sign(Identity identity, Set<String> relayUrls) async {
+  Future<void> _publish(Identity identity, Set<String> relayUrls) async {
     final messenger = ScaffoldMessenger.of(context);
 
     List<List<String>> tags = const [];

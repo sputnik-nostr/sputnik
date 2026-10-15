@@ -26,8 +26,9 @@ List<List<String>> _eTags(NostrEvent event) {
 ///
 /// Prefers a marked `reply` tag, then `root`. Without markers (deprecated), the
 /// last `e` tag is the parent and earlier ones are just citations.
-String? replyParentId(NostrEvent event) {
-  final eTags = _eTags(event);
+String? replyParentId(NostrEvent event) => _parentId(_eTags(event));
+
+String? _parentId(List<List<String>> eTags) {
   if (eTags.isEmpty) return null;
 
   final marked = eTags.where(_hasNip10Marker).toList();
@@ -48,10 +49,10 @@ String? replyParentId(NostrEvent event) {
 ///
 /// Without markers (deprecated), the first `e` tag is the root.
 String? threadRootId(NostrEvent event) {
-  final parent = replyParentId(event);
+  final eTags = _eTags(event);
+  final parent = _parentId(eTags);
   if (parent == null) return null;
 
-  final eTags = _eTags(event);
   final marked = eTags.where(_hasNip10Marker).toList();
   if (marked.isEmpty) return eTags.first[1].toLowerCase();
 

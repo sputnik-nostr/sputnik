@@ -65,6 +65,7 @@ extension PublishResults on Map<String, RelayPublishResult> {
 /// More than one publish() can be in flight for the same event ID (e.g. a
 /// double-submit); resolve()/failAll() complete all of them rather than one
 /// overwriting another's slot.
+@visibleForTesting
 class PublishWaiters {
   final _byEventId = <String, List<Completer<RelayPublishResult>>>{};
 

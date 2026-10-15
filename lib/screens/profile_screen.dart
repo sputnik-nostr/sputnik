@@ -35,7 +35,7 @@ import 'image_viewer_screen.dart';
 import 'user_relays_screen.dart';
 import 'users_list_screen.dart';
 
-const _bannerHeight = 140.0 * 0.8;
+const _bannerHeight = 112.0;
 const _bannerMaxDecodeExtent = 1600;
 const _avatarMinDecodeExtent = 400;
 const _avatarRadius = 40.0;

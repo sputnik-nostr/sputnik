@@ -104,10 +104,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _base = event ?? _base;
       _baseConclusive = own.conclusive;
       _loading = false;
-    });
-    if (!seedFields) return;
-
-    setState(() {
+      if (!seedFields) return;
       _displayNameController.text = metadata?.displayName ?? '';
       _nameController.text = metadata?.name ?? '';
       _bioController.text = metadata?.about ?? '';

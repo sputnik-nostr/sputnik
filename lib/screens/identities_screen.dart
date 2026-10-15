@@ -7,6 +7,7 @@ import '../app_state.dart';
 import '../models/identity.dart';
 import '../models/time_format.dart';
 import '../nostr/nostr.dart';
+import '../services/error_reporting.dart';
 import '../services/publishing.dart';
 import '../services/settings_store.dart';
 import '../widgets/placeholder_tab.dart';
@@ -50,10 +51,11 @@ Future<void> _generateIdentity(BuildContext context) async {
   try {
     final keyPair = generateNostrKeyPair();
     await _addIdentity(keyPair.publicKeyHex, keyPair.privateKeyHex);
-  } catch (e) {
+  } catch (error, stack) {
+    reportError('generating an identity', error, stack);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not generate a keypair: $e')),
+        const SnackBar(content: Text('Could not generate a key pair')),
       );
     }
   }
@@ -141,11 +143,12 @@ Future<void> _importIdentity(BuildContext context) async {
 
   try {
     await _addIdentity(_pubkeyHexOf(seckeyHex), seckeyHex);
-  } catch (e) {
+  } catch (error, stack) {
+    reportError('importing an identity', error, stack);
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not import this key: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not import this key')),
+      );
     }
   }
 }
@@ -267,7 +270,7 @@ class IdentitiesScreen extends StatelessWidget {
               child: IconButton(
                 key: const Key('generateIdentityButton'),
                 icon: const Icon(Icons.add),
-                tooltip: 'Generate new keypair',
+                tooltip: 'Generate new key pair',
                 onPressed: () => _generateIdentity(context),
               ),
             ),
