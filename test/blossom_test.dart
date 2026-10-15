@@ -151,7 +151,7 @@ void main() {
   group('blossomServersFor', () {
     final author = 'aa'.padRight(64, '0');
 
-    setUp(resetBlossomServerCache);
+    setUp(clearBlossomServerCache);
 
     test('remembers a found list instead of asking relays again', () async {
       final client = InMemoryRelayClient([

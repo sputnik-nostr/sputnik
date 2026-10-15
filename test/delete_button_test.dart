@@ -8,9 +8,10 @@ import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/services/settings_store.dart';
 import 'package:sputnik/widgets/delete_button.dart';
 
+import 'support/answering_relay_client.dart';
 import 'support/fake_secret_store.dart';
 
-class _FakeRelayClient extends RelayClient {
+class _FakeRelayClient extends RelayClient with AnsweringRelayClient {
   _FakeRelayClient(this._target, this._outcome);
 
   final NostrEvent _target;

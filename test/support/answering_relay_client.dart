@@ -7,9 +7,16 @@ mixin AnsweringRelayClient on RelayClient {
   Future<RelayQueryResult> queryWithStatus(
     Set<String> relayUrls,
     NostrFilter filter,
-  ) async => RelayQueryResult(
-    events: await query(relayUrls, filter),
-    answeredRelays: relayUrls.length,
-    queriedRelays: relayUrls.length,
-  );
+  ) async {
+    final events = await query(relayUrls, filter);
+    return RelayQueryResult(
+      events: events,
+      answeredRelays: relayUrls.length,
+      queriedRelays: relayUrls.length,
+      sourceRelays: {
+        if (relayUrls.isNotEmpty)
+          for (final event in events) event.id: relayUrls.first,
+      },
+    );
+  }
 }

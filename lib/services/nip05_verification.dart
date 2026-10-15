@@ -84,6 +84,8 @@ class _CacheEntry {
 
 final _cache = <String, _CacheEntry>{};
 
+void clearNip05Cache() => _cache.clear();
+
 /// Checks that [identifier] maps to [pubkeyHex] via its domain's
 /// `.well-known/nostr.json`. Results are cached per (pubkey, identifier) pair
 /// for an hour.

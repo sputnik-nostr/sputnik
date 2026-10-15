@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
-
 import '../app_state.dart';
 import '../nostr/models/nostr_media.dart';
 import '../nostr/relay_blossom_list_repository.dart';
@@ -37,8 +35,7 @@ Future<List<String>> blossomServersFor(
   }();
 }
 
-@visibleForTesting
-void resetBlossomServerCache() {
+void clearBlossomServerCache() {
   _known.clear();
   _inFlight.clear();
 }

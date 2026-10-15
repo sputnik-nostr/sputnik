@@ -4,7 +4,11 @@ import '../app_state.dart';
 import '../models/app_seed_color.dart';
 import '../models/identity.dart';
 import '../models/relay.dart';
+import '../services/blossom_servers.dart';
 import '../services/cache_store.dart';
+import '../services/nip05_verification.dart';
+import '../widgets/linkified_text.dart';
+import '../widgets/quoted_note.dart';
 import 'identities_screen.dart';
 import 'payment_target_types_screen.dart';
 import 'relays_screen.dart';
@@ -15,7 +19,8 @@ Future<void> _confirmClearCache(BuildContext context) async {
     builder: (context) => AlertDialog(
       title: const Text('Clear cached data?'),
       content: const Text(
-        'This removes cached profiles, follow lists, and payment targets. '
+        'This removes cached profiles, notes, follow lists, payment targets, '
+        'and verification results. '
         'They will be re-fetched from relays as needed.',
       ),
       actions: [
@@ -33,6 +38,10 @@ Future<void> _confirmClearCache(BuildContext context) async {
   if (confirmed != true) return;
 
   await CacheStore.clearAll();
+  clearQuotedNoteCache();
+  clearBlossomServerCache();
+  clearNip05Cache();
+  clearMentionLookups();
   profileCacheNotifier.value = {};
 
   if (context.mounted) {
@@ -273,7 +282,7 @@ class SettingsScreen extends StatelessWidget {
                 leading: const Icon(Icons.delete_outline),
                 title: const Text('Clear cached data'),
                 subtitle: const Text(
-                  'Profiles, follow lists, and payment targets',
+                  'Profiles, notes, follow lists, and payment targets',
                 ),
                 onTap: () => _confirmClearCache(context),
               ),
@@ -281,7 +290,9 @@ class SettingsScreen extends StatelessWidget {
                 key: const Key('resetPreferencesCard'),
                 leading: const Icon(Icons.restore_outlined),
                 title: const Text('Reset preferences'),
-                subtitle: const Text('Theme, color, and relays'),
+                subtitle: const Text(
+                  'Everything except identities and bookmarks',
+                ),
                 onTap: () => _confirmResetPreferences(context),
               ),
               const Divider(height: 1),

@@ -38,60 +38,72 @@ Future<void> _addRelay(BuildContext context) async {
     return;
   }
 
-  final controller = TextEditingController();
-  String? error;
-
   final url = await showDialog<String>(
     context: context,
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          void submit() {
-            final input = canonicalRelayUrl(controller.text);
-            if (!isRelayUrl(input)) {
-              setState(() => error = 'Enter a valid ws:// or wss:// URL');
-              return;
-            }
-            if (isLocalNetworkUrl(input)) {
-              setState(() => error = localNetworkRelayMessage);
-              return;
-            }
-            Navigator.pop(context, input);
-          }
-
-          return AlertDialog(
-            title: const Text('Add relay'),
-            content: TextField(
-              key: const Key('addRelayField'),
-              controller: controller,
-              autofocus: true,
-              keyboardType: TextInputType.url,
-              decoration: InputDecoration(
-                hintText: 'wss://relay.example.com',
-                errorText: error,
-              ),
-              onSubmitted: (_) => submit(),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                key: const Key('confirmAddRelayButton'),
-                onPressed: submit,
-                child: const Text('Add'),
-              ),
-            ],
-          );
-        },
-      );
-    },
+    builder: (context) => const _AddRelayDialog(),
   );
-  if (url == null) return;
+  if (url != null) addCustomRelay(url);
+}
 
-  final relay = canonicalRelayUrl(url);
-  addCustomRelay(relay);
+/// Owns its controller, so it is disposed only after the closing animation.
+class _AddRelayDialog extends StatefulWidget {
+  const _AddRelayDialog();
+
+  @override
+  State<_AddRelayDialog> createState() => _AddRelayDialogState();
+}
+
+class _AddRelayDialogState extends State<_AddRelayDialog> {
+  final _controller = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final input = canonicalRelayUrl(_controller.text);
+    if (!isRelayUrl(input)) {
+      setState(() => _error = 'Enter a valid ws:// or wss:// URL');
+      return;
+    }
+    if (isLocalNetworkUrl(input)) {
+      setState(() => _error = localNetworkRelayMessage);
+      return;
+    }
+    Navigator.pop(context, input);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add relay'),
+      content: TextField(
+        key: const Key('addRelayField'),
+        controller: _controller,
+        autofocus: true,
+        keyboardType: TextInputType.url,
+        decoration: InputDecoration(
+          hintText: 'wss://relay.example.com',
+          errorText: _error,
+        ),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          key: const Key('confirmAddRelayButton'),
+          onPressed: _submit,
+          child: const Text('Add'),
+        ),
+      ],
+    );
+  }
 }
 
 class RelaysScreen extends StatelessWidget {

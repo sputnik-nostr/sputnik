@@ -5,17 +5,36 @@ import '../models/note.dart';
 import '../nostr/nostr.dart';
 import 'publishing.dart';
 
+/// An event to act on, and a relay it was found on ('' if unknown).
+typedef _Target = ({NostrEvent event, String relay});
+
 typedef _Publish = Future<Map<String, RelayPublishResult>> Function({
   required SecretKey secretKey,
   required String myPubkeyHex,
   required NostrEvent target,
+  required String relayHint,
   required Set<String> relayUrls,
 });
+
+/// NIP-09 deletions name only the event, so the relay hint is dropped.
+_Publish _retraction(RelayReactionsRepository repository) =>
+    ({
+      required secretKey,
+      required myPubkeyHex,
+      required target,
+      required relayHint,
+      required relayUrls,
+    }) => repository.publishRetraction(
+      secretKey: secretKey,
+      myPubkeyHex: myPubkeyHex,
+      target: target,
+      relayUrls: relayUrls,
+    );
 
 /// Confirms first if [alwaysConfirm] or the confirmation setting is on.
 Future<bool> _publishAgainst(
   BuildContext context, {
-  required Future<NostrEvent?> Function(String myPubkeyHex, Set<String> relays)
+  required Future<_Target?> Function(String myPubkeyHex, Set<String> relays)
   fetchTarget,
   required String notFoundMessage,
   required String dialogTitle,
@@ -54,7 +73,8 @@ Future<bool> _publishAgainst(
     final results = await publish(
       secretKey: secretKey,
       myPubkeyHex: identity.pubkeyHex,
-      target: target,
+      target: target.event,
+      relayHint: target.relay,
       relayUrls: relayUrls,
     );
     return reportPublishResults(
@@ -82,7 +102,7 @@ Future<bool> _publishOnNote(
     fetchTarget: (_, relayUrls) => RelayPostRepository(
       relayUrls: relayUrls,
       client: relayClient,
-    ).fetchEventById(note.id),
+    ).fetchEventWithRelay(note.id),
     notFoundMessage: 'Could not load this note from relays',
     dialogTitle: dialogTitle,
     dialogBody: dialogBody,
@@ -105,17 +125,20 @@ Future<bool> _retractReaction(
   final repository = RelayReactionsRepository(client: relayClient);
   return _publishAgainst(
     context,
-    fetchTarget: (myPubkeyHex, relayUrls) => repository.fetchOwnReaction(
-      myPubkeyHex: myPubkeyHex,
-      noteId: note.id,
-      kind: kind,
-      relayUrls: relayUrls,
-    ),
+    fetchTarget: (myPubkeyHex, relayUrls) async {
+      final own = await repository.fetchOwnReaction(
+        myPubkeyHex: myPubkeyHex,
+        noteId: note.id,
+        kind: kind,
+        relayUrls: relayUrls,
+      );
+      return own == null ? null : (event: own, relay: '');
+    },
     notFoundMessage: 'Could not find that on any of your relays',
     dialogTitle: dialogTitle,
     dialogBody: dialogBody,
     alwaysConfirm: alwaysConfirm,
-    publish: repository.publishRetraction,
+    publish: _retraction(repository),
   );
 }
 
@@ -224,7 +247,7 @@ Future<bool> deleteNote(
     dialogBody:
         'This asks your relays to delete the note. Removal is not '
         'guaranteed; other relays or clients may still show it.',
-    publish: RelayReactionsRepository(client: relayClient).publishRetraction,
+    publish: _retraction(RelayReactionsRepository(client: relayClient)),
   );
   if (succeeded) _removeNoteFromFeeds(note.id);
   return succeeded;

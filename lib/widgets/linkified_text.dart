@@ -24,6 +24,8 @@ const _maxMentionNameLength = 40;
 /// requested again each time its note scrolls into view.
 final _lookedUp = <String>{};
 
+void clearMentionLookups() => _lookedUp.clear();
+
 class _Link {
   const _Link(this.start, this.end, this.text, this.httpUrl, this.target);
 

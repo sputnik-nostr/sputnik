@@ -21,11 +21,18 @@ class InMemoryRelayClient extends RelayClient with AnsweringRelayClient {
   Future<RelayQueryResult> queryWithStatus(
     Set<String> relayUrls,
     NostrFilter filter,
-  ) async => RelayQueryResult(
-    events: await query(relayUrls, filter),
-    answeredRelays: relaysAnswer ? relayUrls.length : 0,
-    queriedRelays: relayUrls.length,
-  );
+  ) async {
+    final events = await query(relayUrls, filter);
+    return RelayQueryResult(
+      events: events,
+      answeredRelays: relaysAnswer ? relayUrls.length : 0,
+      queriedRelays: relayUrls.length,
+      sourceRelays: {
+        if (relayUrls.isNotEmpty)
+          for (final event in events) event.id: relayUrls.first,
+      },
+    );
+  }
 
   @override
   Future<List<NostrEvent>> query(

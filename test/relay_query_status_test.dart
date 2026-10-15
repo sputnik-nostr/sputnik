@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/nostr/nostr.dart';
+import 'package:sputnik/nostr/relay_connection_pool.dart';
 
 // A local relay: answers every REQ with EOSE, or stays silent.
 Future<HttpServer> _serve({required bool answer}) async {
@@ -54,4 +56,42 @@ void main() {
       expect(result.allRelaysAnswered, isFalse);
     },
   );
+
+  test(
+    'a query sharing a connection that never opens still times out',
+    () async {
+      // Accepts the TCP connection but never answers the WebSocket upgrade.
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((_) {});
+      addTearDown(() => server.close(force: true));
+      final url = 'ws://127.0.0.1:${server.port}';
+
+      final results = await Future.wait([
+        client.queryWithStatus({url}, filter),
+        client.queryWithStatus({url}, filter),
+      ]).timeout(const Duration(seconds: 5));
+
+      expect(results.map((result) => result.answeredRelays), [0, 0]);
+    },
+  );
+
+  test('retainOnly closes connections to other relays', () async {
+    final closed = Completer<void>();
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen((request) async {
+      final socket = await WebSocketTransformer.upgrade(request);
+      socket.listen((message) {
+        final decoded = jsonDecode(message as String) as List<dynamic>;
+        if (decoded.first == 'REQ') {
+          socket.add(jsonEncode(['EOSE', decoded[1]]));
+        }
+      }, onDone: closed.complete);
+    });
+    addTearDown(() => server.close(force: true));
+
+    await client.queryWithStatus({'ws://127.0.0.1:${server.port}'}, filter);
+    await RelayConnectionPool.instance.retainOnly(const {});
+
+    await closed.future.timeout(const Duration(seconds: 5));
+  });
 }

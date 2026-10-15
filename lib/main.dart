@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'app_state.dart';
 import 'models/relay.dart';
+import 'nostr/relay_connection_pool.dart';
 import 'screens/root_screen.dart';
 import 'services/bookmark_store.dart';
 import 'services/cache_store.dart';
@@ -90,6 +91,12 @@ Future<void> main() async {
     }),
     SettingsStore.saveSelectedRelays,
   );
+
+  selectedRelaysNotifier.addListener(() {
+    RelayConnectionPool.instance
+        .retainOnly(selectedRelaysNotifier.value)
+        .ignore();
+  });
 
   profileCacheNotifier.value = CacheStore.loadAllProfiles();
 

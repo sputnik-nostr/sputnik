@@ -103,10 +103,14 @@ class RelayQueryResult {
     required this.events,
     required this.answeredRelays,
     required this.queriedRelays,
+    this.sourceRelays = const {},
   });
 
   /// Events from all queried relays, deduplicated by ID.
   final List<NostrEvent> events;
+
+  /// A relay that returned each event, by event ID, for use as a relay hint.
+  final Map<String, String> sourceRelays;
 
   /// Relays that finished with EOSE, not ones that failed or timed out.
   final int answeredRelays;
@@ -148,21 +152,35 @@ class RelayConnectionPool {
     NostrFilter filter, {
     required Duration timeout,
   }) async {
+    final urls = relayUrls.toList();
     final answers = await Future.wait(
-      relayUrls.map((relayUrl) => _queryRelay(relayUrl, filter, timeout)),
+      urls.map((relayUrl) => _queryRelay(relayUrl, filter, timeout)),
     );
 
     final eventsById = <String, NostrEvent>{};
-    for (final answer in answers) {
-      for (final event in answer.events) {
+    final sourceRelays = <String, String>{};
+    for (var i = 0; i < answers.length; i++) {
+      for (final event in answers[i].events) {
         eventsById[event.id] = event;
+        sourceRelays.putIfAbsent(event.id, () => urls[i]);
       }
     }
     return RelayQueryResult(
       events: eventsById.values.toList(),
       answeredRelays: answers.where((answer) => answer.eose).length,
       queriedRelays: answers.length,
+      sourceRelays: sourceRelays,
     );
+  }
+
+  /// Closes connections to relays outside [relayUrls], so a deselected relay
+  /// stops seeing this client.
+  Future<void> retainOnly(Set<String> relayUrls) async {
+    final stale = [
+      for (final entry in _connections.entries)
+        if (!relayUrls.contains(entry.key)) entry,
+    ];
+    await Future.wait(stale.map((entry) => _drop(entry.key, entry.value)));
   }
 
   Future<({List<NostrEvent> events, bool eose})> _queryRelay(
@@ -186,10 +204,10 @@ class RelayConnectionPool {
     Duration connectTimeout,
   ) async {
     final existing = _connections[relayUrl];
-    if (existing != null && !existing.isClosed) return existing;
-
-    final connection = _RelayConnection(relayUrl);
-    _connections[relayUrl] = connection;
+    // An existing connection may still be connecting, so it gets a timeout too.
+    final connection = existing != null && !existing.isClosed
+        ? existing
+        : _connections[relayUrl] = _RelayConnection(relayUrl);
     try {
       await connection.ready.timeout(connectTimeout);
     } catch (_) {
@@ -394,8 +412,10 @@ class _RelayConnection {
   }
 
   Future<void> close() async {
-    _closed = true;
+    // Cancelling the stream skips onDone, so release waiters here.
+    _fail();
     await _streamSubscription.cancel();
-    await _channel.sink.close();
+    // Not awaited: it waits for a pending connect, which may never finish.
+    _channel.sink.close().ignore();
   }
 }

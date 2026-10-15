@@ -9,9 +9,10 @@ import 'package:sputnik/screens/compose_screen.dart';
 import 'package:sputnik/services/settings_store.dart';
 import 'package:sputnik/widgets/reaction_buttons.dart';
 
+import 'support/answering_relay_client.dart';
 import 'support/fake_secret_store.dart';
 
-class _FakeRelayClient extends RelayClient {
+class _FakeRelayClient extends RelayClient with AnsweringRelayClient {
   _FakeRelayClient(this._target, this._outcome, {this._ownReaction});
 
   final NostrEvent _target;
@@ -260,6 +261,11 @@ void main() {
 
     expect(fakeClient.publishCount, 1);
     expect(fakeClient.lastPublished!.kind, 6);
+    // NIP-18: the e tag must name a relay the note can be fetched from.
+    expect(fakeClient.lastPublished!.tags, [
+      ['e', target.id, 'wss://relay.example'],
+      ['p', target.pubkey, ''],
+    ]);
   });
 
   testWidgets(

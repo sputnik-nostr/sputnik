@@ -94,6 +94,7 @@ void main() {
         secretKey: SecretKey.fromHex(seckeyHex),
         myPubkeyHex: me,
         target: target,
+        relayHint: 'wss://hint.example',
         relayUrls: {'wss://relay.example'},
       );
 
@@ -101,7 +102,10 @@ void main() {
       expect(event.kind, 7);
       expect(event.pubkey, me);
       expect(event.content, '+');
-      expect(event.tags, contains(equals(['e', target.id, ''])));
+      expect(
+        event.tags,
+        contains(equals(['e', target.id, 'wss://hint.example', target.pubkey])),
+      );
       expect(event.tags, contains(equals(['p', target.pubkey, ''])));
       expect(event.tags, contains(equals(['k', '1'])));
     },
@@ -115,13 +119,17 @@ void main() {
         secretKey: SecretKey.fromHex(seckeyHex),
         myPubkeyHex: me,
         target: target,
+        relayHint: 'wss://hint.example',
         relayUrls: {'wss://relay.example'},
       );
 
       final event = relay.lastPublished!;
       expect(event.kind, 6);
       expect(event.pubkey, me);
-      expect(event.tags, contains(equals(['e', target.id, ''])));
+      expect(
+        event.tags,
+        contains(equals(['e', target.id, 'wss://hint.example'])),
+      );
       expect(event.tags, contains(equals(['p', target.pubkey, ''])));
       expect(
         (jsonDecode(event.content) as Map<String, dynamic>)['id'],

@@ -99,11 +99,13 @@ class RelayReactionsRepository {
     };
   }
 
-  /// Publishes a NIP-25 like (kind 7, content "+") for [target].
+  /// Publishes a NIP-25 like (kind 7, content "+") for [target], found on
+  /// [relayHint].
   Future<Map<String, RelayPublishResult>> publishLike({
     required SecretKey secretKey,
     required String myPubkeyHex,
     required NostrEvent target,
+    required String relayHint,
     required Set<String> relayUrls,
   }) {
     final event = signEvent(
@@ -111,7 +113,7 @@ class RelayReactionsRepository {
       pubkeyHex: myPubkeyHex,
       kind: 7,
       tags: [
-        ['e', target.id, ''],
+        ['e', target.id, relayHint, target.pubkey],
         ['p', target.pubkey, ''],
         ['k', '${target.kind}'],
       ],
@@ -121,11 +123,12 @@ class RelayReactionsRepository {
   }
 
   /// Publishes a NIP-18 repost (kind 6) of [target], content the reposted
-  /// note's stringified JSON.
+  /// note's stringified JSON. NIP-18 requires [relayHint] in the `e` tag.
   Future<Map<String, RelayPublishResult>> publishRepost({
     required SecretKey secretKey,
     required String myPubkeyHex,
     required NostrEvent target,
+    required String relayHint,
     required Set<String> relayUrls,
   }) {
     final event = signEvent(
@@ -133,7 +136,7 @@ class RelayReactionsRepository {
       pubkeyHex: myPubkeyHex,
       kind: 6,
       tags: [
-        ['e', target.id, ''],
+        ['e', target.id, relayHint],
         ['p', target.pubkey, ''],
       ],
       content: jsonEncode(target.toJson()),

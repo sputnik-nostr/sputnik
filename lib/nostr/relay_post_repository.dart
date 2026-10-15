@@ -37,6 +37,23 @@ class RelayPostRepository {
     return (await _fetchEventsByIds({wantedId}, relayUrls))[wantedId];
   }
 
+  /// Like [fetchEventById], with a relay that returned it ('' if unknown).
+  Future<({NostrEvent event, String relay})?> fetchEventWithRelay(
+    String id,
+  ) async {
+    final wantedId = id.toLowerCase();
+    final result = await client.queryWithStatus(
+      relayUrls,
+      NostrFilter(ids: [wantedId], kinds: const [1], limit: 1),
+    );
+    for (final event in result.events) {
+      if (event.kind == 1 && event.id == wantedId) {
+        return (event: event, relay: result.sourceRelays[wantedId] ?? '');
+      }
+    }
+    return null;
+  }
+
   /// The kind 1 notes among [ids] that some relay returns, by ID.
   Future<Map<String, NostrEvent>> _fetchEventsByIds(
     Set<String> ids,
