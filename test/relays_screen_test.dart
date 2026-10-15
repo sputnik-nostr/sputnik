@@ -76,4 +76,23 @@ void main() {
 
     expect(customRelaysNotifier.value, contains('wss://relay.example.com'));
   });
+
+  testWidgets('the Add button explains that local relays are not supported', (
+    tester,
+  ) async {
+    await openAddRelayDialog(tester);
+
+    await tester.enterText(
+      find.byKey(const Key('addRelayField')),
+      'ws://192.168.1.5:7777',
+    );
+    await tester.tap(find.byKey(const Key('confirmAddRelayButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Relays on local or private networks are not supported'),
+      findsOneWidget,
+    );
+    expect(customRelaysNotifier.value, isEmpty);
+  });
 }

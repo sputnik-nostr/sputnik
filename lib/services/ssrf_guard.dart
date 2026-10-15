@@ -61,6 +61,21 @@ bool isBlockedAddress(InternetAddress address) {
   };
 }
 
+/// Suffixes that name hosts on the local network rather than the internet.
+const _localHostSuffixes = ['.local', '.localhost', '.internal', '.home.arpa'];
+
+/// Whether [url] names a host the guard is sure to refuse, so the UI can say
+/// why instead of the connection failing silently. Only covers IP literals
+/// and local-only names; a domain that resolves to a private address still
+/// fails at connect time.
+bool isLocalNetworkUrl(String url) {
+  final host = Uri.tryParse(url)?.host.toLowerCase();
+  if (host == null || host.isEmpty) return false;
+  final address = InternetAddress.tryParse(host);
+  if (address != null) return isBlockedAddress(address);
+  return host == 'localhost' || _localHostSuffixes.any(host.endsWith);
+}
+
 int effectivePort(Uri url) =>
     url.port != 0 ? url.port : (url.scheme == 'https' ? 443 : 80);
 

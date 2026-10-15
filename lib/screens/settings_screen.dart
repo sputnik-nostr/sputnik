@@ -48,9 +48,9 @@ Future<void> _confirmResetPreferences(BuildContext context) async {
       title: const Text('Reset preferences?'),
       content: const Text(
         'This resets the theme, theme color, relay selection, media '
-        'loading, payment target visibility, and reaction confirmation '
-        'back to their defaults. Identities and bookmarks are not '
-        'affected.',
+        'loading, internet identifier verification, payment target '
+        'visibility, and reaction confirmation back to their defaults. '
+        'Identities and bookmarks are not affected.',
       ),
       actions: [
         TextButton(
@@ -71,6 +71,7 @@ Future<void> _confirmResetPreferences(BuildContext context) async {
   selectedRelaysNotifier.value = defaultRelays.toSet();
   loadMediaNotifier.value = false;
   loadNoteImagesNotifier.value = false;
+  autoVerifyNip05Notifier.value = false;
   hiddenPaymentTargetTypesNotifier.value = const {};
   confirmBeforeReactingNotifier.value = false;
 
@@ -206,6 +207,23 @@ class SettingsScreen extends StatelessWidget {
                     ),
                     value: loadNoteImages,
                     onChanged: (value) => loadNoteImagesNotifier.value = value,
+                  );
+                },
+              ),
+              ValueListenableBuilder<bool>(
+                valueListenable: autoVerifyNip05Notifier,
+                builder: (context, autoVerify, _) {
+                  return SwitchListTile(
+                    key: const Key('autoVerifyNip05Switch'),
+                    secondary: const Icon(Icons.verified_outlined),
+                    title: const Text(
+                      'Verify internet identifiers automatically',
+                    ),
+                    subtitle: const Text(
+                      "Can reveal your IP to a profile's NIP-05 domain.",
+                    ),
+                    value: autoVerify,
+                    onChanged: (value) => autoVerifyNip05Notifier.value = value,
                   );
                 },
               ),

@@ -111,27 +111,37 @@ class _ProfileScreenState extends State<ProfileScreen>
       _resolvedPubkeyHex != null &&
       _resolvedPubkeyHex == activeIdentityPubkeyNotifier.value;
 
-  void _maybeVerifyNip05(String? identifier, String pubkeyHex) {
-    final trimmed = identifier?.trim();
-    if (trimmed == null || trimmed.isEmpty) return;
-    if (trimmed == _checkedNip05Identifier) return;
+  String? get _nip05Identifier {
+    final trimmed = profileCacheNotifier.value[_resolvedPubkeyHex]?.nip05
+        ?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
 
-    _checkedNip05Identifier = trimmed;
-    _nip05Status = null;
-    verifyNip05(identifier: trimmed, pubkeyHex: pubkeyHex).then((status) {
-      if (!mounted || _checkedNip05Identifier != trimmed) return;
+  /// The check contacts the identifier's domain, so it is opt-in.
+  void _verifyNip05() {
+    final identifier = _nip05Identifier;
+    if (identifier == null || identifier == _checkedNip05Identifier) return;
+
+    setState(() {
+      _checkedNip05Identifier = identifier;
+      _nip05Status = null;
+    });
+    verifyNip05(identifier: identifier, pubkeyHex: _resolvedPubkeyHex!).then((
+      status,
+    ) {
+      if (!mounted || _checkedNip05Identifier != identifier) return;
       setState(() => _nip05Status = status);
     });
   }
 
-  void _onProfileCacheChanged() {
-    final pubkeyHex = _resolvedPubkeyHex!;
-    _maybeVerifyNip05(profileCacheNotifier.value[pubkeyHex]?.nip05, pubkeyHex);
+  void _maybeAutoVerifyNip05() {
+    if (autoVerifyNip05Notifier.value) _verifyNip05();
   }
 
   @override
   void dispose() {
-    profileCacheNotifier.removeListener(_onProfileCacheChanged);
+    profileCacheNotifier.removeListener(_maybeAutoVerifyNip05);
+    autoVerifyNip05Notifier.removeListener(_maybeAutoVerifyNip05);
     _tabController.dispose();
     super.dispose();
   }
@@ -146,8 +156,9 @@ class _ProfileScreenState extends State<ProfileScreen>
       return;
     }
 
-    profileCacheNotifier.addListener(_onProfileCacheChanged);
-    _onProfileCacheChanged();
+    profileCacheNotifier.addListener(_maybeAutoVerifyNip05);
+    autoVerifyNip05Notifier.addListener(_maybeAutoVerifyNip05);
+    _maybeAutoVerifyNip05();
     loadProfile(
       pubkeyHex,
       selectedRelaysNotifier.value,
@@ -357,6 +368,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                         displayName: displayName,
                         metadata: metadata,
                         nip05Status: _nip05Status,
+                        onVerifyNip05:
+                            _nip05Identifier == _checkedNip05Identifier
+                            ? null
+                            : _verifyNip05,
                         lastActive: ownNotes.isEmpty
                             ? null
                             : _activityTime(ownNotes.first),
@@ -644,6 +659,7 @@ class _ProfileDetails extends StatelessWidget {
     required this.displayName,
     required this.metadata,
     required this.nip05Status,
+    required this.onVerifyNip05,
     required this.lastActive,
     required this.following,
     required this.followers,
@@ -655,6 +671,7 @@ class _ProfileDetails extends StatelessWidget {
   final String displayName;
   final NostrMetadata? metadata;
   final Nip05Status? nip05Status;
+  final VoidCallback? onVerifyNip05;
   final DateTime? lastActive;
   final List<String>? following;
   final List<String>? followers;
@@ -685,7 +702,11 @@ class _ProfileDetails extends StatelessWidget {
           _NpubRow(npub: npubFromHex(pubkeyHex)),
           if (nip05 != null && nip05.isNotEmpty) ...[
             const SizedBox(height: 2),
-            Nip05Badge(identifier: nip05, status: nip05Status),
+            Nip05Badge(
+              identifier: nip05,
+              status: nip05Status,
+              onVerify: onVerifyNip05,
+            ),
           ],
           if (lastActive != null) ...[
             const SizedBox(height: 4),

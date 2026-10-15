@@ -5,19 +5,28 @@ import '../models/relay.dart';
 import '../nostr/nostr.dart';
 import '../services/publishing.dart';
 import '../services/relay_settings.dart';
+import '../services/ssrf_guard.dart';
 
 bool _isPlaintext(String relay) => Uri.tryParse(relay)?.scheme == 'ws';
 
-Widget _plaintextWarningIcon(BuildContext context) {
+const localNetworkRelayMessage =
+    'Relays on local or private networks are not supported';
+
+/// Why [relay] is unreachable or unsafe, if it is.
+Widget? _relayWarningIcon(BuildContext context, String relay) {
+  final color = Theme.of(context).colorScheme.error;
+  if (isLocalNetworkUrl(relay)) {
+    return Tooltip(
+      message: '$localNetworkRelayMessage, so this relay cannot be reached.',
+      child: Icon(Icons.lan_outlined, size: 20, color: color),
+    );
+  }
+  if (!_isPlaintext(relay)) return null;
   return Tooltip(
     message:
         'Unencrypted relay (ws://). Traffic to and from it can be read '
         'or tampered with on the network. Prefer a wss:// relay.',
-    child: Icon(
-      Icons.no_encryption_outlined,
-      size: 20,
-      color: Theme.of(context).colorScheme.error,
-    ),
+    child: Icon(Icons.no_encryption_outlined, size: 20, color: color),
   );
 }
 
@@ -41,6 +50,10 @@ Future<void> _addRelay(BuildContext context) async {
             final input = canonicalRelayUrl(controller.text);
             if (!isRelayUrl(input)) {
               setState(() => error = 'Enter a valid ws:// or wss:// URL');
+              return;
+            }
+            if (isLocalNetworkUrl(input)) {
+              setState(() => error = localNetworkRelayMessage);
               return;
             }
             Navigator.pop(context, input);
@@ -130,9 +143,7 @@ class RelaysScreen extends StatelessWidget {
                   value: selected.contains(relay),
                   onChanged: (checked) =>
                       setRelaySelected(relay, checked ?? false),
-                  secondary: _isPlaintext(relay)
-                      ? _plaintextWarningIcon(context)
-                      : null,
+                  secondary: _relayWarningIcon(context, relay),
                 ),
               if (customRelays.isNotEmpty) ...[
                 const Divider(height: 1),
@@ -154,8 +165,9 @@ class RelaysScreen extends StatelessWidget {
                     secondary: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (_isPlaintext(relay)) ...[
-                          _plaintextWarningIcon(context),
+                        if (_relayWarningIcon(context, relay)
+                            case final warning?) ...[
+                          warning,
                           const SizedBox(width: 4),
                         ],
                         IconButton(
@@ -220,15 +232,29 @@ class _MyRelayListState extends State<_MyRelayList> {
   }
 
   Future<void> _useList() async {
-    final urls = [for (final entry in _entries) entry.url];
-    final hasPlaintext = urls.any(_isPlaintext);
+    final urls = [
+      for (final entry in _entries)
+        if (!isLocalNetworkUrl(entry.url)) entry.url,
+    ];
+    final localCount = _entries.length - urls.length;
+    if (urls.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text(localNetworkRelayMessage)));
+      return;
+    }
+    final localNote = localCount > 0
+        ? ' $localCount on a local or private network will be skipped.'
+        : '';
+    final plaintextNote = urls.any(_isPlaintext)
+        ? ' It includes unencrypted (ws://) relays.'
+        : '';
     if (!await confirmAction(
           context,
           title: 'Use your relay list?',
           message:
               'This replaces your selected relays with the ${urls.length} '
-              'relay(s) in your published list.'
-              '${hasPlaintext ? ' It includes unencrypted (ws://) relays.' : ''}',
+              'relay(s) in your published list.$localNote$plaintextNote',
           action: 'Use list',
           actionKey: const Key('confirmUseRelayListButton'),
         ) ||
@@ -370,9 +396,7 @@ class _MyRelayListState extends State<_MyRelayList> {
               dense: true,
               title: Text(entry.url),
               subtitle: Text(entry.accessLabel),
-              trailing: _isPlaintext(entry.url)
-                  ? _plaintextWarningIcon(context)
-                  : null,
+              trailing: _relayWarningIcon(context, entry.url),
             ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),

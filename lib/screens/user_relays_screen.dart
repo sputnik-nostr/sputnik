@@ -4,6 +4,8 @@ import '../app_state.dart';
 import '../models/relay.dart';
 import '../nostr/nostr.dart';
 import '../services/relay_settings.dart';
+import '../services/ssrf_guard.dart';
+import 'relays_screen.dart';
 import '../widgets/placeholder_tab.dart';
 
 /// The relays published in a user's NIP-65 relay list.
@@ -67,7 +69,13 @@ class _UserRelaysScreenState extends State<UserRelaysScreen> {
                   ListTile(
                     title: Text(entry.url),
                     subtitle: Text(entry.accessLabel),
-                    trailing: selectedRelaysNotifier.value.contains(entry.url)
+                    trailing: isLocalNetworkUrl(entry.url)
+                        ? const IconButton(
+                            icon: Icon(Icons.block),
+                            tooltip: localNetworkRelayMessage,
+                            onPressed: null,
+                          )
+                        : selectedRelaysNotifier.value.contains(entry.url)
                         ? IconButton(
                             icon: const Icon(Icons.check),
                             tooltip: 'Already added',

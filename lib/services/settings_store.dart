@@ -86,6 +86,7 @@ class SettingsStore {
   static const _identitySecretPrefix = 'identity_secret_';
   static const _loadMediaKey = 'load_media';
   static const _loadNoteImagesKey = 'load_note_images';
+  static const _autoVerifyNip05Key = 'auto_verify_nip05';
   static const _hiddenPaymentTargetTypesKey = 'hidden_payment_target_types';
   static const _confirmBeforeReactingKey = 'confirm_before_reacting';
 
@@ -278,6 +279,16 @@ class SettingsStore {
   static Future<void> saveLoadNoteImages(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_loadNoteImagesKey, value);
+  }
+
+  static Future<bool> loadAutoVerifyNip05() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_autoVerifyNip05Key) ?? false;
+  }
+
+  static Future<void> saveAutoVerifyNip05(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_autoVerifyNip05Key, value);
   }
 
   static Future<bool> loadConfirmBeforeReacting() async {

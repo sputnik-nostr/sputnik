@@ -73,6 +73,11 @@ void main() {
 
     await tester.pumpWidget(const MaterialApp(home: SettingsScreen()));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('paymentTargetTypesCard')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
 
     expect(find.text('1 type hidden'), findsOneWidget);
   });
@@ -82,6 +87,11 @@ void main() {
   ) async {
     await tester.pumpWidget(const MaterialApp(home: SettingsScreen()));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('paymentTargetTypesCard')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
 
     await tester.tap(find.byKey(const Key('paymentTargetTypesCard')));
     await tester.pumpAndSettle();
@@ -89,13 +99,16 @@ void main() {
     expect(find.byType(PaymentTargetTypesScreen), findsOneWidget);
   });
 
-  testWidgets('resetting preferences also restores media loading and payment '
-      'target visibility, without touching identities', (tester) async {
+  testWidgets('resetting preferences also restores media loading, NIP-05 '
+      'checks and payment target visibility, without touching identities', (
+    tester,
+  ) async {
     themeModeNotifier.value = ThemeMode.dark;
     seedColorNotifier.value = AppSeedColor.red;
     selectedRelaysNotifier.value = {'wss://custom.example'};
     loadMediaNotifier.value = true;
     loadNoteImagesNotifier.value = true;
+    autoVerifyNip05Notifier.value = true;
     hiddenPaymentTargetTypesNotifier.value = {'monero'};
     confirmBeforeReactingNotifier.value = true;
     identitiesNotifier.value = [
@@ -122,6 +135,7 @@ void main() {
     expect(selectedRelaysNotifier.value, defaultRelays.toSet());
     expect(loadMediaNotifier.value, isFalse);
     expect(loadNoteImagesNotifier.value, isFalse);
+    expect(autoVerifyNip05Notifier.value, isFalse);
     expect(hiddenPaymentTargetTypesNotifier.value, isEmpty);
     expect(confirmBeforeReactingNotifier.value, isFalse);
     expect(identitiesNotifier.value, hasLength(1));

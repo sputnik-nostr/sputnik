@@ -65,6 +65,11 @@ Future<void> main() async {
       SettingsStore.saveLoadNoteImages,
     ),
     bindPersisted(
+      autoVerifyNip05Notifier,
+      SettingsStore.loadAutoVerifyNip05,
+      SettingsStore.saveAutoVerifyNip05,
+    ),
+    bindPersisted(
       hiddenPaymentTargetTypesNotifier,
       SettingsStore.loadHiddenPaymentTargetTypes,
       SettingsStore.saveHiddenPaymentTargetTypes,

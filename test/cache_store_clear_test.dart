@@ -12,6 +12,7 @@ void main() {
   // The boxes are late final, so they can only be opened once per process.
   setUpAll(() async {
     dir = await Directory.systemTemp.createTemp('cache_store_clear_test');
+    await File('${dir.path}/contacts.hive').writeAsBytes(const []);
     await CacheStore.init(directory: dir);
   });
 
@@ -23,7 +24,13 @@ void main() {
   test('keeps its boxes in the given directory', () {
     final names = dir.listSync().map((e) => e.uri.pathSegments.last).toList();
 
-    expect(names, containsAll(['profiles.hive', 'contacts.hive']));
+    expect(names, containsAll(['profiles.hive', 'paymenttargets.hive']));
+  });
+
+  test('deletes the follow lists older versions kept on disk', () {
+    final names = dir.listSync().map((e) => e.uri.pathSegments.last).toList();
+
+    expect(names, isNot(contains('contacts.hive')));
   });
 
   test('clearAll empties profiles, follow lists and payment targets', () async {

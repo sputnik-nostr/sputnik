@@ -8,6 +8,7 @@ import 'package:sputnik/nostr/relay_payment_targets_repository.dart';
 import 'package:sputnik/nostr/relay_post_repository.dart';
 import 'package:sputnik/nostr/relay_reactions_repository.dart';
 import 'package:sputnik/nostr/relay_thread_repository.dart';
+import 'package:sputnik/services/cache_store.dart';
 
 import 'support/answering_relay_client.dart';
 
@@ -193,6 +194,9 @@ void main() {
   });
 
   group('contacts', () {
+    // Follow lists are cached in memory, so each test starts from relays.
+    setUp(CacheStore.clearAll);
+
     test('ignores a contact list authored by someone else', () async {
       final repository = RelayContactsRepository(
         client: _RelayReturning([
@@ -421,6 +425,8 @@ void main() {
   });
 
   group('followers', () {
+    setUp(CacheStore.clearAll);
+
     test('counts an author whose own list includes the subject', () async {
       final repository = RelayContactsRepository(
         client: _RelayReturning([

@@ -4,12 +4,20 @@ import '../nostr/nip05.dart';
 import '../theme/app_text_styles.dart';
 
 /// Shows a NIP-05 identifier alongside an icon reflecting its verification
-/// state (still checking, verified, mismatched, or unreachable/malformed).
+/// state (unchecked, checking, verified, mismatched, or unreachable).
 class Nip05Badge extends StatelessWidget {
-  const Nip05Badge({super.key, required this.identifier, this.status});
+  const Nip05Badge({
+    super.key,
+    required this.identifier,
+    this.status,
+    this.onVerify,
+  });
 
   final String identifier;
   final Nip05Status? status;
+
+  /// Set while unchecked; tapping the icon starts the check.
+  final VoidCallback? onVerify;
 
   String get _displayIdentifier =>
       identifier.startsWith('_@') ? identifier.substring(2) : identifier;
@@ -17,6 +25,27 @@ class Nip05Badge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final onVerify = this.onVerify;
+    if (onVerify != null) {
+      return _row(
+        theme,
+        Tooltip(
+          message:
+              'Tap to verify with ${parseNip05(identifier)?.domain ?? identifier}',
+          child: InkWell(
+            key: const Key('verifyNip05Button'),
+            onTap: onVerify,
+            customBorder: const CircleBorder(),
+            child: Icon(
+              Icons.travel_explore,
+              size: 14,
+              color: theme.colorScheme.outline,
+            ),
+          ),
+        ),
+      );
+    }
+
     final (icon, color, tooltip) = switch (status) {
       null => (Icons.hourglass_empty, theme.colorScheme.outline, 'Checking...'),
       Nip05Status.verified => (
@@ -36,6 +65,17 @@ class Nip05Badge extends StatelessWidget {
       ),
     };
 
+    return _row(
+      theme,
+      Tooltip(
+        message: tooltip,
+        triggerMode: TooltipTriggerMode.tap,
+        child: Icon(icon, size: 14, color: color),
+      ),
+    );
+  }
+
+  Widget _row(ThemeData theme, Widget statusIcon) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -47,11 +87,7 @@ class Nip05Badge extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 4),
-        Tooltip(
-          message: tooltip,
-          triggerMode: TooltipTriggerMode.tap,
-          child: Icon(icon, size: 14, color: color),
-        ),
+        statusIcon,
       ],
     );
   }

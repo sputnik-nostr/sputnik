@@ -26,4 +26,26 @@ void main() {
       expect(find.text('Verified by bob@example.com'), findsOneWidget);
     },
   );
+
+  testWidgets('an unchecked identifier verifies only when tapped', (
+    tester,
+  ) async {
+    var taps = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Nip05Badge(
+            identifier: 'bob@example.com',
+            onVerify: () => taps++,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.hourglass_empty), findsNothing);
+
+    await tester.tap(find.byKey(const Key('verifyNip05Button')));
+
+    expect(taps, 1);
+  });
 }

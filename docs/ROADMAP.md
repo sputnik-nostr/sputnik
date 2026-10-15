@@ -60,6 +60,7 @@
 - [ ] Check the hash rule against real hosts (e.g. nostr.build) so no existing notes break
 - [x] Load profile pictures and banners with the same size cap, redirect, and hash rules (HTTPS only)
 - [x] Load profile pictures and banners only once you turn it on (off by default)
+- [x] Check NIP-05 identifiers only on tap, or automatically once you turn it on (off by default)
 - [x] Reuse connections for images through one shared client that keeps the address checks
 - [ ] Bundle libmpv in the Linux AppImage, and document that Linux needs it
 
@@ -73,6 +74,8 @@
 - [x] Publish your own relay list (NIP-65) and use it to set your relays
 - [x] Edit your own payment targets
 - [x] Keep the relay data cache in the app's own folder, and let Clear cached data wipe all of it
+- [x] Keep follow lists in memory only, so the disk does not show whose profiles you viewed
+- [x] Say why relays on local or private networks can't be added, instead of failing silently
 - [x] Add payment targets support for Zano and Firo
 - [x] Keep bookmarks in their own store, one entry per bookmark, and clear out settings left by old versions
 - [ ] Encrypt the relay data cache and the bookmarks (they show what you read), keyed from secure storage

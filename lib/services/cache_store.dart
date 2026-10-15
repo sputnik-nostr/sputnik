@@ -19,8 +19,11 @@ class CacheStore {
   static const maxAge = Duration(days: 30);
 
   static late final Box<Map> _profiles;
-  static late final Box<Map> _contacts;
   static late final Box<Map> _paymentTargets;
+
+  /// Memory only: follow lists on disk would hint at whose profiles were
+  /// viewed.
+  static final _contacts = <String, ({List<String> pubkeys, int fetchedAt})>{};
 
   static bool _ready = false;
 
@@ -35,14 +38,16 @@ class CacheStore {
       Hive.init((directory ?? await _cacheDirectory()).path);
       final boxes = await Future.wait([
         Hive.openBox<Map>('profiles'),
-        Hive.openBox<Map>('contacts'),
         Hive.openBox<Map>('paymentTargets'),
       ]);
       _profiles = boxes[0];
-      _contacts = boxes[1];
-      _paymentTargets = boxes[2];
+      _paymentTargets = boxes[1];
       _ready = true;
-      await Future.wait(boxes.map(pruneExpired));
+      await Future.wait([
+        ...boxes.map(pruneExpired),
+        // Left behind by versions that kept follow lists on disk.
+        Hive.deleteBoxFromDisk('contacts'),
+      ]);
     } catch (error, stack) {
       FlutterError.reportError(
         FlutterErrorDetails(
@@ -104,14 +109,12 @@ class CacheStore {
     });
   }
 
-  /// Empties every box, including the follow lists that hint at who was viewed.
+  /// Empties every cache, including the follow lists that hint at who was
+  /// viewed.
   static Future<void> clearAll() async {
+    _contacts.clear();
     if (!_ready) return;
-    await Future.wait([
-      _profiles.clear(),
-      _contacts.clear(),
-      _paymentTargets.clear(),
-    ]);
+    await Future.wait([_profiles.clear(), _paymentTargets.clear()]);
   }
 
   static List<String>? getFollowing(String pubkeyHex) =>
@@ -121,12 +124,10 @@ class CacheStore {
       _getList('$pubkeyHex:followers');
 
   static bool isFollowingFresh(String pubkeyHex) =>
-      _ready &&
-      _isFresh(_contacts.get('$pubkeyHex:following')?['fetchedAt'] as int?);
+      _isFresh(_contacts['$pubkeyHex:following']?.fetchedAt);
 
   static bool isFollowersFresh(String pubkeyHex) =>
-      _ready &&
-      _isFresh(_contacts.get('$pubkeyHex:followers')?['fetchedAt'] as int?);
+      _isFresh(_contacts['$pubkeyHex:followers']?.fetchedAt);
 
   static Future<void> putFollowing(String pubkeyHex, List<String> pubkeys) =>
       _putList('$pubkeyHex:following', pubkeys);
@@ -135,18 +136,18 @@ class CacheStore {
       _putList('$pubkeyHex:followers', pubkeys);
 
   static List<String>? _getList(String key) {
-    if (!_ready) return null;
-    final entry = _contacts.get(key);
-    if (entry == null) return null;
-    return List<String>.from(entry['pubkeys'] as List? ?? const []);
+    final pubkeys = _contacts[key]?.pubkeys;
+    return pubkeys == null ? null : List.of(pubkeys);
   }
 
   static Future<void> _putList(String key, List<String> pubkeys) {
-    if (!_ready) return Future.value();
-    return _contacts.put(key, {
-      'pubkeys': pubkeys,
-      'fetchedAt': DateTime.now().millisecondsSinceEpoch,
-    });
+    // Stale lists are never read, so dropping them bounds memory.
+    _contacts.removeWhere((_, entry) => !_isFresh(entry.fetchedAt));
+    _contacts[key] = (
+      pubkeys: List.unmodifiable(pubkeys),
+      fetchedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    return Future.value();
   }
 
   static List<NostrPaymentTarget>? getPaymentTargets(String pubkeyHex) {

@@ -42,6 +42,10 @@ final ValueNotifier<bool> loadMediaNotifier = ValueNotifier(false);
 
 final ValueNotifier<bool> loadNoteImagesNotifier = ValueNotifier(false);
 
+/// Off by default: a NIP-05 check contacts a domain the profile's author
+/// chose.
+final ValueNotifier<bool> autoVerifyNip05Notifier = ValueNotifier(false);
+
 /// Whether liking or following asks for confirmation first; posting and
 /// reposting always do.
 final ValueNotifier<bool> confirmBeforeReactingNotifier = ValueNotifier(false);

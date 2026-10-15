@@ -75,6 +75,7 @@ void main() {
     hiddenPaymentTargetTypesNotifier.value = const {};
     profileCacheNotifier.value = const {};
     notesNotifier.value = const [];
+    autoVerifyNip05Notifier.value = false;
   });
 
   testWidgets('with no active identity, shows a prompt instead of a profile', (
@@ -327,6 +328,47 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(Key('paymentTarget_monero_4Aexample')), findsNothing);
+  });
+
+  group('NIP-05', () {
+    Future<void> pumpProfileWithNip05(WidgetTester tester) async {
+      final pubkeyHex = 'b' * 64;
+      profileCacheNotifier.value = {
+        pubkeyHex: const NostrMetadata(nip05: 'bob@example.com'),
+      };
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProfileScreen(
+            pubkeyHex: pubkeyHex,
+            relayClient: _FakeRelayClient(),
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    testWidgets('is not checked on its own by default', (tester) async {
+      await pumpProfileWithNip05(tester);
+
+      expect(find.byKey(const Key('verifyNip05Button')), findsOneWidget);
+      expect(find.byIcon(Icons.hourglass_empty), findsNothing);
+    });
+
+    testWidgets('tapping the icon starts the check', (tester) async {
+      await pumpProfileWithNip05(tester);
+
+      await tester.tap(find.byKey(const Key('verifyNip05Button')));
+      await tester.pump();
+
+      expect(find.byKey(const Key('verifyNip05Button')), findsNothing);
+    });
+
+    testWidgets('is checked on its own when the setting is on', (tester) async {
+      autoVerifyNip05Notifier.value = true;
+      await pumpProfileWithNip05(tester);
+
+      expect(find.byKey(const Key('verifyNip05Button')), findsNothing);
+    });
   });
 
   testWidgets(

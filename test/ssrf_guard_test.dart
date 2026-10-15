@@ -156,4 +156,25 @@ void main() {
       expect(served, 0);
     });
   });
+
+  group('isLocalNetworkUrl', () {
+    test('flags private and loopback IP literals', () {
+      expect(isLocalNetworkUrl('ws://192.168.1.5:7777'), isTrue);
+      expect(isLocalNetworkUrl('ws://127.0.0.1'), isTrue);
+      expect(isLocalNetworkUrl('wss://[::1]'), isTrue);
+      expect(isLocalNetworkUrl('ws://10.0.0.2'), isTrue);
+    });
+
+    test('flags local-only host names', () {
+      expect(isLocalNetworkUrl('ws://relay.local'), isTrue);
+      expect(isLocalNetworkUrl('ws://nas.home.arpa'), isTrue);
+      expect(isLocalNetworkUrl('ws://localhost:4848'), isTrue);
+    });
+
+    test('leaves public hosts alone', () {
+      expect(isLocalNetworkUrl('wss://relay.damus.io'), isFalse);
+      expect(isLocalNetworkUrl('wss://8.8.8.8'), isFalse);
+      expect(isLocalNetworkUrl('wss://localhost.example.com'), isFalse);
+    });
+  });
 }
