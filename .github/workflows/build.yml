@@ -37,33 +37,17 @@ jobs:
           path: build/app/outputs/flutter-apk/app-x86_64-release.apk
           compression-level: 0
   linux-appimage:
-    # Older glibc baseline, so the AppImage runs on more distros.
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libsecret-1-dev libmpv-dev patchelf
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - run: flutter build linux --release
-      - name: Package AppImage
-        run: |
-          set -euo pipefail
-          APPIMAGETOOL_VERSION=1.9.1
-          APPIMAGETOOL_SHA256=ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
-          wget -q "https://github.com/AppImage/appimagetool/releases/download/$APPIMAGETOOL_VERSION/appimagetool-x86_64.AppImage" -O appimagetool
-          echo "$APPIMAGETOOL_SHA256  appimagetool" | sha256sum -c -
-          chmod +x appimagetool
-          APPIMAGETOOL="$PWD/appimagetool" contrib/package_appimage.sh
+      # The same pinned container as a local `make dist`, so both match.
+      - run: make dist
       - uses: actions/upload-artifact@v7
         with:
           name: sputnik-linux-appimage
-          path: sputnik-x86_64.AppImage
+          path: |
+            dist/sputnik-x86_64.AppImage
+            dist/SHA256SUMS
           compression-level: 0

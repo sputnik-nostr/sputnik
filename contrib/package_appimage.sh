@@ -124,8 +124,7 @@ exec "\$HERE/usr/bin/$app" "\$@"
 EOF
 chmod +x "$appdir/AppRun"
 
-# Neither the build time nor the builder's umask should show in the image.
-chmod -R u+rwX,go+rX,go-w "$appdir"
+# The build time must not show in the image.
 find "$appdir" -exec touch -h -d "@$SOURCE_DATE_EPOCH" {} +
 
 # The AppStream ID is not reverse-DNS yet, which appstreamcli rejects.
