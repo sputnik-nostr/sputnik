@@ -7,8 +7,7 @@ import 'models/nostr_filter.dart';
 import 'relay_client.dart';
 import 'replaceable_events.dart';
 
-/// Newest own contact list seen or published, per pubkey, so a lagging relay's
-/// older copy is never republished over it.
+/// So a lagging relay's older copy is never republished over the newest.
 final _newestOwnContactList = <String, DateTime>{};
 
 @visibleForTesting
@@ -37,8 +36,7 @@ class RelayContactsRepository {
 
   RelayClient get client => _client ?? RelayClient.instance;
 
-  /// The pubkeys a person follows, from their own kind:3 contact list; null
-  /// when nothing was found and some relay may still hold one.
+  /// Null when nothing was found and some relay may still hold a list.
   Future<List<String>?> fetchFollowingOrNull(
     String pubkeyHex,
     Set<String> relayUrls,
@@ -61,8 +59,7 @@ class RelayContactsRepository {
     return _followedPubkeys(own.first);
   }
 
-  /// The pubkeys of people whose own contact list currently includes this
-  /// pubkey.
+  /// People whose current contact list includes [pubkeyHex].
   Future<List<String>> fetchFollowers(
     String pubkeyHex,
     Set<String> relayUrls,
@@ -147,8 +144,7 @@ class RelayContactsRepository {
     );
   }
 
-  /// Applies follow (true) / unfollow (false) changes to the relays' list,
-  /// which NIP-02 has us republish in full each time.
+  /// Follow (true) or unfollow (false); NIP-02 republishes the whole list.
   Future<({Map<String, RelayPublishResult> results, Set<String> following})>
   applyFollowChanges({
     required SecretKey secretKey,

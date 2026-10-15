@@ -38,22 +38,16 @@ String? _hexFromTlvSpecial(String input, String expectedHrp) {
   return null;
 }
 
-/// Encodes a hex pubkey into the canonical `npub` format.
 String npubFromHex(String pubkeyHex) => _bareEntityFromHex('npub', pubkeyHex);
 
-/// Decodes an `npub`-formatted pubkey into its raw hex form.
 String? hexFromNpub(String npub) => _hexFromBareEntity(npub, 'npub', 32);
 
-/// Decodes an `nsec`-formatted secret key into its raw hex form.
 String? hexFromNsec(String nsec) => _hexFromBareEntity(nsec, 'nsec', 32);
 
-/// Encodes a hex secret key into the canonical `nsec` format.
 String nsecFromHex(String seckeyHex) => _bareEntityFromHex('nsec', seckeyHex);
 
-/// Encodes a hex event ID into the canonical `note` format.
 String noteFromHex(String eventIdHex) => _bareEntityFromHex('note', eventIdHex);
 
-/// Decodes a `note`-formatted event ID into its raw hex form.
 String? hexFromNote(String note) => _hexFromBareEntity(note, 'note', 32);
 
 /// Decodes an `nprofile` into its pubkey hex, ignoring relay hints.
@@ -74,8 +68,7 @@ String neventFromHex(String eventIdHex, {String? authorPubkeyHex}) {
   return bech32Encode('nevent', convertBits(bytes, 8, 5, pad: true));
 }
 
-/// Elides the middle of [value] with "..." to fit [totalLength], keeping the
-/// last [suffixLength] characters.
+/// Elides the middle of [value] with "..." to fit [totalLength].
 String truncateMiddle(
   String value, {
   required int totalLength,
@@ -91,7 +84,6 @@ String truncateMiddle(
 String truncateNpub(String npub) =>
     truncateMiddle(npub, totalLength: 20, suffixLength: 5);
 
-/// The first [length] characters of [pubkeyHex].
 String shortPubkey(String pubkeyHex, [int length = 8]) =>
     pubkeyHex.length <= length ? pubkeyHex : pubkeyHex.substring(0, length);
 
@@ -101,9 +93,7 @@ const nostrEntityPattern =
 
 typedef NostrUriTarget = ({String? pubkeyHex, String? eventIdHex});
 
-/// Decodes an npub, nprofile, note or nevent, with or without `nostr:`.
-///
-/// Returns null if it is anything else. Exactly one field of the result is set.
+/// An npub, nprofile, note or nevent, with or without `nostr:`; else null.
 NostrUriTarget? decodeNostrUri(String text) {
   final value = text.startsWith('nostr:') ? text.substring(6) : text;
 

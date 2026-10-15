@@ -1,8 +1,7 @@
 import '../models/relay.dart';
 import 'models/nostr_event.dart';
 
-/// Entries past this are ignored: a longer list is bloat or abuse, not a real
-/// preference.
+/// A longer list is bloat or abuse, not a real preference.
 const maxRelayListEntries = 50;
 
 /// A relay from a NIP-65 relay list, and whether it is read, written, or both.

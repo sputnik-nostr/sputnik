@@ -19,8 +19,7 @@ bool _hasHost(String url) => Uri.tryParse(url)?.host.isNotEmpty ?? false;
 const _maxMentionLookups = 20;
 const _maxMentionNameLength = 40;
 
-/// Pubkeys already looked up this session, so a missing profile is not
-/// requested again each time its note scrolls into view.
+/// So a missing profile is not requested again on every scroll.
 final _lookedUp = BoundedSet<String>(2000);
 
 void clearMentionLookups() => _lookedUp.clear();
@@ -191,8 +190,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
       final nostrTarget = link.target;
 
       if (httpUrl == null && nostrTarget == null) {
-        // An unrecognized `nostr:` entity (e.g. `nsec`, `naddr`); leave as
-        // plain text rather than linkifying something we can't open.
+        // An entity we can't open (e.g. `nsec`, `naddr`) stays plain text.
         spans.add(TextSpan(text: matchedText));
         start = link.end;
         continue;

@@ -26,8 +26,7 @@ class NostrPost {
     this.repostedAt,
   });
 
-  /// [original], reposted by [byPubkey] at [at] (a NIP-18 pointer, not a
-  /// new note, so every other field still describes [original]).
+  /// A NIP-18 pointer, so every other field still describes [original].
   factory NostrPost.repost(
     NostrPost original, {
     required String byPubkey,

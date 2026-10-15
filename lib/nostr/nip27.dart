@@ -3,8 +3,7 @@ import 'nip19.dart';
 
 typedef NoteReference = ({int start, int end, String eventIdHex});
 
-/// HTTP(S) URLs (group 1), and nostr: URIs or bare NIP-19 entities (group 2).
-/// URLs are matched too, so an entity inside one is not taken for a reference.
+/// URLs are group 1, so an entity inside a URL is never group 2.
 final linkPattern = RegExp(
   '(${httpUrlPattern.pattern})|($nostrEntityPattern)',
   caseSensitive: false,

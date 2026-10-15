@@ -33,8 +33,7 @@ void main() {
   });
 
   test('a signature from a fixed test-only key verifies against it', () {
-    // Same seckey as the BIP-340 test vector above -- public, well-known,
-    // and not anyone's real identity.
+    // The BIP-340 vector's public test key, not a real identity.
     const seckeyHex =
         '0000000000000000000000000000000000000000000000000000000000000003';
     final pubkeyHex = xonlyPubkeyHex(SecretKey.fromHex(seckeyHex));

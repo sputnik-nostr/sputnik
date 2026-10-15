@@ -22,10 +22,7 @@ List<List<String>> _eTags(NostrEvent event) {
   ];
 }
 
-/// The ID of the note [event] directly replies to, or null if it isn't a reply.
-///
-/// Prefers a marked `reply` tag, then `root`. Without markers (deprecated), the
-/// last `e` tag is the parent and earlier ones are just citations.
+/// The parent's ID: marked `reply`, then `root`, else the last `e` tag.
 String? replyParentId(NostrEvent event) => _parentId(_eTags(event));
 
 String? _parentId(List<List<String>> eTags) {
@@ -45,9 +42,7 @@ String? _parentId(List<List<String>> eTags) {
   return eTags.last[1].toLowerCase();
 }
 
-/// The ID of the first note of [event]'s thread, or null if it isn't a reply.
-///
-/// Without markers (deprecated), the first `e` tag is the root.
+/// The thread root's ID; unmarked, the first `e` tag.
 String? threadRootId(NostrEvent event) {
   final eTags = _eTags(event);
   final parent = _parentId(eTags);

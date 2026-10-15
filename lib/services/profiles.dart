@@ -2,8 +2,7 @@ import '../app_state.dart';
 import '../nostr/nostr.dart';
 import 'cache_store.dart';
 
-/// Profiles for [pubkeys], from the cache while fresh and from relays
-/// otherwise. Fetched ones go into [profileCacheNotifier] and the disk cache.
+/// Cached while fresh; fetched ones also go to [profileCacheNotifier].
 Future<Map<String, NostrMetadata>> loadProfiles(
   Set<String> pubkeys,
   Set<String> relayUrls, {

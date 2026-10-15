@@ -4,10 +4,7 @@ import '../models/note.dart';
 import '../services/reaction_actions.dart';
 import 'note_action_button.dart';
 
-/// A delete button for [note]; publishes a NIP-09 deletion request on tap.
-///
-/// Callers are responsible for only showing this for the active identity's
-/// own notes.
+/// Callers show this only on the active identity's own notes.
 class DeleteButton extends StatefulWidget {
   const DeleteButton({
     super.key,

@@ -39,9 +39,7 @@ const _maxConnectionsPerHost = 6;
 HttpClient Function() _sharedClientBuilder = guardedHttpClient;
 HttpClient? _sharedClient;
 
-/// One guarded client for every image, so a feed reuses connections.
-///
-/// [downloadMedia] never closes it: a download only aborts its own request.
+/// Shared so a feed reuses connections; a download aborts only itself.
 HttpClient sharedImageClient() {
   return _sharedClient ??= _sharedClientBuilder()
     ..connectionTimeout = _connectTimeout

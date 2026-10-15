@@ -59,8 +59,6 @@ class RelayThreadRepository {
 
   RelayClient get client => _client ?? RelayClient.instance;
 
-  /// Fetches the thread around [postId]: its ancestors, replies and reactions.
-  ///
   /// [extraEvents] are notes just published that relays may not return yet.
   Future<ThreadData> fetchThread(
     String postId,

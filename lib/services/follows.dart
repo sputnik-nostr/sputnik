@@ -1,8 +1,7 @@
 import '../nostr/nostr.dart';
 import 'cache_store.dart';
 
-/// Who [pubkeyHex] follows, from the cache while fresh and from relays
-/// otherwise. Null when nothing was found and some relay may still hold a list.
+/// Cached while fresh; null when some relay may still hold a list.
 Future<List<String>?> loadFollowingOrNull(
   String pubkeyHex,
   Set<String> relayUrls, {
@@ -30,8 +29,7 @@ Future<List<String>> loadFollowing(
     await loadFollowingOrNull(pubkeyHex, relayUrls, force: force) ??
     const <String>[];
 
-/// Who follows [pubkeyHex], from the cache while fresh and from relays
-/// otherwise.
+/// Who follows [pubkeyHex], from the cache while fresh.
 Future<List<String>> loadFollowers(
   String pubkeyHex,
   Set<String> relayUrls, {

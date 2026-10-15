@@ -20,8 +20,7 @@ class _FakeRelayClient extends RelayClient with AnsweringRelayClient {
     this.followingQueryGate,
   });
 
-  // Used to self-sign the active identity's own kind:3 event returned from
-  // query() -- must match the active identity so the event verifies.
+  // Signs the active identity's own kind:3 event, so it verifies.
   final String seckeyHex;
 
   // The active identity's own kind:3 event, as raw "p" tags.

@@ -6,11 +6,7 @@ import '../app_state.dart';
 import '../services/media_loader.dart';
 import 'media_frame.dart';
 
-/// A circular avatar whose image fades in over [fallback] (e.g. initials).
-///
-/// The fallback is hidden once the image loads so it can't show through a
-/// transparent picture. Images load only when [loadProfileImagesNotifier] is true,
-/// since fetching one reveals the viewer's IP to the image host.
+/// Loads only per [loadProfileImagesNotifier], since it reveals the IP.
 class FadeInAvatar extends StatefulWidget {
   const FadeInAvatar({
     super.key,
@@ -26,8 +22,7 @@ class FadeInAvatar extends StatefulWidget {
   final Widget fallback;
   final double radius;
 
-  /// Minimum decode size, for placements such as the profile page that want a
-  /// sharper image than the widget's own size implies.
+  /// For placements such as the profile page that want a sharper image.
   final int? minDecodeExtent;
 
   @override

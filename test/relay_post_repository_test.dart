@@ -32,8 +32,7 @@ void main() {
 
   test('fetchReposts resolves embedded content, falls back to fetching by id, '
       'and skips a dangling repost', () async {
-    // A genuinely signed event, so its embedded-JSON round trip through
-    // NostrEvent.fromJson (which verifies id/sig) actually succeeds.
+    // Really signed, so the embedded copy passes fromJson's verification.
     final keypair = generateNostrKeyPair();
     final embeddedOriginal = signEvent(
       secretKey: SecretKey.fromHex(keypair.privateKeyHex),
@@ -54,8 +53,7 @@ void main() {
       sig: 'f1' * 64,
     );
 
-    // No embedded content, so this one only resolves via the fallback
-    // fetch-by-id.
+    // No embedded content, so this resolves only via fetch-by-ID.
     final fallbackOriginal = NostrEvent(
       id: 'c2' * 32,
       pubkey: otherAuthorPubkey,
@@ -77,7 +75,7 @@ void main() {
       sig: 'f2' * 64,
     );
 
-    // Points at a note no relay has -- should be dropped, not crash.
+    // Points at a note no relay has, so it is dropped.
     final danglingRepost = NostrEvent(
       id: 'e3' * 32,
       pubkey: reposterPubkey,

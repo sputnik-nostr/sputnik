@@ -23,9 +23,7 @@ class _RelayReturning extends RelayClient with AnsweringRelayClient {
   ) async => events;
 }
 
-// A mutable sibling of _RelayReturning for tests that also publish -- kept
-// separate since _RelayReturning's const constructor is relied on elsewhere
-// (e.g. the top-level _noReactions below).
+// Separate from _RelayReturning, whose const constructor is used elsewhere.
 class _RelayReturningAndPublishing extends RelayClient
     with AnsweringRelayClient {
   _RelayReturningAndPublishing(

@@ -1,8 +1,7 @@
 import '../nostr/nostr.dart';
 import 'note.dart';
 
-/// Sets like/repost counts, and whether [myPubkeyHex] is among them, from
-/// [reactionsByPostId], where present.
+/// Applies counts, and whether [myPubkeyHex] reacted, where present.
 List<Note> applyReactionCounts(
   List<Note> notes,
   Map<String, PostReactions> reactionsByPostId, {
@@ -21,8 +20,7 @@ List<Note> applyReactionCounts(
   }).toList();
 }
 
-/// Prefers the profile name in [authorMetadata] over the post's placeholder,
-/// and [repostedByMetadata] for whoever reposted it, if [post] is a repost.
+/// Names come from the metadata, falling back to a short pubkey.
 Note noteFromNostrPost(
   NostrPost post, {
   NostrMetadata? authorMetadata,

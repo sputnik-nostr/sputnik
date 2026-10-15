@@ -9,7 +9,6 @@ const defaultRelays = [
   'wss://relay.ditto.pub',
 ];
 
-/// Maximum number of user-added relays.
 const maxCustomRelays = 20;
 
 /// Hostname label, as relaxed by RFC 1123 to allow a leading digit.

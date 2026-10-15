@@ -70,8 +70,6 @@ void main() {
   late NostrEvent target;
 
   setUp(() {
-    // A fresh, throwaway keypair generated for this test run only -- never
-    // a real saved identity.
     final keypair = generateNostrKeyPair();
     me = keypair.publicKeyHex;
     seckeyHex = keypair.privateKeyHex;

@@ -160,8 +160,7 @@ class _NotesList extends StatelessWidget {
   Widget build(BuildContext context) {
     final notes = this.notes;
 
-    // RefreshIndicator needs a scrollable to attach to, so the loading and
-    // empty states use a ListView too.
+    // RefreshIndicator needs a scrollable, even when loading or empty.
     Widget body;
     if (notes == null) {
       body = ListView(
@@ -194,7 +193,7 @@ class _NotesList extends StatelessWidget {
           itemCount: notes.length + (more ? 1 : 0),
           separatorBuilder: (_, _) => const Divider(height: 1),
           itemBuilder: (context, index) => index == notes.length
-              // A new key per page, so the next one is asked for if still in view.
+              // A new key per page, so the next is asked for if still in view.
               ? LoadMoreFooter(
                   key: ValueKey(notes.length),
                   onLoadMore: onLoadMore,

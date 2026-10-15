@@ -46,12 +46,10 @@ final loadProfileImagesNotifier = Preference(false);
 
 final loadNoteImagesNotifier = Preference(false);
 
-/// Off by default: a NIP-05 check contacts a domain the profile's author
-/// chose.
+/// Off by default: a check contacts a domain the profile's author chose.
 final autoVerifyNip05Notifier = Preference(false);
 
-/// Whether liking or following asks for confirmation first; posting and
-/// reposting always do.
+/// Liking and following only; posting and reposting always confirm.
 final confirmBeforeReactingNotifier = Preference(false);
 
 /// Payment target types (e.g. "monero") to hide on every profile.

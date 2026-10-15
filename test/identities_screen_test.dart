@@ -9,8 +9,7 @@ import 'support/fake_secret_store.dart';
 
 void main() {
   setUp(() {
-    // Avoid HomeScreen's indefinite loading spinner, which would keep
-    // pumpAndSettle spinning forever.
+    // Without posts, HomeScreen's spinner keeps pumpAndSettle going forever.
     notesNotifier.value = const [];
     identitiesNotifier.value = const [];
     activeIdentityPubkeyNotifier.value = null;

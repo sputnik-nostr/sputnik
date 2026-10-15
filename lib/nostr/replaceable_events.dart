@@ -2,8 +2,7 @@ import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'relay_client.dart';
 
-/// The newest copy of one of the user's replaceable events, if any. Only build
-/// an edit on it when [conclusive].
+/// Only build an edit on [event] when [conclusive].
 class OwnEvent {
   const OwnEvent({required this.event, required this.conclusive});
 

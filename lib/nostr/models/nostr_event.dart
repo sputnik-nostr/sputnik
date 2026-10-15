@@ -37,9 +37,7 @@ List<List<String>> _tagsFromJson(Object? raw) {
 
 final _needsEscape = RegExp(r'[\x00-\x1f"\\]');
 
-/// Characters that should be escaped in the `content` field, according to
-/// NIP-01. [jsonEncode] would also escape other control characters, which
-/// changes the event's hash (the `id` field).
+/// NIP-01's escapes only; [jsonEncode] escapes more, changing the ID.
 const _nip01Escapes = {
   0x08: r'\b',
   0x09: r'\t',
@@ -72,8 +70,7 @@ String _encodeJson(Object? value) => switch (value) {
   _ => jsonEncode(value),
 };
 
-/// The NIP-01 ID-hash input: `[0, pubkey, created_at, kind, tags, content]`.
-/// Shared by verification and signing so the two can't drift apart.
+/// Shared by signing and verification so the two can't drift apart.
 Uint8List _canonicalSerialization({
   required String pubkey,
   required Object? createdAt,
@@ -84,9 +81,7 @@ Uint8List _canonicalSerialization({
   return utf8.encode(_encodeJson([0, pubkey, createdAt, kind, tags, content]));
 }
 
-/// Whether [id] is the hash of [json] and [sig] a valid signature of it by
-/// [pubkey]. Uses the raw JSON values, since the ID covers what the author
-/// signed, not the sanitized text stored on [NostrEvent].
+/// Uses the raw JSON, since the ID covers what was signed, not sanitized.
 bool _isAuthentic(
   Map<String, dynamic> json,
   String id,
@@ -110,8 +105,7 @@ bool _isAuthentic(
   );
 }
 
-/// A NIP-01 event. [NostrEvent.fromJson] throws [FormatException] unless the
-/// ID and signature check out.
+/// [NostrEvent.fromJson] throws unless the ID and signature check out.
 class NostrEvent {
   const NostrEvent({
     required this.id,
@@ -205,8 +199,7 @@ NostrEvent signEvent({
     sig: hexEncode(sigBytes),
   );
 
-  // Defense in depth: a locally-signed event must verify through the same
-  // path a relay-received event does, or the native binding is broken.
+  // A local event must pass the relay check too, or the binding is broken.
   if (!_isAuthentic(event.toJson(), event.id, event.pubkey, event.sig)) {
     throw StateError('Locally signed event failed its own verification');
   }

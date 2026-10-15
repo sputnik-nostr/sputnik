@@ -21,8 +21,6 @@ void main() {
       jsonDecode(event.content) as Map<String, dynamic>;
 
   setUp(() async {
-    // A fresh, throwaway keypair generated for this test run only -- never
-    // a real saved identity.
     final keypair = generateNostrKeyPair();
     identity = Identity(
       pubkeyHex: keypair.publicKeyHex,

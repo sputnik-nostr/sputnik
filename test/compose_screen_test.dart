@@ -35,13 +35,10 @@ void main() {
   late Identity identity;
 
   setUp(() async {
-    // Avoid HomeScreen's indefinite loading spinner, which would keep
-    // pumpAndSettle spinning forever.
+    // Without posts, HomeScreen's spinner keeps pumpAndSettle going forever.
     notesNotifier.value = const [];
     followingNotesNotifier.value = const [];
 
-    // A fresh, throwaway keypair generated for this test run only -- never
-    // a real saved identity.
     final keypair = generateNostrKeyPair();
     identity = Identity(
       pubkeyHex: keypair.publicKeyHex,
@@ -189,10 +186,7 @@ void main() {
     await tester.tap(find.byKey(const Key('composePostButton')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('confirmPostButton')));
-    // A couple of bounded pumps -- enough to let the dialog close and the
-    // (fake, non-delayed) sign+publish resolve -- rather than
-    // pumpAndSettle, which would advance the fake clock straight through
-    // the SnackBar's whole auto-dismiss duration before we get to check it.
+    // Bounded pumps: pumpAndSettle would run out the SnackBar's timer.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 

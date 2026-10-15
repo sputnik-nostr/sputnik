@@ -62,9 +62,7 @@ extension PublishResults on Map<String, RelayPublishResult> {
   }
 }
 
-/// More than one publish() can be in flight for the same event ID (e.g. a
-/// double-submit); resolve()/failAll() complete all of them rather than one
-/// overwriting another's slot.
+/// Completes every publish in flight for an event, e.g. a double-submit.
 @visibleForTesting
 class PublishWaiters {
   final _byEventId = <String, List<Completer<RelayPublishResult>>>{};
@@ -174,8 +172,7 @@ class RelayConnectionPool {
     );
   }
 
-  /// Closes connections to relays outside [relayUrls], so a deselected relay
-  /// stops seeing this client.
+  /// Closes the rest, so a deselected relay stops seeing this client.
   Future<void> retainOnly(Set<String> relayUrls) async {
     final stale = [
       for (final entry in _connections.entries)
@@ -276,8 +273,7 @@ class _RelayConnection {
 
   bool get isClosed => _closed;
 
-  /// Parsing starts as each message arrives so the workers can overlap, but
-  /// results are handled in arrival order, so EOSE never beats its events.
+  /// Parses in parallel but handles in order, so EOSE can't beat events.
   void _handleMessage(dynamic raw) {
     if (raw is! String) return;
 

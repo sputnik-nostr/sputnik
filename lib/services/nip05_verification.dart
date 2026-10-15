@@ -87,9 +87,7 @@ final _cache = BoundedMap<String, _CacheEntry>(500);
 
 void clearNip05Cache() => _cache.clear();
 
-/// Checks that [identifier] maps to [pubkeyHex] via its domain's
-/// `.well-known/nostr.json`. Results are cached per (pubkey, identifier) pair
-/// for an hour.
+/// Cached per (pubkey, identifier) pair for an hour.
 Future<Nip05Status> verifyNip05({
   required String identifier,
   required String pubkeyHex,

@@ -33,8 +33,7 @@ int _failedAttempts = 0;
 /// The identity [myFollowingNotifier] was last loaded for.
 String? _myFollowingLoadedFor;
 
-/// The load in flight and whose list it is, so concurrent callers for the
-/// same identity share one fetch.
+/// Shared by concurrent callers loading the same identity's list.
 ({String pubkeyHex, Future<void> future})? _myFollowingLoading;
 
 /// Populates [myFollowingNotifier] for the active identity, once per identity.

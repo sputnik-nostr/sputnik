@@ -1,11 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/nostr/models/nostr_event.dart';
 
-// Format-only checks: these mutate a field to be structurally invalid hex,
-// which is rejected before NostrEvent.fromJson ever reaches signature
-// verification, so a real signature isn't needed here. See
-// nostr_event_verification_test.dart for authenticity checks against real
-// signed events, and nostr_metadata_test.dart for content sanitization.
+// Malformed hex fails before the signature check, so none is needed.
 Map<String, dynamic> _json({
   String? id,
   String? pubkey,

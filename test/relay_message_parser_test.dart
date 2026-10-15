@@ -55,8 +55,7 @@ void main() {
     final parsed = await parser.parse(raw);
 
     expect(parsed, isNotNull);
-    // The lone surrogate is replaced with U+FFFD rather than left dangling
-    // (which would make the string unsafe to render).
+    // The lone surrogate becomes U+FFFD, so the string is safe to render.
     expect(parsed!.message, 'broken�message');
   });
 

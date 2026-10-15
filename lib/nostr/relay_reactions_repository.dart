@@ -9,12 +9,10 @@ import 'relay_client.dart';
 /// Max events requested for each of likes and reposts, per chunk of posts.
 const _reactionLimit = 500;
 
-/// Posts per reaction query, so one popular post can only use up the
-/// [_reactionLimit] of its own chunk rather than a whole page's.
+/// Small chunks, so one popular post only uses up its own chunk's limit.
 const _postsPerReactionQuery = 10;
 
-/// Per NIP-25/NIP-18: with more than one "e" tag, the last one is the
-/// actual target; earlier ones are just citations.
+/// With several `e` tags, the last is the target; the rest are citations.
 String? _lastTaggedEventId(NostrEvent event) {
   String? found;
   for (final tag in event.tags) {
@@ -23,12 +21,10 @@ String? _lastTaggedEventId(NostrEvent event) {
   return found;
 }
 
-/// Per NIP-25: "+" or empty content means like, "-" means dislike, and
-/// anything else (emoji, custom-emoji shortcode) is neither.
+/// Per NIP-25, "+" or empty is a like; "-" and emoji are not.
 bool _isLikeReaction(String content) => content.isEmpty || content == '+';
 
-/// The pubkeys of authors of events (kind 6 reposts, kind 7 likes) that tag
-/// one of the given post IDs, grouped by which post ID they tagged.
+/// Authors of kind [kind] events tagging [postIds], by tagged post.
 Map<String, List<String>> _authorsByTaggedPost(
   List<NostrEvent> events,
   Set<String> postIds,
@@ -55,10 +51,7 @@ class RelayReactionsRepository {
 
   RelayClient get client => _client ?? RelayClient.instance;
 
-  /// Fetches likes and reposts for many posts, a few posts per pair of relay
-  /// queries (one for kind 7, one for kind 6) rather than one pair per post.
-  /// Every requested ID is present in the result, defaulting to no reactions
-  /// when none were found.
+  /// Every requested ID is in the result, with no reactions if none found.
   Future<Map<String, PostReactions>> fetchReactions(
     List<String> postIds,
     Set<String> relayUrls,
@@ -101,8 +94,7 @@ class RelayReactionsRepository {
     };
   }
 
-  /// Publishes a NIP-25 like (kind 7, content "+") for [target], found on
-  /// [relayHint].
+  /// A NIP-25 like (kind 7, "+") of [target], found on [relayHint].
   Future<Map<String, RelayPublishResult>> publishLike({
     required SecretKey secretKey,
     required String myPubkeyHex,
@@ -124,8 +116,7 @@ class RelayReactionsRepository {
     return client.publish(event, relayUrls);
   }
 
-  /// Publishes a NIP-18 repost (kind 6) of [target], content the reposted
-  /// note's stringified JSON. NIP-18 requires [relayHint] in the `e` tag.
+  /// A NIP-18 repost (kind 6) of [target]; NIP-18 requires [relayHint].
   Future<Map<String, RelayPublishResult>> publishRepost({
     required SecretKey secretKey,
     required String myPubkeyHex,
@@ -146,8 +137,7 @@ class RelayReactionsRepository {
     return client.publish(event, relayUrls);
   }
 
-  /// The newest kind [kind] event by [myPubkeyHex] targeting [noteId], if
-  /// any -- what [publishRetraction] would delete.
+  /// Your newest kind [kind] event on [noteId], for [publishRetraction].
   Future<NostrEvent?> fetchOwnReaction({
     required String myPubkeyHex,
     required String noteId,
@@ -176,8 +166,7 @@ class RelayReactionsRepository {
     return mine.isEmpty ? null : mine.first;
   }
 
-  /// Publishes a NIP-09 deletion request for [target]; removal is never
-  /// guaranteed, since other relays or clients may already have a copy.
+  /// A NIP-09 deletion request; other relays or clients may keep a copy.
   Future<Map<String, RelayPublishResult>> publishRetraction({
     required SecretKey secretKey,
     required String myPubkeyHex,

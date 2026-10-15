@@ -6,8 +6,7 @@ enum Nip05Status {
   /// The domain responded but does not map this identifier to the pubkey.
   mismatch,
 
-  /// Could not be checked: malformed identifier, no response, or the
-  /// target was refused as unsafe to fetch.
+  /// Malformed, no response, or refused as unsafe to fetch.
   unreachable,
 }
 
@@ -16,8 +15,7 @@ typedef Nip05Identifier = ({String local, String domain});
 
 final _localPartPattern = RegExp(r'^[a-z0-9-_.]+$');
 
-/// Splits a NIP-05 identifier into local-part and domain. A bare domain
-/// (no `@`) means the `_@domain` root identifier, per the spec.
+/// A bare domain means the `_@domain` root identifier, per the spec.
 Nip05Identifier? parseNip05(String identifier) {
   final trimmed = identifier.trim();
   if (trimmed.isEmpty) return null;

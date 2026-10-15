@@ -41,8 +41,7 @@ void main() {
       expect(status, Nip05Status.unreachable);
     });
 
-    // Regression test: connectionFactory must actually complete a real
-    // TLS handshake, which fakes can't catch.
+    // Fakes can't catch a connectionFactory that skips the TLS handshake.
     test('completes a real TLS handshake and verifies a known identifier', () async {
       final verified = await verifyNip05(
         identifier: 'jb55@damus.io',

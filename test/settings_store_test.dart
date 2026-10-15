@@ -76,8 +76,7 @@ void main() {
   test(
     'migrates a legacy identity whose private key was stored inline',
     () async {
-      // The format used before private keys got their own secure-storage
-      // slot: privkeyHex embedded right in the identity index.
+      // The old format: privkeyHex inline in the identity index.
       await SettingsStore.secretStore.write(
         'identities',
         jsonEncode([
@@ -95,8 +94,7 @@ void main() {
       expect(identities.single.pubkeyHex, 'a' * 64);
       expect(await SettingsStore.loadPrivateKey('a' * 64), 'legacy-secret');
 
-      // The index itself no longer carries the secret, so this doesn't
-      // need to migrate again next time.
+      // No secret is left in the index, so it won't migrate again.
       final rewritten = await SettingsStore.secretStore.read('identities');
       expect(rewritten, isNot(contains('legacy-secret')));
     },

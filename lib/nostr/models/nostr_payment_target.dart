@@ -20,8 +20,7 @@ class NostrPaymentTarget {
   final String type;
   final String address;
 
-  /// A `<type>:<address>` URI when the type has its own scheme, otherwise
-  /// `payto://<type>/<address>` (RFC 8905), per NIP-A3.
+  /// `<type>:<address>` if the type has its own scheme, else RFC 8905.
   Uri get launchUri => (paymentTargetTypes[type]?.hasDirectUriScheme ?? false)
       ? Uri(scheme: type, path: address)
       : Uri(scheme: 'payto', host: type, pathSegments: [address]);

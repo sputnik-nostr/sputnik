@@ -16,12 +16,10 @@ class PaymentTargetTypeInfo {
   /// A short hint for types whose names are generally not self-describing.
   final String? description;
 
-  /// Whether launchUri should use `<type>:<address>` instead of
-  /// `payto://<type>/<address>`.
+  /// Use `<type>:<address>` rather than `payto://<type>/<address>`.
   final bool hasDirectUriScheme;
 
-  /// Whether this type's ticker is also accepted, on read, as an alternate
-  /// spelling of the type itself (e.g. "xmr" for "monero").
+  /// Also read the ticker as the type, e.g. "xmr" for "monero".
   final bool tickerIsAlias;
 }
 

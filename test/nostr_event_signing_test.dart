@@ -6,8 +6,6 @@ import 'package:sputnik/nostr/keys.dart';
 import 'package:sputnik/nostr/models/nostr_event.dart';
 
 void main() {
-  // A fresh, throwaway keypair generated for this test run only -- never a
-  // real saved identity.
   final keypair = generateNostrKeyPair();
 
   test('toJson round-trips tags and created_at exactly', () {

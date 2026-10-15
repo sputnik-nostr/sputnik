@@ -1,7 +1,6 @@
 import 'package:sputnik/nostr/nostr.dart';
 
-// For fakes that override only [RelayClient.query]: reports every relay as
-// having answered, so status-aware callers behave as if the relays were up.
+// Reports every relay as answered, so status-aware callers see them up.
 mixin AnsweringRelayClient on RelayClient {
   @override
   Future<RelayQueryResult> queryWithStatus(

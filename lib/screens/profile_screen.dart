@@ -46,8 +46,7 @@ const _avatarInitialFontSize = _avatarRadius * 0.7;
 const _profileEventLimit = 100;
 
 void openProfile(BuildContext context, String pubkeyHex) {
-  // Otherwise a text field left focused offstage (e.g. search) can pop the
-  // keyboard back up when this route is popped.
+  // A field focused offstage (e.g. search) would reopen the keyboard.
   FocusScope.of(context).unfocus();
   Navigator.push(
     context,
@@ -141,7 +140,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.initState();
     final pubkeyHex = _resolvedPubkeyHex;
     if (pubkeyHex == null) {
-      // No identity to show a profile for at all.
       _loadingNotes = false;
       return;
     }
@@ -236,7 +234,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     ]);
   }
 
-  /// Published targets, the legacy Monero field as fallback, minus hidden types.
+  /// Published targets, with the legacy Monero field as a fallback.
   List<NostrPaymentTarget> _visiblePaymentTargets(NostrMetadata? metadata) {
     final targets = _paymentTargets ?? const <NostrPaymentTarget>[];
     final legacyMonero = metadata?.legacyMoneroAddress;

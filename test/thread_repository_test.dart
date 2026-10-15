@@ -10,7 +10,7 @@ DateTime _at(int minutes) =>
 void main() {
   const relays = {'wss://r'};
 
-  // root <- a <- b <- c, plus a sibling of b under a, and another reply to root.
+  // root <- a <- b <- c, plus a sibling of b and another reply to root.
   late NostrEvent root, a, b, c, sibling, other;
   late InMemoryRelayClient client;
 

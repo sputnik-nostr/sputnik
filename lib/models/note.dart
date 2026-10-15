@@ -68,14 +68,12 @@ class Note {
   final int likeCount;
   final bool isReply;
 
-  /// Whether the active identity already liked/reposted this, per the
-  /// relays' reaction data.
+  /// Per the relays' reaction data, for the active identity.
   final bool likedByMe;
   final bool repostedByMe;
   final List<NostrMedia> media;
 
-  /// Who reposted this note, and when, if this entry is here as a repost
-  /// rather than the note itself; [createdAt] still reflects the original.
+  /// Set when this entry is a repost; [createdAt] is still the original's.
   final String? repostedByPubkey;
   final String? repostedByDisplayName;
   final DateTime? repostedAt;

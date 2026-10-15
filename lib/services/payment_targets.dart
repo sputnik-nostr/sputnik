@@ -1,8 +1,7 @@
 import '../nostr/nostr.dart';
 import 'cache_store.dart';
 
-/// [pubkeyHex]'s payment targets, from the cache while fresh and from relays
-/// otherwise.
+/// [pubkeyHex]'s payment targets, from the cache while fresh.
 Future<List<NostrPaymentTarget>> loadPaymentTargets(
   String pubkeyHex,
   Set<String> relayUrls, {

@@ -20,8 +20,7 @@ class CacheStore {
   static late final Box<Map> _profiles;
   static late final Box<Map> _paymentTargets;
 
-  /// Memory only: these are fetched just for opened profiles, so on disk they
-  /// would list exactly which were viewed.
+  /// Memory only: on disk they would list exactly which profiles were opened.
   static final _contacts = <String, ({List<String> pubkeys, int fetchedAt})>{};
 
   static bool _ready = false;
@@ -52,7 +51,6 @@ class CacheStore {
     }
   }
 
-  /// Deletes entries whose `fetchedAt` is older than [maxAge].
   @visibleForTesting
   static Future<void> pruneExpired(Box<Map> box, {DateTime? now}) {
     final cutoff = (now ?? DateTime.now())

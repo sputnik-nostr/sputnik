@@ -18,8 +18,7 @@ class _FakeRelayClient extends RelayClient with AnsweringRelayClient {
   final NostrEvent _target;
   final RelayPublishOutcome _outcome;
 
-  /// The caller's own like/repost of [_target], if any -- what a "fetch my
-  /// own reaction" query should find, and what a retraction removes.
+  /// What a fetch of your own reaction finds, and a retraction removes.
   NostrEvent? _ownReaction;
 
   NostrEvent? lastPublished;
@@ -55,8 +54,6 @@ void main() {
   late Note note;
 
   setUp(() async {
-    // A fresh, throwaway keypair generated for this test run only -- never
-    // a real saved identity.
     final keypair = generateNostrKeyPair();
     identity = Identity(
       pubkeyHex: keypair.publicKeyHex,

@@ -41,8 +41,7 @@ Identity? activeIdentity() {
   return identityWithPubkey(identitiesNotifier.value, pubkeyHex);
 }
 
-/// Runs [use] with [identity]'s key and wipes it after. Null, with a
-/// snackbar, if the key is missing or [signFailure] if signing throws.
+/// Wipes the key after; null with a snackbar if it is missing or invalid.
 Future<T?> withSecretKey<T>(
   Identity identity,
   ScaffoldMessengerState messenger, {
@@ -68,8 +67,7 @@ Future<T?> withSecretKey<T>(
   }
 }
 
-/// Runs [publish] with [identity]'s key and snackbars how it went; the
-/// published event, or null if no relay accepted it.
+/// The published event, or null if no relay accepted it.
 Future<NostrEvent?> signAndPublish(
   Identity identity,
   ScaffoldMessengerState messenger, {
@@ -96,9 +94,7 @@ Future<NostrEvent?> signAndPublish(
   return accepted ? published.event : null;
 }
 
-/// Snackbars how [results] went and returns whether any relay accepted.
-///
-/// [success] gets an "accepted/total" count; null shows nothing on success.
+/// Whether any relay accepted; [success] gets an "accepted/total" count.
 bool reportPublishResults(
   ScaffoldMessengerState messenger,
   Map<String, RelayPublishResult> results, {

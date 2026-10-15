@@ -6,8 +6,7 @@ import 'dart:isolate';
 import 'models/nostr_event.dart';
 import 'models/text_sanitizer.dart';
 
-/// OK messages are attacker-controlled, so sanitize/bound them like any
-/// other untrusted relay text.
+/// OK messages are attacker-controlled, so they are bounded and sanitized.
 const _maxOkMessageLength = 300;
 
 String? _sanitizedOkMessage(Object? raw) {
@@ -21,8 +20,7 @@ String? _sanitizedOkMessage(Object? raw) {
 /// Events dated further ahead than this are dropped, to tolerate clock drift.
 const maxEventFutureSkew = Duration(hours: 1);
 
-/// A relay message that passed validation. [event] is set for EVENT messages
-/// and [accepted] for OK messages.
+/// [event] is set for EVENT messages and [accepted] for OK messages.
 class ParsedRelayMessage {
   const ParsedRelayMessage({
     required this.subscriptionId,
@@ -39,8 +37,7 @@ class ParsedRelayMessage {
 
   final NostrEvent? event;
 
-  /// Only set for OK messages, where [subscriptionId] is the event ID being
-  /// acknowledged.
+  /// For OK messages, where [subscriptionId] is the acknowledged event.
   final bool? accepted;
   final String? message;
 }
@@ -94,8 +91,7 @@ ParsedRelayMessage? _parse(String raw, Set<String>? subscriptionIds) {
       message: okMessage,
     );
   } catch (_) {
-    // Malformed or unexpected message from the relay; drop it rather than
-    // letting a bad payload take down the parser isolate.
+    // Drop a bad payload rather than let it kill the parser isolate.
     return null;
   }
 }
@@ -111,8 +107,7 @@ void _parserIsolateMain(SendPort mainSendPort) {
   });
 }
 
-/// Signature checks are CPU-bound, so a few workers let relays be verified in
-/// parallel without taking every core.
+/// Signature checks are CPU-bound; a few workers leave cores free.
 final _workerCount = (Platform.numberOfProcessors - 1).clamp(1, 4);
 
 class _Worker {

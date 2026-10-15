@@ -8,7 +8,6 @@ import '../theme/app_text_styles.dart';
 import '../widgets/payment_target_chip.dart';
 import '../widgets/unchecked_warning.dart';
 
-/// Maximum number of payment targets.
 const _maxPaymentTargets = 20;
 
 String? _validateAddress(String? value) {

@@ -72,7 +72,6 @@ class NostrMedia {
   /// A preview image for a video, shown once images are allowed to load.
   final String? posterUrl;
 
-  /// Width over height, when both are known.
   double? get aspectRatio {
     final width = this.width;
     final height = this.height;
@@ -94,5 +93,4 @@ class NostrMedia {
 
 final _sha256Pattern = RegExp(r'^[0-9a-f]{64}$');
 
-/// Whether [value] is a lowercase hex SHA-256.
 bool isSha256Hex(String value) => _sha256Pattern.hasMatch(value);

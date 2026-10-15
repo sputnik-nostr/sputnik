@@ -418,8 +418,6 @@ void main() {
     final targetPubkeyHex = 'b' * 64;
 
     setUp(() async {
-      // A fresh, throwaway keypair generated for this test run only -- never
-      // a real saved identity.
       final keypair = generateNostrKeyPair();
       identity = Identity(
         pubkeyHex: keypair.publicKeyHex,
@@ -456,7 +454,7 @@ void main() {
         expect(fakeClient.lastPublished, isNull);
         expect(find.byType(AlertDialog), findsNothing);
 
-        // Immediately tappable again -- no disabled/pending state.
+        // Immediately tappable again, with no pending state.
         await tester.tap(find.byKey(const Key('followButton')));
         await tester.pump();
         expect(find.text('Follow'), findsOneWidget);

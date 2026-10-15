@@ -36,9 +36,7 @@ class _SecureSecretStore implements SecretStore {
   Future<void> delete(String key) => _storage.delete(key: key);
 }
 
-/// Loads [notifier]'s value, keeping its default when [load] finds nothing.
-///
-/// On failure it is left unsaved, so bad data stays.
+/// Keeps the default if [load] finds nothing; a failed load is never saved.
 Future<void> bindPersisted<T>(
   ValueNotifier<T> notifier,
   Future<T?> Function() load,

@@ -69,9 +69,6 @@ class RelayPostRepository {
     };
   }
 
-  /// Fetches up to [limit] kind 1 notes older than [until], optionally only by
-  /// [authors] and without replies.
-  ///
   /// Pass the previous page's [PostPage.next] as [until] for the next page.
   Future<PostPage> fetchPage({
     List<String>? authors,
@@ -114,8 +111,7 @@ class RelayPostRepository {
                 event,
           ],
       ];
-      // A chunk that hit its limit may lack older events, so only trust events
-      // at or newer than the newest such cutoff.
+      // A chunk at its limit may lack older events, so trust only newer.
       DateTime? horizon;
       for (var i = 0; i < valid.length; i++) {
         if (eventsByFilter[i].length < queryLimit || valid[i].isEmpty) continue;
@@ -149,10 +145,7 @@ class RelayPostRepository {
     return PostPage(kept.map(nostrPostFromEvent).toList(), next);
   }
 
-  /// Up to [limit] reposts (kind 6) by [authors] older than [until], each
-  /// resolved to the kind 1 note it points at; unresolvable ones are dropped.
-  ///
-  /// Pass the previous page's [PostPage.next] as [until] for the next page.
+  /// Reposts resolved to their notes; unresolvable ones are dropped.
   Future<PostPage> fetchRepostPage({
     required List<String> authors,
     DateTime? until,

@@ -171,8 +171,7 @@ Future<bool> unlikeNote(BuildContext context, Note note) {
   );
 }
 
-/// Removes a previously-published repost of [note] (NIP-09). Always
-/// confirms first.
+/// Removes your repost of [note] (NIP-09), always confirming first.
 Future<bool> unrepostNote(BuildContext context, Note note) {
   final repository = RelayReactionsRepository();
   return _publishAgainst(
@@ -198,8 +197,7 @@ void _removeNoteFromFeeds(String noteId) {
       .toList();
 }
 
-/// Publishes a NIP-09 deletion request for [note] itself. Always confirms
-/// first, since deleting your own note is not easily undone.
+/// Requests deletion of [note] (NIP-09), always confirming first.
 Future<bool> deleteNote(BuildContext context, Note note) async {
   final succeeded = await _publishAgainst(
     context,

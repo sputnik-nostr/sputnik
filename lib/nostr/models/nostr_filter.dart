@@ -38,8 +38,7 @@ class NostrFilter {
   NostrFilterMatcher matcher() => NostrFilterMatcher(this);
 }
 
-/// Checks events against a [NostrFilter], since relays are untrusted and may
-/// return events that were not asked for.
+/// Relays are untrusted and may return events that were not asked for.
 class NostrFilterMatcher {
   NostrFilterMatcher(NostrFilter filter)
     : _ids = filter.ids?.map((id) => id.toLowerCase()).toSet(),

@@ -1,7 +1,6 @@
 import 'dart:io';
 
-/// Whether the first [bits] bits of [bytes] match [prefix], which may be
-/// shorter than [bytes].
+/// Whether the first [bits] bits of [bytes] match [prefix].
 bool _inCidr(List<int> bytes, List<int> prefix, int bits) {
   final whole = bits ~/ 8;
   for (var i = 0; i < whole; i++) {
@@ -64,10 +63,7 @@ bool isBlockedAddress(InternetAddress address) {
 /// Suffixes that name hosts on the local network rather than the internet.
 const _localHostSuffixes = ['.local', '.localhost', '.internal', '.home.arpa'];
 
-/// Whether [url] names a host the guard is sure to refuse, so the UI can say
-/// why instead of the connection failing silently. Only covers IP literals
-/// and local-only names; a domain that resolves to a private address still
-/// fails at connect time.
+/// IP literals and local names only; other private hosts fail at connect.
 bool isLocalNetworkUrl(String url) {
   final host = Uri.tryParse(url)?.host.toLowerCase();
   if (host == null || host.isEmpty) return false;
@@ -79,9 +75,7 @@ bool isLocalNetworkUrl(String url) {
 int effectivePort(Uri url) =>
     url.port != 0 ? url.port : (url.scheme == 'https' ? 443 : 80);
 
-/// Connects to the address it vetted, so DNS can't rebind after the check.
-///
-/// Ignores [proxyHost] and [proxyPort].
+/// Connects to the vetted address so DNS can't rebind; ignores proxies.
 Future<ConnectionTask<Socket>> guardedConnectionFactory(
   Uri url,
   String? proxyHost,

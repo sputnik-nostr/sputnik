@@ -14,11 +14,9 @@ export 'relay_connection_pool.dart'
 /// Authors per filter, to stay within typical relay limits.
 const authorsChunkSize = 100;
 
-/// Splits [authors] into chunks of at most [authorsChunkSize].
 List<List<String>> chunkedAuthors(List<String> authors) =>
     chunked(authors, authorsChunkSize);
 
-/// Splits [values] into consecutive chunks of at most [size].
 List<List<T>> chunked<T>(List<T> values, int size) {
   return [
     for (var i = 0; i < values.length; i += size)

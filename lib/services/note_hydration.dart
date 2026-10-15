@@ -13,8 +13,7 @@ Future<Note?> loadNote(String id, Set<String> relayUrls) async {
   return noteFromNostrPost(post, authorMetadata: metadata);
 }
 
-/// Fetches profiles and reaction counts for [posts], then maps them to
-/// notes. [knownMetadata] skips the fetch for pubkeys it already covers.
+/// [knownMetadata] skips the profile fetch for pubkeys it covers.
 Future<List<Note>> hydratePosts(
   List<NostrPost> posts,
   Set<String> relayUrls, {

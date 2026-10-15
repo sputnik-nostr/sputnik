@@ -122,8 +122,7 @@ void main() {
       await lockDownPlayer(player);
       await player.open(Media('${dir.path}/good.wav'));
 
-      // Without this, "fetches nothing" also passes for a player that
-      // refuses to open anything at all.
+      // Otherwise a player that opens nothing would pass too.
       final duration = await player.stream.duration
           .firstWhere((d) => d > Duration.zero)
           .timeout(const Duration(seconds: 5));
