@@ -4,6 +4,7 @@ import 'models/nostr_post.dart';
 import 'models/post_reactions.dart';
 import 'nip10.dart';
 import 'relay_client.dart';
+import 'relay_post_repository.dart';
 import 'relay_reactions_repository.dart';
 
 /// A reply in a thread, and how deeply it is nested.
@@ -20,8 +21,7 @@ class ThreadReply {
 class ThreadData {
   const ThreadData({
     required this.replies,
-    required this.likerPubkeys,
-    required this.reposterPubkeys,
+    required this.reactions,
     this.ancestors = const [],
     this.replyToId,
   });
@@ -34,12 +34,9 @@ class ThreadData {
 
   /// Everything below the viewed note, depth-first and oldest first.
   final List<ThreadReply> replies;
-  final List<String> likerPubkeys;
-  final List<String> reposterPubkeys;
+  final PostReactions reactions;
 
   int get directReplyCount => replies.where((reply) => reply.depth == 0).length;
-  int get likeCount => likerPubkeys.length;
-  int get repostCount => reposterPubkeys.length;
 }
 
 /// Most replies kept for one thread.
@@ -115,14 +112,11 @@ class RelayThreadRepository {
       current = parent;
     }
 
-    final reactions = (await reactionsFuture)[postId] ?? const PostReactions();
-
     return ThreadData(
       ancestors: ancestors.reversed.map(nostrPostFromEvent).toList(),
       replyToId: focus == null ? null : replyParentId(focus),
       replies: _descendants(wantedId, pool.values),
-      likerPubkeys: reactions.likerPubkeys,
-      reposterPubkeys: reactions.reposterPubkeys,
+      reactions: (await reactionsFuture)[postId] ?? const PostReactions(),
     );
   }
 
@@ -143,15 +137,11 @@ class RelayThreadRepository {
     List<String> ids,
     Set<String> relayUrls,
   ) async {
-    final wanted = ids.toSet();
-    final events = await client.query(
-      relayUrls,
-      NostrFilter(ids: ids, kinds: const [1], limit: ids.length),
-    );
-    return [
-      for (final event in events)
-        if (wanted.contains(event.id)) event,
-    ];
+    final events = await RelayPostRepository(
+      relayUrls: relayUrls,
+      client: client,
+    ).fetchEventsByIds(ids.toSet());
+    return events.values.toList();
   }
 
   List<ThreadReply> _descendants(String rootId, Iterable<NostrEvent> events) {

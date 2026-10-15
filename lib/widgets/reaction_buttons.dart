@@ -4,10 +4,10 @@ import '../models/note.dart';
 import '../nostr/nostr.dart';
 import '../screens/compose_screen.dart';
 import '../services/reaction_actions.dart';
-import '../theme/app_text_styles.dart';
+import 'note_action_button.dart';
 
 /// A like button for [note]; toggles a like on tap.
-class LikeButton extends StatefulWidget {
+class LikeButton extends StatelessWidget {
   const LikeButton({
     super.key,
     required this.note,
@@ -22,70 +22,23 @@ class LikeButton extends StatefulWidget {
   final double size;
 
   @override
-  State<LikeButton> createState() => _LikeButtonState();
-}
-
-class _LikeButtonState extends State<LikeButton> {
-  bool _pending = false;
-
-  /// Set once this button has toggled a like itself; null defers to
-  /// [Note.likedByMe].
-  bool? _localOverride;
-
-  Future<void> _tap() async {
-    final liked = _localOverride ?? widget.note.likedByMe;
-    setState(() => _pending = true);
-    final succeeded = liked
-        ? await unlikeNote(
-            context,
-            widget.note,
-            relayClient: widget.relayClient,
-          )
-        : await likeNote(context, widget.note, relayClient: widget.relayClient);
-    if (!mounted) return;
-    setState(() {
-      _pending = false;
-      if (succeeded) _localOverride = !liked;
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final liked = _localOverride ?? widget.note.likedByMe;
-    final count =
-        widget.note.likeCount +
-        (liked == widget.note.likedByMe ? 0 : (liked ? 1 : -1));
-    final color = liked ? theme.colorScheme.primary : theme.colorScheme.outline;
-
-    final content = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          liked ? Icons.favorite : Icons.favorite_border,
-          size: widget.size,
-          color: color,
-        ),
-        if (widget.showCount && count > 0) ...[
-          const SizedBox(width: 4),
-          Text('$count', style: theme.metadata),
-        ],
-      ],
-    );
-
-    return Tooltip(
-      message: liked ? 'Liked' : 'Like',
-      child: InkResponse(
-        onTap: _pending ? null : _tap,
-        radius: 20,
-        child: Padding(padding: const EdgeInsets.all(4), child: content),
-      ),
+    return _ReactionToggle(
+      active: note.likedByMe,
+      count: note.likeCount,
+      showCount: showCount,
+      size: size,
+      icon: (liked) => liked ? Icons.favorite : Icons.favorite_border,
+      tooltip: (liked) => liked ? 'Liked' : 'Like',
+      toggle: (liked) => liked
+          ? unlikeNote(context, note, relayClient: relayClient)
+          : likeNote(context, note, relayClient: relayClient),
     );
   }
 }
 
-/// A repost button for [note]; toggles a repost on tap.
-class RepostButton extends StatefulWidget {
+/// A repost button for [note]; toggles a repost on tap, quotes on hold.
+class RepostButton extends StatelessWidget {
   const RepostButton({
     super.key,
     required this.note,
@@ -100,70 +53,85 @@ class RepostButton extends StatefulWidget {
   final double size;
 
   @override
-  State<RepostButton> createState() => _RepostButtonState();
+  Widget build(BuildContext context) {
+    return _ReactionToggle(
+      active: note.repostedByMe,
+      count: note.repostCount,
+      showCount: showCount,
+      size: size,
+      icon: (_) => Icons.repeat,
+      tooltip: (reposted) =>
+          '${reposted ? 'Reposted' : 'Repost'} (hold to quote)',
+      toggle: (reposted) => reposted
+          ? unrepostNote(context, note, relayClient: relayClient)
+          : repostNote(context, note, relayClient: relayClient),
+      onLongPress: () =>
+          openQuoteComposer(context, note, relayClient: relayClient),
+    );
+  }
 }
 
-class _RepostButtonState extends State<RepostButton> {
+class _ReactionToggle extends StatefulWidget {
+  const _ReactionToggle({
+    required this.active,
+    required this.count,
+    required this.showCount,
+    required this.size,
+    required this.icon,
+    required this.tooltip,
+    required this.toggle,
+    this.onLongPress,
+  });
+
+  /// Whether the relays say the active identity already reacted.
+  final bool active;
+
+  /// What the relays count, before any toggle from this button.
+  final int count;
+  final bool showCount;
+  final double size;
+  final IconData Function(bool active) icon;
+  final String Function(bool active) tooltip;
+
+  /// Undoes the reaction if [active], else adds it; true if it went through.
+  final Future<bool> Function(bool active) toggle;
+  final VoidCallback? onLongPress;
+
+  @override
+  State<_ReactionToggle> createState() => _ReactionToggleState();
+}
+
+class _ReactionToggleState extends State<_ReactionToggle> {
   bool _pending = false;
 
-  /// Set once this button has toggled a repost itself; null defers to
-  /// [Note.repostedByMe].
+  /// Set once this button has toggled itself; null defers to [widget.active].
   bool? _localOverride;
 
   Future<void> _tap() async {
-    final reposted = _localOverride ?? widget.note.repostedByMe;
+    final active = _localOverride ?? widget.active;
     setState(() => _pending = true);
-    final succeeded = reposted
-        ? await unrepostNote(
-            context,
-            widget.note,
-            relayClient: widget.relayClient,
-          )
-        : await repostNote(
-            context,
-            widget.note,
-            relayClient: widget.relayClient,
-          );
+    final succeeded = await widget.toggle(active);
     if (!mounted) return;
     setState(() {
       _pending = false;
-      if (succeeded) _localOverride = !reposted;
+      if (succeeded) _localOverride = !active;
     });
   }
 
-  Future<void> _quote() =>
-      openQuoteComposer(context, widget.note, relayClient: widget.relayClient);
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final reposted = _localOverride ?? widget.note.repostedByMe;
-    final count =
-        widget.note.repostCount +
-        (reposted == widget.note.repostedByMe ? 0 : (reposted ? 1 : -1));
-    final color = reposted
-        ? theme.colorScheme.primary
-        : theme.colorScheme.outline;
+    final colorScheme = Theme.of(context).colorScheme;
+    final active = _localOverride ?? widget.active;
+    final delta = active == widget.active ? 0 : (active ? 1 : -1);
 
-    final content = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.repeat, size: widget.size, color: color),
-        if (widget.showCount && count > 0) ...[
-          const SizedBox(width: 4),
-          Text('$count', style: theme.metadata),
-        ],
-      ],
-    );
-
-    return Tooltip(
-      message: '${reposted ? 'Reposted' : 'Repost'} (hold to quote)',
-      child: InkResponse(
-        onTap: _pending ? null : _tap,
-        onLongPress: _pending ? null : _quote,
-        radius: 20,
-        child: Padding(padding: const EdgeInsets.all(4), child: content),
-      ),
+    return NoteActionButton(
+      icon: widget.icon(active),
+      tooltip: widget.tooltip(active),
+      count: widget.showCount ? widget.count + delta : 0,
+      size: widget.size,
+      color: active ? colorScheme.primary : null,
+      onTap: _pending ? null : _tap,
+      onLongPress: _pending ? null : widget.onLongPress,
     );
   }
 }

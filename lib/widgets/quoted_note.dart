@@ -3,12 +3,11 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../models/avatar_initial.dart';
 import '../models/note.dart';
-import '../models/note_mapper.dart';
 import '../models/time_format.dart';
 import '../nostr/http_urls.dart';
 import '../nostr/nostr.dart';
 import '../screens/post_screen.dart';
-import '../services/profiles.dart';
+import '../services/note_hydration.dart';
 import '../theme/app_text_styles.dart';
 import 'fade_in_avatar.dart';
 import 'linkified_text.dart';
@@ -42,20 +41,15 @@ Future<Note?> _fetch(String id, RelayClient client) {
 }
 
 Future<Note?> _load(String id, RelayClient client) async {
-  final relayUrls = selectedRelaysNotifier.value;
   try {
-    final post = await RelayPostRepository(
-      relayUrls: relayUrls,
+    final note = await loadNote(
+      id,
+      selectedRelaysNotifier.value,
       client: client,
-    ).fetchPostById(id);
-    if (post != null) {
-      final metadata = await loadProfile(
-        post.authorPubkey,
-        relayUrls,
-        client: client,
-      );
+    );
+    if (note != null) {
       if (_notes.length >= _maxCached) _notes.clear();
-      return _notes[id] = noteFromNostrPost(post, authorMetadata: metadata);
+      return _notes[id] = note;
     }
   } catch (_) {
     // A failed lookup is a miss, so the reference stays a plain link.

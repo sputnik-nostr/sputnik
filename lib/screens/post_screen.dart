@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -9,6 +8,7 @@ import '../models/avatar_initial.dart';
 import '../models/note.dart';
 import '../models/time_format.dart';
 import '../nostr/nostr.dart';
+import '../services/error_reporting.dart';
 import '../services/note_hydration.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/bookmark_button.dart';
@@ -43,18 +43,16 @@ class _PostThread {
     required this.replyToId,
     required this.replies,
     required this.depths,
-    required this.likerPubkeys,
-    required this.reposterPubkeys,
+    required this.directReplyCount,
+    required this.reactions,
   });
 
   final List<Note> ancestors;
   final String? replyToId;
   final List<Note> replies;
   final List<int> depths;
-  final List<String> likerPubkeys;
-  final List<String> reposterPubkeys;
-
-  int get directReplyCount => depths.where((depth) => depth == 0).length;
+  final int directReplyCount;
+  final PostReactions reactions;
 }
 
 /// Nesting past this only shifts replies off the screen.
@@ -107,14 +105,7 @@ class _PostScreenState extends State<PostScreen> {
     try {
       thread = await _loadThread();
     } catch (error, stack) {
-      FlutterError.reportError(
-        FlutterErrorDetails(
-          exception: error,
-          stack: stack,
-          library: 'sputnik',
-          context: ErrorDescription('loading a thread'),
-        ),
-      );
+      reportError('loading a thread', error, stack);
     }
     if (!mounted || generation != _loadGeneration) return;
     setState(() {
@@ -146,8 +137,8 @@ class _PostScreenState extends State<PostScreen> {
         for (final note in notes)
           note.id == widget.note.id
               ? note.copyWith(
-                  likeCount: thread.likeCount,
-                  repostCount: thread.repostCount,
+                  likeCount: thread.reactions.likeCount,
+                  repostCount: thread.reactions.repostCount,
                   replyCount: thread.directReplyCount,
                 )
               : note,
@@ -173,8 +164,8 @@ class _PostScreenState extends State<PostScreen> {
       replyToId: thread.replyToId,
       replies: notes.sublist(ancestorCount),
       depths: [for (final reply in thread.replies) reply.depth],
-      likerPubkeys: thread.likerPubkeys,
-      reposterPubkeys: thread.reposterPubkeys,
+      directReplyCount: thread.directReplyCount,
+      reactions: thread.reactions,
     );
   }
 
@@ -234,8 +225,8 @@ class _PostScreenState extends State<PostScreen> {
                   note: widget.note,
                   relayClient: widget.relayClient,
                   replyCount: thread?.directReplyCount,
-                  likerPubkeys: thread?.likerPubkeys,
-                  reposterPubkeys: thread?.reposterPubkeys,
+                  likerPubkeys: thread?.reactions.likerPubkeys,
+                  reposterPubkeys: thread?.reactions.reposterPubkeys,
                   onReply: () => _reply(widget.note),
                   onDeleted: () => Navigator.pop(context),
                 ),

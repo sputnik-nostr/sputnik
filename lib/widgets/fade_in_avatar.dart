@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../services/media_loader.dart';
+import 'media_frame.dart';
 
 /// A circular avatar whose image fades in over [fallback] (e.g. initials).
 ///
@@ -99,12 +100,11 @@ class _FadeInAvatarState extends State<FadeInAvatar> {
                   frameBuilder:
                       (context, child, frame, wasSynchronouslyLoaded) {
                         _markLoaded(frame != null);
-                        if (wasSynchronouslyLoaded) return child;
-                        return AnimatedOpacity(
-                          opacity: frame == null ? 0 : 1,
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.easeOut,
-                          child: child,
+                        return fadeInFrame(
+                          context,
+                          child,
+                          frame,
+                          wasSynchronouslyLoaded,
                         );
                       },
                   errorBuilder: (_, _, _) {

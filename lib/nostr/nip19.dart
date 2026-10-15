@@ -13,6 +13,9 @@ String? _hexFromBareEntity(
   return hexEncode(bytes);
 }
 
+String _bareEntityFromHex(String hrp, String hex) =>
+    bech32Encode(hrp, convertBits(hexDecode(hex), 8, 5, pad: true));
+
 const _tlvSpecialByteLength = 32;
 
 String? _hexFromTlvSpecial(String input, String expectedHrp) {
@@ -36,12 +39,7 @@ String? _hexFromTlvSpecial(String input, String expectedHrp) {
 }
 
 /// Encodes a hex pubkey into the canonical `npub` format.
-String npubFromHex(String pubkeyHex) {
-  return bech32Encode(
-    'npub',
-    convertBits(hexDecode(pubkeyHex), 8, 5, pad: true),
-  );
-}
+String npubFromHex(String pubkeyHex) => _bareEntityFromHex('npub', pubkeyHex);
 
 /// Decodes an `npub`-formatted pubkey into its raw hex form.
 String? hexFromNpub(String npub) => _hexFromBareEntity(npub, 'npub', 32);
@@ -50,20 +48,10 @@ String? hexFromNpub(String npub) => _hexFromBareEntity(npub, 'npub', 32);
 String? hexFromNsec(String nsec) => _hexFromBareEntity(nsec, 'nsec', 32);
 
 /// Encodes a hex secret key into the canonical `nsec` format.
-String nsecFromHex(String seckeyHex) {
-  return bech32Encode(
-    'nsec',
-    convertBits(hexDecode(seckeyHex), 8, 5, pad: true),
-  );
-}
+String nsecFromHex(String seckeyHex) => _bareEntityFromHex('nsec', seckeyHex);
 
 /// Encodes a hex event ID into the canonical `note` format.
-String noteFromHex(String eventIdHex) {
-  return bech32Encode(
-    'note',
-    convertBits(hexDecode(eventIdHex), 8, 5, pad: true),
-  );
-}
+String noteFromHex(String eventIdHex) => _bareEntityFromHex('note', eventIdHex);
 
 /// Decodes a `note`-formatted event ID into its raw hex form.
 String? hexFromNote(String note) => _hexFromBareEntity(note, 'note', 32);

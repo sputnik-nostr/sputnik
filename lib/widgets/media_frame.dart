@@ -146,6 +146,22 @@ class MediaTileMessage extends StatelessWidget {
   }
 }
 
+/// Fades an image in on its first frame; one already in memory shows at once.
+Widget fadeInFrame(
+  BuildContext context,
+  Widget child,
+  int? frame,
+  bool wasSynchronouslyLoaded,
+) {
+  if (wasSynchronouslyLoaded) return child;
+  return AnimatedOpacity(
+    opacity: frame == null ? 0 : 1,
+    duration: const Duration(milliseconds: 250),
+    curve: Curves.easeOut,
+    child: child,
+  );
+}
+
 /// A network image sized to its box, fading in over whatever sits behind it.
 class NetworkMediaImage extends StatelessWidget {
   const NetworkMediaImage({
@@ -172,15 +188,7 @@ class NetworkMediaImage extends StatelessWidget {
           fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
-          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-            if (wasSynchronouslyLoaded) return child;
-            return AnimatedOpacity(
-              opacity: frame == null ? 0 : 1,
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOut,
-              child: child,
-            );
-          },
+          frameBuilder: fadeInFrame,
           errorBuilder: errorBuilder,
         );
       },

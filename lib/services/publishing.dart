@@ -41,11 +41,14 @@ Identity? activeIdentity() {
   return identityWithPubkey(identitiesNotifier.value, pubkeyHex);
 }
 
-/// [identity]'s key for signing, or null with a snackbar; wipe it after use.
-Future<SecretKey?> loadSecretKeyOrReport(
+/// Runs [use] with [identity]'s key and wipes it after. Null, with a
+/// snackbar, if the key is missing or [signFailure] if signing throws.
+Future<T?> withSecretKey<T>(
   Identity identity,
-  ScaffoldMessengerState messenger,
-) async {
+  ScaffoldMessengerState messenger, {
+  required String signFailure,
+  required Future<T> Function(SecretKey secretKey) use,
+}) async {
   final secretKey = await SettingsStore.loadSecretKey(identity.pubkeyHex);
   if (secretKey == null) {
     messenger.showSnackBar(
@@ -53,8 +56,16 @@ Future<SecretKey?> loadSecretKeyOrReport(
         content: Text("Could not find this identity's private key"),
       ),
     );
+    return null;
   }
-  return secretKey;
+  try {
+    return await use(secretKey);
+  } on ArgumentError {
+    messenger.showSnackBar(SnackBar(content: Text(signFailure)));
+    return null;
+  } finally {
+    secretKey.wipe();
+  }
 }
 
 /// Snackbars how [results] went and returns whether any relay accepted.

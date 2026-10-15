@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/note.dart';
 import '../nostr/nostr.dart';
 import '../services/reaction_actions.dart';
+import 'note_action_button.dart';
 
 /// A delete button for [note]; publishes a NIP-09 deletion request on tap.
 ///
@@ -45,22 +46,11 @@ class _DeleteButtonState extends State<DeleteButton> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Tooltip(
-      message: 'Delete',
-      child: InkResponse(
-        onTap: _pending ? null : _tap,
-        radius: 20,
-        child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: Icon(
-            Icons.delete_outline,
-            size: widget.size,
-            color: theme.colorScheme.outline,
-          ),
-        ),
-      ),
+    return NoteActionButton(
+      icon: Icons.delete_outline,
+      tooltip: 'Delete',
+      size: widget.size,
+      onTap: _pending ? null : _tap,
     );
   }
 }

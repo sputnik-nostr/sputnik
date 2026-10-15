@@ -65,26 +65,27 @@ Future<bool> _publishAgainst(
     if (!confirmed || !context.mounted) return false;
   }
 
-  final secretKey = await loadSecretKeyOrReport(identity, messenger);
-  if (secretKey == null) return false;
-
-  try {
-    if (!context.mounted) return false;
-    final results = await publish(
-      secretKey: secretKey,
-      myPubkeyHex: identity.pubkeyHex,
-      target: target.event,
-      relayHint: target.relay,
-      relayUrls: relayUrls,
-    );
-    return reportPublishResults(
-      messenger,
-      results,
-      failure: 'Could not publish to any relay',
-    );
-  } finally {
-    secretKey.wipe();
-  }
+  final published = await withSecretKey(
+    identity,
+    messenger,
+    signFailure: 'Could not sign this event',
+    use: (secretKey) async {
+      if (!context.mounted) return false;
+      final results = await publish(
+        secretKey: secretKey,
+        myPubkeyHex: identity.pubkeyHex,
+        target: target.event,
+        relayHint: target.relay,
+        relayUrls: relayUrls,
+      );
+      return reportPublishResults(
+        messenger,
+        results,
+        failure: 'Could not publish to any relay',
+      );
+    },
+  );
+  return published ?? false;
 }
 
 /// [_publishAgainst] with [note]'s own signed event as the target.

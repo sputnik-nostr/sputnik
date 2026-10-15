@@ -1,6 +1,5 @@
 import 'keys.dart';
 import 'models/nostr_event.dart';
-import 'models/nostr_filter.dart';
 import 'models/nostr_payment_target.dart';
 import 'relay_client.dart';
 import 'replaceable_events.dart';
@@ -15,22 +14,11 @@ class RelayPaymentTargetsRepository {
     String pubkeyHex,
     Set<String> relayUrls,
   ) async {
-    final events = await client.query(
+    final event = (await fetchOwnPaymentTargetsEvent(
+      pubkeyHex,
       relayUrls,
-      NostrFilter(kinds: const [10133], authors: [pubkeyHex], limit: 1),
-    );
-
-    if (events.isEmpty) return const <NostrPaymentTarget>[];
-
-    final author = pubkeyHex.toLowerCase();
-    final own = [
-      for (final event in events)
-        if (event.kind == 10133 && event.pubkey == author) event,
-    ]..sort(compareNewestFirst);
-
-    if (own.isEmpty) return const <NostrPaymentTarget>[];
-
-    return paymentTargetsFromEvent(own.first);
+    )).event;
+    return event == null ? const [] : paymentTargetsFromEvent(event);
   }
 
   /// Uncached, so an edit builds on what is really published.

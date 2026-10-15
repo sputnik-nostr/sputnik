@@ -1,6 +1,5 @@
 import 'dart:ui' show PointerDeviceKind;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
@@ -15,6 +14,7 @@ import 'linkified_text.dart';
 import 'media_frame.dart';
 import 'note_video.dart';
 import 'open_url.dart';
+import 'platform.dart';
 import 'quoted_note.dart';
 
 /// URLs tapped this session, so a tile scrolled back into view stays loaded.
@@ -210,13 +210,6 @@ class _ScrollingRowState extends State<_ScrollingRow> {
       },
     );
 
-    final desktop = switch (defaultTargetPlatform) {
-      TargetPlatform.linux ||
-      TargetPlatform.macOS ||
-      TargetPlatform.windows => true,
-      _ => false,
-    };
-
     return ScrollConfiguration(
       behavior: behavior,
       child: LayoutBuilder(
@@ -225,7 +218,7 @@ class _ScrollingRowState extends State<_ScrollingRow> {
           return Scrollbar(
             controller: _controller,
             // A mouse has no touch cue that the row scrolls, so show the bar.
-            thumbVisibility: desktop,
+            thumbVisibility: isDesktop,
             child: SingleChildScrollView(
               controller: _controller,
               scrollDirection: Axis.horizontal,

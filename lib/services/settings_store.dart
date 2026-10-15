@@ -8,6 +8,7 @@ import '../models/app_seed_color.dart';
 import '../models/identity.dart';
 import '../models/relay.dart';
 import '../nostr/keys.dart';
+import 'error_reporting.dart';
 
 /// Storage seam so tests can fake [SettingsStore.secretStore].
 abstract class SecretStore {
@@ -35,17 +36,6 @@ class _SecureSecretStore implements SecretStore {
   Future<void> delete(String key) => _storage.delete(key: key);
 }
 
-void _reportPersistenceError(String what, Object error, StackTrace stack) {
-  FlutterError.reportError(
-    FlutterErrorDetails(
-      exception: error,
-      stack: stack,
-      library: 'sputnik',
-      context: ErrorDescription(what),
-    ),
-  );
-}
-
 /// Loads [notifier]'s value; on failure it is left unsaved, so bad data stays.
 Future<void> bindPersisted<T>(
   ValueNotifier<T> notifier,
@@ -55,7 +45,7 @@ Future<void> bindPersisted<T>(
   try {
     notifier.value = await load();
   } catch (error, stack) {
-    _reportPersistenceError('loading persisted $T', error, stack);
+    reportError('loading persisted $T', error, stack);
     return;
   }
   var pending = Future<void>.value();
@@ -65,7 +55,7 @@ Future<void> bindPersisted<T>(
       try {
         await save(value);
       } catch (error, stack) {
-        _reportPersistenceError('saving $T', error, stack);
+        reportError('saving $T', error, stack);
       }
     });
   });

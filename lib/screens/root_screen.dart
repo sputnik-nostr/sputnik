@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../models/avatar_initial.dart';
+import '../services/profiles.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/app_drawer.dart';
 import 'bookmarks_screen.dart';
@@ -10,15 +11,9 @@ import 'home_screen.dart';
 import 'notifications_screen.dart';
 import 'search_screen.dart';
 
-/// Avatar fallback letter for the active identity, or "?" with no identity.
 String _activeIdentityInitial() {
-  final pubkeyHex = activeIdentityPubkeyNotifier.value;
-  if (pubkeyHex == null) return '?';
-  final resolvedName = profileCacheNotifier.value[pubkeyHex]?.resolvedName
-      ?.trim();
-  return avatarInitial(
-    resolvedName?.isNotEmpty == true ? resolvedName! : pubkeyHex,
-  );
+  final name = activeIdentityName();
+  return name == null ? '?' : avatarInitial(name);
 }
 
 class RootScreen extends StatefulWidget {

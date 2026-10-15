@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../services/error_reporting.dart';
+
 /// Blocks network access from files; access-references=no breaks loadlist.
 const videoPlayerOptions = {
   'demuxer-lavf-o': 'protocol_whitelist=file',
@@ -59,14 +61,7 @@ class _MediaKitPlayerState extends State<MediaKitPlayer> {
       await player.open(Media(widget.file.path));
       if (mounted) setState(() => _controller = controller);
     } catch (error, stack) {
-      FlutterError.reportError(
-        FlutterErrorDetails(
-          exception: error,
-          stack: stack,
-          library: 'sputnik',
-          context: ErrorDescription('starting video playback'),
-        ),
-      );
+      reportError('starting video playback', error, stack);
       if (mounted) setState(() => _failed = true);
     }
   }

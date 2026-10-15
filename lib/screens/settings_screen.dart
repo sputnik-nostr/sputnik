@@ -7,6 +7,7 @@ import '../models/relay.dart';
 import '../services/blossom_servers.dart';
 import '../services/cache_store.dart';
 import '../services/nip05_verification.dart';
+import '../services/publishing.dart';
 import '../widgets/linkified_text.dart';
 import '../widgets/quoted_note.dart';
 import 'identities_screen.dart';
@@ -14,28 +15,16 @@ import 'payment_target_types_screen.dart';
 import 'relays_screen.dart';
 
 Future<void> _confirmClearCache(BuildContext context) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Clear cached data?'),
-      content: const Text(
+  final confirmed = await confirmAction(
+    context,
+    title: 'Clear cached data?',
+    message:
         'This removes cached profiles, notes, follow lists, payment targets, '
         'and verification results. '
         'They will be re-fetched from relays as needed.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          child: const Text('Clear'),
-        ),
-      ],
-    ),
+    action: 'Clear',
   );
-  if (confirmed != true) return;
+  if (!confirmed) return;
 
   await CacheStore.clearAll();
   clearQuotedNoteCache();
@@ -51,29 +40,17 @@ Future<void> _confirmClearCache(BuildContext context) async {
 }
 
 Future<void> _confirmResetPreferences(BuildContext context) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Reset preferences?'),
-      content: const Text(
+  final confirmed = await confirmAction(
+    context,
+    title: 'Reset preferences?',
+    message:
         'This resets the theme, theme color, relay selection, media '
         'loading, internet identifier verification, payment target '
         'visibility, and reaction confirmation back to their defaults. '
         'Identities and bookmarks are not affected.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          child: const Text('Reset'),
-        ),
-      ],
-    ),
+    action: 'Reset',
   );
-  if (confirmed != true) return;
+  if (!confirmed) return;
 
   themeModeNotifier.value = ThemeMode.system;
   seedColorNotifier.value = AppSeedColor.blue;

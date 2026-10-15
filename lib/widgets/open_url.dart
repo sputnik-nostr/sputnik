@@ -12,15 +12,19 @@ Future<void> openExternalUrl(BuildContext context, String url) async {
     return;
   }
 
-  var opened = false;
-  try {
-    opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-  } on PlatformException {
-    opened = false;
-  } on MissingPluginException {
-    opened = false;
-  }
+  final opened = await launchExternal(uri);
   if (!opened && context.mounted) _reportUnopenable(context);
+}
+
+/// Hands [uri] to another app; false if none could take it.
+Future<bool> launchExternal(Uri uri) async {
+  try {
+    return await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } on PlatformException {
+    return false;
+  } on MissingPluginException {
+    return false;
+  }
 }
 
 void _reportUnopenable(BuildContext context) {

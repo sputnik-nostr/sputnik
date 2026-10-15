@@ -7,6 +7,7 @@ import '../app_state.dart';
 import '../models/identity.dart';
 import '../models/time_format.dart';
 import '../nostr/nostr.dart';
+import '../services/publishing.dart';
 import '../services/settings_store.dart';
 import '../widgets/placeholder_tab.dart';
 
@@ -153,29 +154,17 @@ Future<void> _confirmDeleteIdentity(
   BuildContext context,
   Identity identity,
 ) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Delete identity?'),
-      content: Text(
+  final confirmed = await confirmAction(
+    context,
+    title: 'Delete identity?',
+    message:
         'This removes the key pair for '
         '${truncateNpub(npubFromHex(identity.pubkeyHex))} from this device. '
         'Make sure you have a backup of its private key if you want to use '
         'it again.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          child: const Text('Delete'),
-        ),
-      ],
-    ),
+    action: 'Delete',
   );
-  if (confirmed != true) return;
+  if (!confirmed) return;
 
   final remaining = identitiesNotifier.value
       .where((i) => i.pubkeyHex != identity.pubkeyHex)
@@ -190,27 +179,15 @@ Future<void> _confirmDeleteIdentity(
 }
 
 Future<void> _showNsec(BuildContext context, Identity identity) async {
-  final reveal = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Reveal private key?'),
-      content: const Text(
+  final reveal = await confirmAction(
+    context,
+    title: 'Reveal private key?',
+    message:
         'Anyone with this key can post as this identity. Only reveal it '
         'somewhere private.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          child: const Text('Reveal'),
-        ),
-      ],
-    ),
+    action: 'Reveal',
   );
-  if (reveal != true || !context.mounted) return;
+  if (!reveal || !context.mounted) return;
 
   final privkeyHex = await SettingsStore.loadPrivateKey(identity.pubkeyHex);
   if (!context.mounted) return;

@@ -6,6 +6,7 @@ import '../nostr/nostr.dart';
 import '../services/publishing.dart';
 import '../services/relay_settings.dart';
 import '../services/ssrf_guard.dart';
+import '../widgets/unchecked_warning.dart';
 
 bool _isPlaintext(String relay) => Uri.tryParse(relay)?.scheme == 'ws';
 
@@ -318,46 +319,45 @@ class _MyRelayListState extends State<_MyRelayList> {
     }
 
     final messenger = ScaffoldMessenger.of(context);
-    final secretKey = await loadSecretKeyOrReport(identity, messenger);
-    if (secretKey == null) return;
-
+    setState(() => _publishing = true);
     try {
-      if (!mounted) return;
-      setState(() => _publishing = true);
-      final published = await _repository.publish(
-        secretKey: secretKey,
-        pubkeyHex: identity.pubkeyHex,
-        base: _own?.event,
-        entries: [
-          for (final url in selected.toList()..sort())
-            RelayListEntry(
-              url: url,
-              read: existing[url]?.read ?? true,
-              write: existing[url]?.write ?? true,
-            ),
-        ],
-        relayUrls: selected,
-      );
-      if (!mounted) return;
-
-      final updated = reportPublishResults(
+      await withSecretKey<void>(
+        identity,
         messenger,
-        published.results,
-        failure: 'Could not publish your relay list to any relay',
-        success: (counts) => 'Published relay list to $counts relays',
-      );
-      if (!updated) return;
+        signFailure: 'Could not sign your relay list',
+        use: (secretKey) async {
+          if (!mounted) return;
+          final published = await _repository.publish(
+            secretKey: secretKey,
+            pubkeyHex: identity.pubkeyHex,
+            base: _own?.event,
+            entries: [
+              for (final url in selected.toList()..sort())
+                RelayListEntry(
+                  url: url,
+                  read: existing[url]?.read ?? true,
+                  write: existing[url]?.write ?? true,
+                ),
+            ],
+            relayUrls: selected,
+          );
+          if (!mounted) return;
 
-      setState(() {
-        _own = OwnEvent(event: published.event, conclusive: true);
-        _entries = relayListFromEvent(published.event);
-      });
-    } on ArgumentError {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Could not sign your relay list')),
+          final updated = reportPublishResults(
+            messenger,
+            published.results,
+            failure: 'Could not publish your relay list to any relay',
+            success: (counts) => 'Published relay list to $counts relays',
+          );
+          if (!updated) return;
+
+          setState(() {
+            _own = OwnEvent(event: published.event, conclusive: true);
+            _entries = relayListFromEvent(published.event);
+          });
+        },
       );
     } finally {
-      secretKey.wipe();
       if (mounted) setState(() => _publishing = false);
     }
   }
@@ -385,19 +385,14 @@ class _MyRelayListState extends State<_MyRelayList> {
             child: LinearProgressIndicator(),
           )
         else if (unchecked)
-          ListTile(
-            leading: Icon(
-              Icons.warning_amber_outlined,
-              color: theme.colorScheme.error,
-            ),
-            title: const Text(
-              'Some relays did not respond, so your published list could not '
-              'be checked',
-            ),
-            trailing: TextButton(
-              key: const Key('retryLoadRelayListButton'),
-              onPressed: _load,
-              child: const Text('Retry'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: UncheckedWarning(
+              message:
+                  'Some relays did not respond, so your published list could '
+                  'not be checked.',
+              retryKey: const Key('retryLoadRelayListButton'),
+              onRetry: _load,
             ),
           )
         else if (_entries.isEmpty)

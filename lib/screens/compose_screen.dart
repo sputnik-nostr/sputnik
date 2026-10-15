@@ -6,6 +6,7 @@ import '../models/identity.dart';
 import '../models/note.dart';
 import '../nostr/nip10.dart';
 import '../nostr/nostr.dart';
+import '../services/profiles.dart';
 import '../services/publishing.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/fade_in_avatar.dart';
@@ -129,27 +130,20 @@ class _ComposeScreenState extends State<ComposeScreen> {
       content = content.isEmpty ? reference : '$content\n\n$reference';
     }
 
-    final secretKey = await loadSecretKeyOrReport(identity, messenger);
-    if (secretKey == null) return;
-
-    final NostrEvent event;
-    try {
-      if (!mounted) return;
-      event = signEvent(
+    // Wiped before publishing, so the key is not held during network I/O.
+    final event = await withSecretKey(
+      identity,
+      messenger,
+      signFailure: 'Could not sign this note',
+      use: (secretKey) async => signEvent(
         secretKey: secretKey,
         pubkeyHex: identity.pubkeyHex,
         kind: 1,
         tags: tags,
         content: content,
-      );
-    } on ArgumentError {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Could not sign this note')),
-      );
-      return;
-    } finally {
-      secretKey.wipe();
-    }
+      ),
+    );
+    if (event == null || !mounted) return;
 
     final results = await widget.relayClient.publish(event, relayUrls);
     if (!mounted) return;
@@ -176,12 +170,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
     final metadata = pubkeyHex == null
         ? null
         : profileCacheNotifier.value[pubkeyHex];
-    final resolvedName = metadata?.resolvedName?.trim();
-    final fallbackLabel = resolvedName?.isNotEmpty == true
-        ? avatarInitial(resolvedName!)
-        : pubkeyHex?.isNotEmpty == true
-        ? avatarInitial(pubkeyHex!)
-        : '?';
+    final name = activeIdentityName();
+    final fallbackLabel = name == null ? '?' : avatarInitial(name);
 
     return Scaffold(
       appBar: AppBar(

@@ -6,6 +6,7 @@ import 'package:sputnik/main.dart';
 import 'package:sputnik/models/note.dart';
 import 'package:sputnik/nostr/models/nostr_event.dart';
 import 'package:sputnik/nostr/models/nostr_post.dart';
+import 'package:sputnik/nostr/models/post_reactions.dart';
 import 'package:sputnik/nostr/relay_thread_repository.dart';
 import 'package:sputnik/screens/post_screen.dart';
 import 'package:sputnik/widgets/fade_in_avatar.dart';
@@ -26,8 +27,7 @@ class _StubThread extends RelayThreadRepository {
       replies: [
         for (final reply in replies) ThreadReply(post: reply, depth: 0),
       ],
-      likerPubkeys: const [],
-      reposterPubkeys: const [],
+      reactions: const PostReactions(),
     );
   }
 }

@@ -12,6 +12,7 @@ import '../theme/app_text_styles.dart';
 import 'bookmark_button.dart';
 import 'delete_button.dart';
 import 'fade_in_avatar.dart';
+import 'note_action_button.dart';
 import 'note_content.dart';
 import 'reaction_buttons.dart';
 
@@ -115,12 +116,12 @@ class NoteTile extends StatelessWidget {
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
-                            _StatButton(
+                            NoteActionButton(
                               key: const Key('replyButton'),
                               icon: Icons.chat_bubble_outline,
                               count: note.replyCount,
                               tooltip: 'Reply',
-                              onPressed: () => openReplyComposer(context, note),
+                              onTap: () => openReplyComposer(context, note),
                             ),
                             const SizedBox(width: 20),
                             RepostButton(note: note),
@@ -160,46 +161,4 @@ Future<NostrEvent?> openReplyComposer(
       fullscreenDialog: true,
     ),
   );
-}
-
-class _StatButton extends StatelessWidget {
-  const _StatButton({
-    super.key,
-    required this.icon,
-    required this.count,
-    this.tooltip,
-    this.onPressed,
-  });
-
-  final IconData icon;
-  final int count;
-  final String? tooltip;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = theme.colorScheme.outline;
-
-    final content = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 16, color: color),
-        if (count > 0) ...[
-          const SizedBox(width: 4),
-          Text('$count', style: theme.metadata),
-        ],
-      ],
-    );
-    if (onPressed == null) return content;
-
-    return Tooltip(
-      message: tooltip ?? '',
-      child: InkResponse(
-        onTap: onPressed,
-        radius: 20,
-        child: Padding(padding: const EdgeInsets.all(4), child: content),
-      ),
-    );
-  }
 }

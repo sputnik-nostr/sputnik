@@ -4,6 +4,25 @@ import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
 import 'profiles.dart';
 
+/// The note [id] with its author's profile, or null if no relay returns it.
+Future<Note?> loadNote(
+  String id,
+  Set<String> relayUrls, {
+  RelayClient client = const RelayClient(),
+}) async {
+  final post = await RelayPostRepository(
+    relayUrls: relayUrls,
+    client: client,
+  ).fetchPostById(id);
+  if (post == null) return null;
+  final metadata = await loadProfile(
+    post.authorPubkey,
+    relayUrls,
+    client: client,
+  );
+  return noteFromNostrPost(post, authorMetadata: metadata);
+}
+
 /// Fetches profiles and reaction counts for [posts], then maps them to
 /// notes. [knownMetadata] skips the fetch for pubkeys it already covers.
 Future<List<Note>> hydratePosts(

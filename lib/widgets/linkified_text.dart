@@ -2,15 +2,14 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
-import '../models/note_mapper.dart';
 import '../nostr/http_urls.dart';
 import '../nostr/models/nostr_metadata.dart';
 import '../nostr/nip19.dart';
 import '../nostr/nip27.dart';
 import '../nostr/relay_client.dart';
-import '../nostr/relay_post_repository.dart';
 import '../screens/post_screen.dart';
 import '../screens/profile_screen.dart';
+import '../services/note_hydration.dart';
 import '../services/profiles.dart';
 import 'open_url.dart';
 
@@ -274,33 +273,23 @@ class _LinkifiedTextState extends State<LinkifiedText> {
   }
 
   Future<void> _openNote(BuildContext context, String eventIdHex) async {
-    final relayUrls = selectedRelaysNotifier.value;
-    final post = await RelayPostRepository(
-      relayUrls: relayUrls,
+    final note = await loadNote(
+      eventIdHex,
+      selectedRelaysNotifier.value,
       client: widget.relayClient,
-    ).fetchPostById(eventIdHex);
+    );
     if (!context.mounted) return;
 
-    if (post == null) {
+    if (note == null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Note not found')));
       return;
     }
 
-    final authorMetadata = await loadProfile(
-      post.authorPubkey,
-      relayUrls,
-      client: widget.relayClient,
-    );
-    if (!context.mounted) return;
-
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => PostScreen(
-          note: noteFromNostrPost(post, authorMetadata: authorMetadata),
-          relayClient: widget.relayClient,
-        ),
+        builder: (_) => PostScreen(note: note, relayClient: widget.relayClient),
       ),
     );
   }

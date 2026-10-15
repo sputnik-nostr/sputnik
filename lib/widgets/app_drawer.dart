@@ -2,20 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../models/avatar_initial.dart';
-import '../nostr/nip19.dart';
 import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
+import '../services/profiles.dart';
 import '../theme/app_text_styles.dart';
-
-/// Profile name if cached, else a short pubkey, else "No identity yet".
-String _activeIdentityLabel() {
-  final pubkeyHex = activeIdentityPubkeyNotifier.value;
-  if (pubkeyHex == null) return 'No identity yet';
-  final resolvedName = profileCacheNotifier.value[pubkeyHex]?.resolvedName
-      ?.trim();
-  if (resolvedName != null && resolvedName.isNotEmpty) return resolvedName;
-  return shortPubkey(pubkeyHex);
-}
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -47,7 +37,7 @@ class AppDrawer extends StatelessWidget {
                     profileCacheNotifier,
                   ]),
                   builder: (context, _) {
-                    final label = _activeIdentityLabel();
+                    final label = activeIdentityName() ?? 'No identity yet';
                     return Row(
                       children: [
                         CircleAvatar(

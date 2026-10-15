@@ -55,6 +55,9 @@ class RelayPostRepository {
   }
 
   /// The kind 1 notes among [ids] that some relay returns, by ID.
+  Future<Map<String, NostrEvent>> fetchEventsByIds(Set<String> ids) =>
+      _fetchEventsByIds(ids, relayUrls);
+
   Future<Map<String, NostrEvent>> _fetchEventsByIds(
     Set<String> ids,
     Set<String> relayUrls,

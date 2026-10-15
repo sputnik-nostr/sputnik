@@ -6,6 +6,7 @@ import '../services/cache_store.dart';
 import '../services/publishing.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/payment_target_chip.dart';
+import '../widgets/unchecked_warning.dart';
 
 /// Maximum number of payment targets.
 const _maxPaymentTargets = 20;
@@ -146,40 +147,39 @@ class _EditPaymentTargetsScreenState extends State<EditPaymentTargetsScreen> {
     if (!confirmed || !mounted) return;
 
     final messenger = ScaffoldMessenger.of(context);
-    final secretKey = await loadSecretKeyOrReport(identity, messenger);
-    if (secretKey == null) return;
-
+    setState(() => _saving = true);
     try {
-      if (!mounted) return;
-      setState(() => _saving = true);
-      final published = await _repository.publishPaymentTargets(
-        secretKey: secretKey,
-        pubkeyHex: identity.pubkeyHex,
-        base: _base,
-        paytoTags: _paytoTags(),
-        relayUrls: relayUrls,
-      );
-      if (!mounted) return;
-
-      final updated = reportPublishResults(
+      await withSecretKey<void>(
+        identity,
         messenger,
-        published.results,
-        failure: 'Could not publish your payment targets to any relay',
-        success: (counts) => 'Updated payment targets on $counts relays',
-      );
-      if (!updated) return;
+        signFailure: 'Could not sign your payment targets',
+        use: (secretKey) async {
+          if (!mounted) return;
+          final published = await _repository.publishPaymentTargets(
+            secretKey: secretKey,
+            pubkeyHex: identity.pubkeyHex,
+            base: _base,
+            paytoTags: _paytoTags(),
+            relayUrls: relayUrls,
+          );
+          if (!mounted) return;
 
-      await CacheStore.putPaymentTargets(
-        identity.pubkeyHex,
-        paymentTargetsFromEvent(published.event),
-      );
-      if (mounted) Navigator.pop(context);
-    } on ArgumentError {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Could not sign your payment targets')),
+          final updated = reportPublishResults(
+            messenger,
+            published.results,
+            failure: 'Could not publish your payment targets to any relay',
+            success: (counts) => 'Updated payment targets on $counts relays',
+          );
+          if (!updated) return;
+
+          await CacheStore.putPaymentTargets(
+            identity.pubkeyHex,
+            paymentTargetsFromEvent(published.event),
+          );
+          if (mounted) Navigator.pop(context);
+        },
       );
     } finally {
-      secretKey.wipe();
       if (mounted) setState(() => _saving = false);
     }
   }
@@ -221,25 +221,12 @@ class _EditPaymentTargetsScreenState extends State<EditPaymentTargetsScreen> {
                   if (!_baseConclusive)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.warning_amber_outlined,
-                            color: theme.colorScheme.error,
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Text(
-                              'Some relays did not respond, so your published '
-                              'targets could not be checked.',
-                            ),
-                          ),
-                          TextButton(
-                            key: const Key('retryLoadPaymentTargetsButton'),
-                            onPressed: () => _load(seedRows: false),
-                            child: const Text('Retry'),
-                          ),
-                        ],
+                      child: UncheckedWarning(
+                        message:
+                            'Some relays did not respond, so your published '
+                            'targets could not be checked.',
+                        retryKey: const Key('retryLoadPaymentTargetsButton'),
+                        onRetry: () => _load(seedRows: false),
                       ),
                     ),
                   Text(

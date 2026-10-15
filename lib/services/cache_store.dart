@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../nostr/models/nostr_metadata.dart';
 import '../nostr/models/nostr_payment_target.dart';
+import 'error_reporting.dart';
 
 /// Relay data with fetch times, so a fresh entry can skip a relay round trip.
 class CacheStore {
@@ -47,14 +48,7 @@ class CacheStore {
         Hive.deleteBoxFromDisk('contacts'),
       ]);
     } catch (error, stack) {
-      FlutterError.reportError(
-        FlutterErrorDetails(
-          exception: error,
-          stack: stack,
-          library: 'sputnik',
-          context: ErrorDescription('opening the relay data cache'),
-        ),
-      );
+      reportError('opening the relay data cache', error, stack);
     }
   }
 

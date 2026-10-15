@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../models/note.dart';
-import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
+import '../services/note_hydration.dart';
 import '../services/profiles.dart';
 import '../widgets/note_tile.dart';
 import '../widgets/placeholder_tab.dart';
@@ -143,15 +143,8 @@ class _NoteResultState extends State<_NoteResult> {
     _noteFuture = _load();
   }
 
-  Future<Note?> _load() async {
-    final relayUrls = selectedRelaysNotifier.value;
-    final post = await RelayPostRepository(relayUrls: relayUrls)
-        .fetchPostById(widget.eventIdHex);
-    if (post == null) return null;
-
-    final authorMetadata = await loadProfile(post.authorPubkey, relayUrls);
-    return noteFromNostrPost(post, authorMetadata: authorMetadata);
-  }
+  Future<Note?> _load() =>
+      loadNote(widget.eventIdHex, selectedRelaysNotifier.value);
 
   @override
   Widget build(BuildContext context) {

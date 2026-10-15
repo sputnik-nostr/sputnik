@@ -5,6 +5,7 @@ import '../nostr/nip05.dart';
 import '../nostr/nostr.dart';
 import '../services/cache_store.dart';
 import '../services/publishing.dart';
+import '../widgets/unchecked_warning.dart';
 import 'edit_payment_targets_screen.dart';
 
 bool _isWebUrl(String value) {
@@ -141,58 +142,55 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!confirmed || !mounted) return;
 
     final messenger = ScaffoldMessenger.of(context);
-    final secretKey = await loadSecretKeyOrReport(identity, messenger);
-    if (secretKey == null) return;
-
+    setState(() => _saving = true);
     try {
-      if (!mounted) return;
-      setState(() => _saving = true);
-      final published = await _profiles.publishProfile(
-        secretKey: secretKey,
-        pubkeyHex: pubkeyHex,
-        base: _base,
-        fields: {
-          'display_name': _displayNameController.text,
-          'name': _nameController.text,
-          'about': _bioController.text,
-          'picture': _pictureController.text,
-          'banner': _bannerController.text,
-          'nip05': _nip05Controller.text,
-          'website': _websiteController.text,
-        },
-        relayUrls: relayUrls,
-      );
-      if (!mounted) return;
-
-      final updated = reportPublishResults(
+      await withSecretKey<void>(
+        identity,
         messenger,
-        published.results,
-        failure: 'Could not publish this profile update to any relay',
-        success: (counts) => 'Updated profile on $counts relays',
-      );
-      if (!updated) return;
+        signFailure: 'Could not sign this profile update',
+        use: (secretKey) async {
+          if (!mounted) return;
+          final published = await _profiles.publishProfile(
+            secretKey: secretKey,
+            pubkeyHex: pubkeyHex,
+            base: _base,
+            fields: {
+              'display_name': _displayNameController.text,
+              'name': _nameController.text,
+              'about': _bioController.text,
+              'picture': _pictureController.text,
+              'banner': _bannerController.text,
+              'nip05': _nip05Controller.text,
+              'website': _websiteController.text,
+            },
+            relayUrls: relayUrls,
+          );
+          if (!mounted) return;
 
-      final metadata = NostrMetadata.fromContent(published.event.content);
-      profileCacheNotifier.value = {
-        ...profileCacheNotifier.value,
-        pubkeyHex: metadata,
-      };
-      await CacheStore.putProfiles({pubkeyHex: metadata});
-      if (mounted) Navigator.pop(context);
-    } on ArgumentError {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Could not sign this profile update')),
+          final updated = reportPublishResults(
+            messenger,
+            published.results,
+            failure: 'Could not publish this profile update to any relay',
+            success: (counts) => 'Updated profile on $counts relays',
+          );
+          if (!updated) return;
+
+          final metadata = NostrMetadata.fromContent(published.event.content);
+          profileCacheNotifier.value = {
+            ...profileCacheNotifier.value,
+            pubkeyHex: metadata,
+          };
+          await CacheStore.putProfiles({pubkeyHex: metadata});
+          if (mounted) Navigator.pop(context);
+        },
       );
     } finally {
-      secretKey.wipe();
       if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit profile'),
@@ -221,25 +219,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         if (!_baseConclusive)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 16),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.warning_amber_outlined,
-                                  color: theme.colorScheme.error,
-                                ),
-                                const SizedBox(width: 12),
-                                const Expanded(
-                                  child: Text(
-                                    'Some relays did not respond, so your published '
-                                    'profile could not be checked.',
-                                  ),
-                                ),
-                                TextButton(
-                                  key: const Key('retryLoadProfileButton'),
-                                  onPressed: () => _load(seedFields: false),
-                                  child: const Text('Retry'),
-                                ),
-                              ],
+                            child: UncheckedWarning(
+                              message:
+                                  'Some relays did not respond, so your published '
+                                  'profile could not be checked.',
+                              retryKey: const Key('retryLoadProfileButton'),
+                              onRetry: () => _load(seedFields: false),
                             ),
                           ),
                         TextFormField(

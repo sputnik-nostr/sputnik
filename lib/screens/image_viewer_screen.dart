@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/image_saver.dart';
 import '../services/media_loader.dart';
+import '../widgets/platform.dart';
 
 /// Bounds the decoded size, so a huge image can't exhaust memory.
 const _maxDecodeExtent = 4096;
@@ -68,13 +68,6 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
     if (mounted) _say('Link copied');
   }
 
-  bool get _desktop => switch (defaultTargetPlatform) {
-    TargetPlatform.linux ||
-    TargetPlatform.macOS ||
-    TargetPlatform.windows => true,
-    _ => false,
-  };
-
   @override
   Widget build(BuildContext context) {
     final count = widget.sources.length;
@@ -129,7 +122,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                 ),
               ),
               // A mouse can't swipe, so desktop gets buttons as well as keys.
-              if (count > 1 && _desktop) ...[
+              if (count > 1 && isDesktop) ...[
                 _PageButton(
                   key: const Key('previousImageButton'),
                   alignment: Alignment.centerLeft,

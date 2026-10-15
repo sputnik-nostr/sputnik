@@ -31,6 +31,14 @@ Future<Map<String, NostrMetadata>> loadProfiles(
   return {...cached, ...fetched};
 }
 
+/// The active identity's profile name or short pubkey, or null with none.
+String? activeIdentityName() {
+  final pubkeyHex = activeIdentityPubkeyNotifier.value;
+  if (pubkeyHex == null) return null;
+  return profileCacheNotifier.value[pubkeyHex]?.resolvedName ??
+      shortPubkey(pubkeyHex);
+}
+
 /// [loadProfiles] for a single [pubkey].
 Future<NostrMetadata?> loadProfile(
   String pubkey,

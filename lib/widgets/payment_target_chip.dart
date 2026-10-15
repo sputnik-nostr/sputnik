@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../nostr/models/nostr_payment_target.dart';
 import '../nostr/models/payment_target_types.dart';
 import '../nostr/nip19.dart';
 import '../theme/app_text_styles.dart';
+import 'open_url.dart';
 
 /// Kept separate from PaymentTargetTypeInfo since Color is a UI concern and
 /// the model layer stays Flutter-free.
@@ -55,38 +55,23 @@ class PaymentTargetChip extends StatelessWidget {
   final NostrPaymentTarget target;
 
   Future<void> _open(BuildContext context) async {
-    bool opened;
+    final name = paymentTargetTypeDisplayName(target.type);
+    final Uri uri;
     try {
-      opened = await launchUrl(
-        target.launchUri,
-        mode: LaunchMode.externalApplication,
-      );
-    } on PlatformException {
-      opened = false;
-    } on MissingPluginException {
-      opened = false;
+      uri = target.launchUri;
     } on FormatException {
       // The event tag data behind this target didn't form a valid URI.
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'This ${paymentTargetTypeDisplayName(target.type)} address looks malformed',
-            ),
-          ),
-        );
-      }
+      _say(context, 'This $name address looks malformed');
       return;
     }
-    if (!opened && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'No app found to open ${paymentTargetTypeDisplayName(target.type)} addresses',
-          ),
-        ),
-      );
+    if (!await launchExternal(uri) && context.mounted) {
+      _say(context, 'No app found to open $name addresses');
     }
+  }
+
+  void _say(BuildContext context, String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override

@@ -4,6 +4,7 @@ import '../app_state.dart';
 import '../models/note.dart';
 import '../models/note_mapper.dart';
 import '../nostr/nostr.dart';
+import 'error_reporting.dart';
 import 'follow_sync.dart';
 import 'note_hydration.dart';
 import 'post_cursor.dart';
@@ -20,14 +21,7 @@ int _followingGeneration = 0;
 /// Runs [load] unawaited; errors are reported to Flutter as [description].
 void runFeedLoad(Future<void> Function() load, String description) {
   load().catchError((Object error, StackTrace stack) {
-    FlutterError.reportError(
-      FlutterErrorDetails(
-        exception: error,
-        stack: stack,
-        library: 'sputnik',
-        context: ErrorDescription(description),
-      ),
-    );
+    reportError(description, error, stack);
   });
 }
 
@@ -105,24 +99,11 @@ Future<void> _appendPosts(
   final posts = await cursor.more();
   if (posts.isEmpty) return;
 
-  final relayUrls = selectedRelaysNotifier.value;
   target.value = [
     ...?target.value,
     ...notesFromPosts(posts, profileCacheNotifier.value),
   ];
-
-  final hydrated = {
-    for (final note in await hydratePosts(
-      posts,
-      relayUrls,
-      client: feedRelayClient,
-    ))
-      note.id: note,
-  };
-  target.value = [
-    for (final note in target.value ?? const <Note>[])
-      hydrated[note.id] ?? note,
-  ];
+  await _hydrateInto(target, posts, selectedRelaysNotifier.value);
 }
 
 Future<void> _showPosts(
@@ -134,7 +115,16 @@ Future<void> _showPosts(
   // Show posts immediately, using cached profile data when available, instead
   // of blocking the entire feed on the profile and reaction round trips below.
   target.value = notesFromPosts(posts, profileCacheNotifier.value);
+  await _hydrateInto(target, posts, relayUrls, isCurrent: isCurrent);
+}
 
+/// Replaces [posts]' notes in [target] with ones that have profiles and counts.
+Future<void> _hydrateInto(
+  ValueNotifier<List<Note>?> target,
+  List<NostrPost> posts,
+  Set<String> relayUrls, {
+  bool Function()? isCurrent,
+}) async {
   final hydrated = {
     for (final note in await hydratePosts(
       posts,
@@ -143,8 +133,8 @@ Future<void> _showPosts(
     ))
       note.id: note,
   };
-  if (!isCurrent()) return;
-  // Older pages may have been appended while this was hydrating.
+  if (isCurrent != null && !isCurrent()) return;
+  // Other pages may have been added while this was hydrating.
   target.value = [
     for (final note in target.value ?? const <Note>[])
       hydrated[note.id] ?? note,
