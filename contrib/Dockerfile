@@ -23,6 +23,7 @@ RUN sed -i \
     -e "s|http://archive.ubuntu.com/ubuntu/|https://snapshot.ubuntu.com/ubuntu/${UBUNTU_SNAPSHOT}/|" \
     -e "s|http://security.ubuntu.com/ubuntu/|https://snapshot.ubuntu.com/ubuntu/${UBUNTU_SNAPSHOT}/|" \
     /etc/apt/sources.list \
+    && ! grep -rqsE "(archive|security)\.ubuntu\.com" /etc/apt/sources.list /etc/apt/sources.list.d \
     && apt-get -o Acquire::https::Verify-Peer=false update \
     && apt-get -o Acquire::https::Verify-Peer=false install -y \
     --no-install-recommends ca-certificates \

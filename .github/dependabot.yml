@@ -16,3 +16,7 @@ updates:
     directory: "/contrib"
     schedule:
       interval: "weekly"
+    # Newer releases raise the AppImage's glibc floor; upgrade deliberately.
+    ignore:
+      - dependency-name: "ubuntu"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
