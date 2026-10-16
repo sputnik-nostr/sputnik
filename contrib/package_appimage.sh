@@ -76,7 +76,7 @@ if [[ ! -e ${mpv_libs[0]} ]]; then
 fi
 mpv_lib="${mpv_libs[0]##*/}"
 
-cp assets/icon/icon.png "$appdir/usr/share/icons/hicolor/1024x1024/apps/$app.png"
+cp assets/icon/icon_round.png "$appdir/usr/share/icons/hicolor/1024x1024/apps/$app.png"
 ln -s "usr/share/icons/hicolor/1024x1024/apps/$app.png" "$appdir/$app.png"
 
 cat >"$appdir/usr/share/applications/$app.desktop" <<EOF
