@@ -15,3 +15,7 @@ A minimal, cross-platform Nostr client.
 | Profile page                            | Bookmarks page                          |
 | --------------------------------------- | --------------------------------------- |
 | ![img_01](./contrib/screenshots/01.png) | ![img_02](./contrib/screenshots/02.png) |
+
+## Contact
+
+Matrix room: [`#sputnik-nostr:matrix.org`](https://matrix.to/#/#sputnik-nostr:matrix.org)
