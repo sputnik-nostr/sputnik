@@ -63,7 +63,7 @@
 - [x] Check NIP-05 identifiers automatically, with an option to check only on tap
 - [x] Reuse connections for images through one shared client that keeps the address checks
 - [x] Bundle libmpv in the Linux AppImage
-- [ ] Document that building from source on Linux needs libmpv
+- [x] Document that building from source on Linux needs libmpv
 
 ## Other things:
 
