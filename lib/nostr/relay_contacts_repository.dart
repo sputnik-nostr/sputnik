@@ -53,7 +53,7 @@ class RelayContactsRepository {
     ]..sort(compareNewestFirst);
 
     if (own.isEmpty) {
-      return result.allRelaysAnswered ? const <String>[] : null;
+      return result.mostRelaysAnswered ? const <String>[] : null;
     }
 
     return _followedPubkeys(own.first);

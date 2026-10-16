@@ -118,6 +118,39 @@ class _PerAuthorRelay extends RelayClient with AnsweringRelayClient {
   }
 }
 
+/// Two relays answer "nothing here" and the third never answers.
+class _ThreeRelays extends RelayClient {
+  _ThreeRelays(this.me);
+
+  final String me;
+  NostrEvent? lastPublished;
+
+  @override
+  Future<List<NostrEvent>> query(
+    Set<String> relayUrls,
+    NostrFilter filter,
+  ) async => const [];
+
+  @override
+  Future<RelayQueryResult> queryWithStatus(
+    Set<String> relayUrls,
+    NostrFilter filter,
+  ) async =>
+      const RelayQueryResult(events: [], answeredRelays: 2, queriedRelays: 3);
+
+  @override
+  Future<Map<String, RelayPublishResult>> publish(
+    NostrEvent event,
+    Set<String> relayUrls,
+  ) async {
+    lastPublished = event;
+    return {
+      for (final url in relayUrls)
+        url: const RelayPublishResult(RelayPublishOutcome.accepted),
+    };
+  }
+}
+
 // The follow-sync loop debounces before publishing.
 Future<void> _waitForSync() =>
     Future<void>.delayed(const Duration(milliseconds: 800));
@@ -286,6 +319,20 @@ void main() {
       for (final tag in relay.lastPublished!.tags) tag[1],
     ], unorderedEquals([alice, bob, carol]));
   });
+
+  test(
+    'a first follow goes through while one relay of three is down',
+    () async {
+      final relay = _ThreeRelays(me);
+      RelayClient.instance = relay;
+
+      scheduleFollowingSync(carol, follow: true);
+      await _waitForSync();
+
+      expect([for (final tag in relay.lastPublished!.tags) tag[1]], [carol]);
+      expect(myFollowingNotifier.value, {carol});
+    },
+  );
 
   test('changes made in a row are all applied', () async {
     final relay = _FlakyRelay(me, [alice, bob])..relays = _Relays.up;

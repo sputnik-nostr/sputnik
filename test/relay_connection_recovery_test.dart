@@ -117,4 +117,21 @@ void main() {
       expect(results.acceptedCount, 1);
     },
   );
+
+  test('a relay that failed to connect is skipped for a while', () async {
+    var attempts = 0;
+    // Accepts the TCP connection but never answers the WebSocket upgrade.
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen((_) => attempts++);
+    addTearDown(() => server.close(force: true));
+    final url = 'ws://127.0.0.1:${server.port}';
+
+    await client.queryWithStatus({url}, filter);
+    final stopwatch = Stopwatch()..start();
+    final second = await client.queryWithStatus({url}, filter);
+
+    expect(second.answeredRelays, 0);
+    expect(stopwatch.elapsed, lessThan(const Duration(milliseconds: 200)));
+    expect(attempts, 1);
+  });
 }

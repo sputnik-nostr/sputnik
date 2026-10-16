@@ -8,7 +8,7 @@ class OwnEvent {
 
   final NostrEvent? event;
 
-  /// False unless every relay answered, or a majority did and one had it.
+  /// False unless most relays answered.
   final bool conclusive;
 }
 
@@ -31,10 +31,8 @@ Future<OwnEvent> fetchOwnReplaceable(
 
   return OwnEvent(
     event: own.isEmpty ? null : own.first,
-    // A lagging relay can hold an older copy while the newest one is silent.
-    conclusive:
-        result.allRelaysAnswered ||
-        (own.isNotEmpty && result.answeredRelays * 2 > result.queriedRelays),
+    // A silent minority could hold a newer copy, but lists are widely copied.
+    conclusive: result.mostRelaysAnswered,
   );
 }
 

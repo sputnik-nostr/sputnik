@@ -28,6 +28,14 @@ const _maxConcurrentSubscriptions = 10;
 /// Detects a socket the OS dropped silently, e.g. while Android was paused.
 const _pingInterval = Duration(seconds: 20);
 
+/// How long a relay that failed is skipped, doubling up to [_maxCooldown].
+const _firstCooldown = Duration(seconds: 5);
+const _maxCooldown = Duration(minutes: 2);
+
+class _RelayCoolingDown implements Exception {
+  const _RelayCoolingDown();
+}
+
 String _generateSubscriptionId() =>
     hexEncode(List<int>.generate(8, (_) => _random.nextInt(256)));
 
@@ -127,6 +135,9 @@ class RelayQueryResult {
   /// An empty [events] only proves absence if no relay could be hiding it.
   bool get allRelaysAnswered =>
       queriedRelays > 0 && answeredRelays == queriedRelays;
+
+  /// Enough to trust an absence, since one dead relay must not block writes.
+  bool get mostRelaysAnswered => answeredRelays * 2 > queriedRelays;
 }
 
 /// A failing caller must not evict a newer connection another one opened.
@@ -144,6 +155,21 @@ class RelayConnectionPool {
   static final instance = RelayConnectionPool._();
 
   final _connections = <String, _RelayConnection>{};
+
+  /// Relays that just failed, so a dead one doesn't stall every request.
+  final _cooldowns = <String, ({int failures, DateTime until})>{};
+
+  void _noteFailure(String relayUrl) {
+    final current = _cooldowns[relayUrl];
+    // Requests that were in flight together count as one failure.
+    if (current != null && DateTime.now().isBefore(current.until)) return;
+    final failures = (current?.failures ?? 0) + 1;
+    final pause = _firstCooldown * (1 << min(failures - 1, 8));
+    _cooldowns[relayUrl] = (
+      failures: failures,
+      until: DateTime.now().add(pause < _maxCooldown ? pause : _maxCooldown),
+    );
+  }
 
   Future<List<NostrEvent>> query(
     Set<String> relayUrls,
@@ -199,13 +225,17 @@ class RelayConnectionPool {
       connection = await _connectionFor(relayUrl, timeout);
       final mark = connection.mark();
       final answer = await connection.subscribe(filter, timeout);
-      if (answer.eose || !connection.silentSince(mark)) return answer;
+      if (answer.eose || !connection.silentSince(mark)) {
+        _cooldowns.remove(relayUrl);
+        return answer;
+      }
 
       await _drop(relayUrl, connection);
       // Only a socket that used to answer is worth one fresh attempt.
       if (!isRetry && mark.wasAlive) {
         return await _queryRelay(relayUrl, filter, timeout, isRetry: true);
       }
+      _noteFailure(relayUrl);
       return answer;
     } catch (_) {
       // Drop the failed connection so the next query reconnects.
@@ -219,6 +249,12 @@ class RelayConnectionPool {
     Duration connectTimeout,
   ) async {
     final existing = _connections[relayUrl];
+    final cooldown = _cooldowns[relayUrl];
+    if ((existing == null || existing.isClosed) &&
+        cooldown != null &&
+        DateTime.now().isBefore(cooldown.until)) {
+      throw const _RelayCoolingDown();
+    }
     // An existing connection may still be connecting, so it gets a timeout too.
     final connection = existing != null && !existing.isClosed
         ? existing
@@ -227,6 +263,7 @@ class RelayConnectionPool {
       await connection.ready.timeout(connectTimeout);
     } catch (_) {
       await _drop(relayUrl, connection);
+      _noteFailure(relayUrl);
       rethrow;
     }
     return connection;
@@ -264,6 +301,7 @@ class RelayConnectionPool {
       if (result.outcome == RelayPublishOutcome.accepted ||
           result.outcome == RelayPublishOutcome.rejected ||
           !connection.silentSince(mark)) {
+        _cooldowns.remove(relayUrl);
         return result;
       }
 
@@ -272,6 +310,7 @@ class RelayConnectionPool {
       if (!isRetry && mark.wasAlive) {
         return await _publishToRelay(relayUrl, event, timeout, isRetry: true);
       }
+      _noteFailure(relayUrl);
       return result;
     } catch (_) {
       if (connection != null) await _drop(relayUrl, connection);
