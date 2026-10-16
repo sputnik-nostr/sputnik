@@ -4,18 +4,27 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
+  - package-ecosystem: "gradle"
+    directory: "/android"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-  - package-ecosystem: "gitsubmodule"
-    directory: "/"
-    schedule:
-      interval: "weekly"
+    cooldown:
+      default-days: 7
+  # No gitsubmodule: it only bumps to branch tips; secp256k1 stays on tags.
   - package-ecosystem: "docker"
     directory: "/contrib"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     # Newer releases raise the AppImage's glibc floor; upgrade deliberately.
     ignore:
       - dependency-name: "ubuntu"

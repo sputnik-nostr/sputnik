@@ -35,6 +35,20 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     "Debug" "Profile" "Release")
 endif()
 
+# Clang does not enable these by default, unlike distro GCC builds.
+add_compile_options(
+  -fstack-protector-strong
+  -fstack-clash-protection
+  "$<$<CONFIG:Release>:-U_FORTIFY_SOURCE>"
+  "$<$<CONFIG:Release>:-D_FORTIFY_SOURCE=2>"
+)
+include(CheckCCompilerFlag)
+check_c_compiler_flag(-fcf-protection HAVE_CF_PROTECTION)
+if(HAVE_CF_PROTECTION)
+  add_compile_options(-fcf-protection)
+endif()
+add_link_options("LINKER:-z,relro" "LINKER:-z,now")
+
 # Compilation settings that should be applied to most targets.
 #
 # Be cautious about adding new options here, as plugins use this function by

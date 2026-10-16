@@ -17,7 +17,7 @@ cd /build/sputnik
 git config submodule.src/secp256k1.url /src/.git/modules/src/secp256k1
 git -c protocol.file.allow=always submodule update --init --quiet
 
-flutter pub get
+flutter pub get --enforce-lockfile
 
 if [[ $mode == check ]]; then
     dart format --output=none --set-exit-if-changed .

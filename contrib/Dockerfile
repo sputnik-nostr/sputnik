@@ -8,6 +8,11 @@ ARG APPIMAGETOOL_VERSION=1.9.1
 ARG APPIMAGETOOL_SHA256=ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
 ARG ANDROID_CMDLINE_TOOLS_BUILD=16111833
 ARG ANDROID_CMDLINE_TOOLS_SHA256=0877a1d048fe4a24efe2eff536ca4223f7adeb58648bb81909d33c446918cfa8
+ARG ANDROID_PLATFORM=android-37
+ARG ANDROID_BUILD_TOOLS=36.0.0
+# Must match what Gradle wants, or it downloads its own unpinned copy.
+ARG ANDROID_NDK=28.2.13676358
+ARG ANDROID_CMAKE=3.22.1
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
@@ -34,7 +39,6 @@ RUN sed -i \
     openjdk-21-jdk-headless pkg-config unzip xz-utils zip \
     && rm -rf /var/lib/apt/lists/*
 
-ARG ANDROID_BUILD_TOOLS=36.0.0
 RUN curl -fsSL -o /tmp/cmdline-tools.zip \
     "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_CMDLINE_TOOLS_BUILD}_latest.zip" \
     && echo "${ANDROID_CMDLINE_TOOLS_SHA256}  /tmp/cmdline-tools.zip" | sha256sum -c - \
@@ -43,8 +47,9 @@ RUN curl -fsSL -o /tmp/cmdline-tools.zip \
     && mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest" \
     && rm /tmp/cmdline-tools.zip \
     && yes | sdkmanager --licenses >/dev/null \
-    && sdkmanager --install "platforms;android-37" \
-    "build-tools;${ANDROID_BUILD_TOOLS}" "ndk;28.2.13676358" "cmake;3.22.1" \
+    && sdkmanager --install "platforms;${ANDROID_PLATFORM}" \
+    "build-tools;${ANDROID_BUILD_TOOLS}" "ndk;${ANDROID_NDK}" \
+    "cmake;${ANDROID_CMAKE}" \
     >/dev/null
 
 ENV PATH=/opt/android-sdk/build-tools/${ANDROID_BUILD_TOOLS}:$PATH
