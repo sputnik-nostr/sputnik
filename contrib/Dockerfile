@@ -33,6 +33,7 @@ RUN sed -i \
     openjdk-21-jdk-headless pkg-config unzip xz-utils zip \
     && rm -rf /var/lib/apt/lists/*
 
+ARG ANDROID_BUILD_TOOLS=36.0.0
 RUN curl -fsSL -o /tmp/cmdline-tools.zip \
     "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_CMDLINE_TOOLS_BUILD}_latest.zip" \
     && echo "${ANDROID_CMDLINE_TOOLS_SHA256}  /tmp/cmdline-tools.zip" | sha256sum -c - \
@@ -41,8 +42,11 @@ RUN curl -fsSL -o /tmp/cmdline-tools.zip \
     && mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest" \
     && rm /tmp/cmdline-tools.zip \
     && yes | sdkmanager --licenses >/dev/null \
-    && sdkmanager --install "platforms;android-37" "build-tools;36.0.0" \
-    "ndk;28.2.13676358" "cmake;3.22.1" >/dev/null
+    && sdkmanager --install "platforms;android-37" \
+    "build-tools;${ANDROID_BUILD_TOOLS}" "ndk;28.2.13676358" "cmake;3.22.1" \
+    >/dev/null
+
+ENV PATH=/opt/android-sdk/build-tools/${ANDROID_BUILD_TOOLS}:$PATH
 
 RUN git clone --quiet --depth 1 --branch "$FLUTTER_VERSION" \
     https://github.com/flutter/flutter.git /opt/flutter \

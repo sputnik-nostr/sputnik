@@ -6,23 +6,33 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: contrib
+          file: contrib/Dockerfile
+          tags: sputnik-build
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       # The same pinned container as a local `make dist`, so both match.
-      - run: make dist
-      # Skipped until the release key is set up; the unsigned APKs still build.
+      - run: make -o image dist
       - name: Sign APKs
-        if: env.ANDROID_KEYSTORE_BASE64 != ''
         env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_ALIAS: sputnik
         run: |
           set -euo pipefail
+          if [[ -z $ANDROID_KEYSTORE_BASE64 ]]; then
+            echo "No release key configured; leaving the APKs unsigned."
+            exit 0
+          fi
           keys="$RUNNER_TEMP/keys"
           mkdir -m 700 "$keys"
           trap 'rm -rf "$keys"' EXIT
@@ -31,7 +41,7 @@ jobs:
             docker run --rm -e OWNER="$(id -u):$(id -g)" \
               -e KS_PASS -e KEY_PASS -e KEY_ALIAS \
               -v "$keys:/keys:ro" -v "$PWD/dist:/out" sputnik-build \
-              sh -c '/opt/android-sdk/build-tools/36.0.0/apksigner sign \
+              sh -c 'apksigner sign \
                 --ks /keys/release.jks --ks-key-alias "$KEY_ALIAS" \
                 --ks-pass env:KS_PASS --key-pass env:KEY_PASS \
                 --v1-signing-enabled false --v4-signing-enabled false \
@@ -39,7 +49,7 @@ jobs:
                 && chown "$OWNER" "/out/sputnik-$0.apk"' "$abi"
           done
           (cd dist && sha256sum sputnik-*.apk sputnik-x86_64.AppImage >SHA256SUMS)
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sputnik
           path: dist/

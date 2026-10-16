@@ -84,3 +84,13 @@
 - [ ] Route posts by relay lists (outbox model), instead of only the selected relays
 - [ ] Add an option to hide/show client ID string
 - [ ] Have some visual indication that there are more payment target chips to scroll to
+
+## Releases and builds:
+
+- [x] Build the AppImage and APKs reproducibly in a pinned container (`make dist`), in CI and locally
+- [x] Build release APKs unsigned and sign them in a separate CI step
+- [ ] Verify Gradle dependencies against checksums (dependency verification)
+- [ ] Build twice in CI and fail if the outputs differ
+- [ ] Publish the signed APKs, the AppImage and `SHA256SUMS` as GitHub Releases, and document how to verify them
+- [ ] Choose a permanent Android application ID (it is still the template's `sputnik.sputnik`)
+- [ ] Use a reverse-DNS AppStream ID for the Linux AppImage

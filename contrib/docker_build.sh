@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 
-# Runs in contrib/Dockerfile: builds /src's HEAD at a fixed path into /out.
+# Runs in contrib/Dockerfile: checks or builds /src's HEAD at a fixed path.
 
 set -euo pipefail
+
+mode="${1:-dist}"
+if [[ $mode != dist && $mode != check ]]; then
+    echo "usage: $0 [dist|check]" >&2
+    exit 2
+fi
 
 git config --global --add safe.directory '*'
 git clone --quiet /src /build/sputnik
@@ -12,6 +18,14 @@ git config submodule.src/secp256k1.url /src/.git/modules/src/secp256k1
 git -c protocol.file.allow=always submodule update --init --quiet
 
 flutter pub get
+
+if [[ $mode == check ]]; then
+    dart format --output=none --set-exit-if-changed .
+    flutter analyze
+    make test
+    exit 0
+fi
+
 flutter build linux --release
 contrib/package_appimage.sh
 SPUTNIK_UNSIGNED=1 flutter build apk --release --split-per-abi
