@@ -8,9 +8,8 @@ master="$repo_root/assets/icon/icon.png"
 foreground="$repo_root/assets/icon/icon_foreground.png"
 round="$repo_root/assets/icon/icon_round.png"
 
-padding_ratio=0.88
+padding_ratio=0.7
 foreground_padding_ratio=0.55
-round_padding_ratio=0.825
 master_size=1024
 
 tmp="$(mktemp -d)"
@@ -36,12 +35,11 @@ magick "$trimmed" -resize "${fg_content_size}x${fg_content_size}" \
     -background none -gravity center -extent "${master_size}x${master_size}" \
     "$foreground"
 
-round_content_size="$(awk -v s="$master_size" -v r="$round_padding_ratio" 'BEGIN { printf "%d", s * r }')"
 radius="$(awk -v s="$master_size" 'BEGIN { printf "%.1f", (s - 1) / 2 }')"
 
 magick -size "${master_size}x${master_size}" xc:none -fill white \
     -draw "circle $radius,$radius $radius,0" \
-    \( "$trimmed" -resize "${round_content_size}x${round_content_size}" \) \
+    \( "$trimmed" -resize "${content_size}x${content_size}" \) \
     -gravity center -composite -depth 8 \
     "$round"
 
@@ -52,7 +50,7 @@ done
 
 echo "wrote $master (${master_size}x${master_size}, glyph ${content_size}x${content_size})"
 echo "wrote $foreground (${master_size}x${master_size}, glyph ${fg_content_size}x${fg_content_size})"
-echo "wrote $round (${master_size}x${master_size}, glyph ${round_content_size}x${round_content_size})"
+echo "wrote $round (${master_size}x${master_size}, glyph ${content_size}x${content_size})"
 
 cd "$repo_root"
 dart run flutter_launcher_icons
