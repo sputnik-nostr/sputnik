@@ -48,7 +48,7 @@ Future<void> ensureMyFollowingLoaded(Set<String> relayUrls) {
       myFollowingNotifier.value != null) {
     return Future.value();
   }
-  if (_myFollowingLoadedFor != myPubkeyHex) {
+  if (_myFollowingLoadedFor != myPubkeyHex && !_hasPendingFor(myPubkeyHex)) {
     // Another identity's list must not stand in while this one loads.
     myFollowingNotifier.value = null;
     _myFollowingLoadedFor = null;
@@ -66,7 +66,9 @@ Future<void> ensureMyFollowingLoaded(Set<String> relayUrls) {
         if (following == null) return;
         // The active identity may have changed while this was in flight.
         if (activeIdentityPubkeyNotifier.value != myPubkeyHex) return;
-        myFollowingNotifier.value = following.toSet();
+        // A publish that landed meanwhile already set a newer list.
+        if (_myFollowingLoadedFor == myPubkeyHex) return;
+        myFollowingNotifier.value = _withPending(myPubkeyHex, following);
         _myFollowingLoadedFor = myPubkeyHex;
       })
       .whenComplete(() {
@@ -76,6 +78,20 @@ Future<void> ensureMyFollowingLoaded(Set<String> relayUrls) {
       });
   _myFollowingLoading = (pubkeyHex: myPubkeyHex, future: future);
   return future;
+}
+
+bool _hasPendingFor(String pubkeyHex) =>
+    _pendingFor == pubkeyHex && _pending.isNotEmpty;
+
+/// [following] with [pubkeyHex]'s not-yet-published taps applied on top.
+Set<String> _withPending(String pubkeyHex, Iterable<String> following) {
+  if (_pendingFor != pubkeyHex) return following.toSet();
+  return {
+    for (final pubkey in following)
+      if (_pending[pubkey] != false) pubkey,
+    for (final change in _pending.entries)
+      if (change.value) change.key,
+  };
 }
 
 /// Queues a follow change, published in a batch after a short debounce.
@@ -154,12 +170,10 @@ Future<void> _runSync() async {
       if (activeIdentityPubkeyNotifier.value == myPubkeyHex) {
         // Built on a conclusive fetch of the list, so it counts as loaded.
         _myFollowingLoadedFor = myPubkeyHex;
-        myFollowingNotifier.value = {
-          for (final pubkey in outcome.following)
-            if (_pending[pubkey] != false) pubkey,
-          for (final change in _pending.entries)
-            if (change.value) change.key,
-        };
+        myFollowingNotifier.value = _withPending(
+          myPubkeyHex,
+          outcome.following,
+        );
       }
     }
   } finally {

@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 
 /// Whether the first [bits] bits of [bytes] match [prefix].
 bool _inCidr(List<int> bytes, List<int> prefix, int bits) {
@@ -75,25 +78,107 @@ bool isLocalNetworkUrl(String url) {
 int effectivePort(Uri url) =>
     url.port != 0 ? url.port : (url.scheme == 'https' ? 443 : 80);
 
-/// Connects to the vetted address so DNS can't rebind; ignores proxies.
+/// Head start each address gets before the next one is tried too (RFC 8305).
+const _connectAttemptDelay = Duration(milliseconds: 250);
+
+/// Alternates IPv6 and IPv4, so one broken family can't stall every attempt.
+List<InternetAddress> _interleaveFamilies(List<InternetAddress> addresses) {
+  if (addresses.isEmpty) return addresses;
+  final first = addresses.first.type;
+  final preferred = [
+    for (final a in addresses)
+      if (a.type == first) a,
+  ];
+  final other = [
+    for (final a in addresses)
+      if (a.type != first) a,
+  ];
+  return [
+    for (var i = 0; i < preferred.length || i < other.length; i++) ...[
+      if (i < preferred.length) preferred[i],
+      if (i < other.length) other[i],
+    ],
+  ];
+}
+
+/// Races [addresses] in staggered order, as dart:io does for a hostname.
+@visibleForTesting
+ConnectionTask<Socket> connectToAny(List<InternetAddress> addresses, int port) {
+  final result = Completer<Socket>();
+  final tasks = <ConnectionTask<Socket>>[];
+  var next = 0;
+  var failed = 0;
+  var cancelled = false;
+  Timer? stagger;
+
+  void startNext() {
+    stagger?.cancel();
+    if (cancelled || result.isCompleted || next >= addresses.length) return;
+    final address = addresses[next++];
+    stagger = Timer(_connectAttemptDelay, startNext);
+
+    void fail(Object error, StackTrace stack) {
+      if (result.isCompleted) return;
+      if (++failed == addresses.length) {
+        stagger?.cancel();
+        result.completeError(error, stack);
+      } else {
+        startNext();
+      }
+    }
+
+    Socket.startConnect(address, port).then((task) {
+      if (cancelled || result.isCompleted) {
+        task.cancel();
+        return;
+      }
+      tasks.add(task);
+      task.socket.then((socket) {
+        if (result.isCompleted) {
+          socket.destroy();
+          return;
+        }
+        stagger?.cancel();
+        result.complete(socket);
+        for (final other in tasks) {
+          if (!identical(other, task)) other.cancel();
+        }
+      }, onError: fail);
+    }, onError: fail);
+  }
+
+  if (addresses.isEmpty) {
+    result.completeError(const SocketException('No address to connect to'));
+  } else {
+    startNext();
+  }
+  return ConnectionTask.fromSocket(result.future, () {
+    cancelled = true;
+    stagger?.cancel();
+    for (final task in tasks) {
+      task.cancel();
+    }
+  });
+}
+
+/// Connects only to vetted addresses so DNS can't rebind; ignores proxies.
 Future<ConnectionTask<Socket>> guardedConnectionFactory(
   Uri url,
   String? proxyHost,
   int? proxyPort,
 ) async {
-  final addresses = await InternetAddress.lookup(url.host);
-  InternetAddress? address;
-  for (final candidate in addresses) {
-    if (!isBlockedAddress(candidate)) {
-      address = candidate;
-      break;
-    }
-  }
-  if (address == null) {
+  final addresses = [
+    for (final candidate in await InternetAddress.lookup(url.host))
+      if (!isBlockedAddress(candidate)) candidate,
+  ];
+  if (addresses.isEmpty) {
     throw SocketException('No public address found for ${url.host}');
   }
 
-  final rawTask = await Socket.startConnect(address, effectivePort(url));
+  final rawTask = connectToAny(
+    _interleaveFamilies(addresses),
+    effectivePort(url),
+  );
   if (url.scheme != 'https') return rawTask;
 
   // connectionFactory doesn't wrap HTTPS in TLS itself.

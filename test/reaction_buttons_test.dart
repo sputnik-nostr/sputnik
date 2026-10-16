@@ -54,6 +54,7 @@ void main() {
   late Note note;
 
   setUp(() async {
+    confirmBeforeReactingNotifier.value = false;
     final keypair = generateNostrKeyPair();
     identity = Identity(
       pubkeyHex: keypair.publicKeyHex,
@@ -94,7 +95,7 @@ void main() {
     return tester.pumpWidget(MaterialApp(home: Scaffold(body: button)));
   }
 
-  testWidgets('with confirmation off (the default), tapping like publishes '
+  testWidgets('with confirmation off, tapping like publishes '
       'immediately with no dialog', (tester) async {
     final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
     RelayClient.instance = fakeClient;

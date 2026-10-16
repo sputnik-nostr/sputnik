@@ -42,15 +42,15 @@ final ValueNotifier<List<Identity>> identitiesNotifier = ValueNotifier(
 
 final ValueNotifier<String?> activeIdentityPubkeyNotifier = ValueNotifier(null);
 
-final loadProfileImagesNotifier = Preference(false);
+final loadProfileImagesNotifier = Preference(true);
 
-final loadNoteImagesNotifier = Preference(false);
+final loadNoteImagesNotifier = Preference(true);
 
-/// Off by default: a check contacts a domain the profile's author chose.
-final autoVerifyNip05Notifier = Preference(false);
+/// A check contacts a domain the profile's author chose.
+final autoVerifyNip05Notifier = Preference(true);
 
 /// Liking and following only; posting and reposting always confirm.
-final confirmBeforeReactingNotifier = Preference(false);
+final confirmBeforeReactingNotifier = Preference(true);
 
 /// Payment target types (e.g. "monero") to hide on every profile.
 final hiddenPaymentTargetTypesNotifier = Preference<Set<String>>(const {});

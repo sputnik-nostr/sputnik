@@ -76,6 +76,7 @@ void main() {
   final notFollowedPubkeyHex = 'c' * 64;
 
   setUp(() async {
+    confirmBeforeReactingNotifier.value = false;
     final keypair = generateNostrKeyPair();
     seckeyHex = keypair.privateKeyHex;
     identity = Identity(

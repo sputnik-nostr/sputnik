@@ -219,6 +219,40 @@ void main() {
     },
   );
 
+  test('a follow tapped while the list loads survives the load', () async {
+    final relay = _PerAuthorRelay({
+      me: [alice, bob],
+    }, held: me);
+    RelayClient.instance = relay;
+
+    final load = ensureMyFollowingLoaded({'wss://relay.example'});
+    myFollowingNotifier.value = {carol};
+    scheduleFollowingSync(carol, follow: true);
+    relay.release.complete();
+    await load;
+
+    expect(myFollowingNotifier.value, {alice, bob, carol});
+  });
+
+  test(
+    'a follow tapped after a failed load is not cleared by a retry',
+    () async {
+      final relay = _FlakyRelay(me, [alice, bob]);
+      RelayClient.instance = relay;
+      Future<void> load() => ensureMyFollowingLoaded({'wss://relay.example'});
+      await load();
+
+      myFollowingNotifier.value = {carol};
+      scheduleFollowingSync(carol, follow: true);
+      await load();
+      expect(myFollowingNotifier.value, {carol});
+
+      relay.relays = _Relays.up;
+      await load();
+      expect(myFollowingNotifier.value, {alice, bob, carol});
+    },
+  );
+
   test('a follow made while relays are unreachable is retried until it '
       'goes through', () async {
     final relay = _FlakyRelay(me, [alice, bob]);

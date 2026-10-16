@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'hex.dart';
@@ -20,6 +21,12 @@ const _maxSubscriptionDuration = Duration(seconds: 30);
 
 /// Cap on events kept per subscription, bounding what a chatty relay can send.
 const _maxEventsPerSubscription = 2000;
+
+/// Below the 20 that common relays allow before refusing more REQs.
+const _maxConcurrentSubscriptions = 10;
+
+/// Detects a socket the OS dropped silently, e.g. while Android was paused.
+const _pingInterval = Duration(seconds: 20);
 
 String _generateSubscriptionId() =>
     hexEncode(List<int>.generate(8, (_) => _random.nextInt(256)));
@@ -184,12 +191,22 @@ class RelayConnectionPool {
   Future<({List<NostrEvent> events, bool eose})> _queryRelay(
     String relayUrl,
     NostrFilter filter,
-    Duration timeout,
-  ) async {
+    Duration timeout, {
+    bool isRetry = false,
+  }) async {
     _RelayConnection? connection;
     try {
       connection = await _connectionFor(relayUrl, timeout);
-      return await connection.subscribe(filter, timeout);
+      final mark = connection.mark();
+      final answer = await connection.subscribe(filter, timeout);
+      if (answer.eose || !connection.silentSince(mark)) return answer;
+
+      await _drop(relayUrl, connection);
+      // Only a socket that used to answer is worth one fresh attempt.
+      if (!isRetry && mark.wasAlive) {
+        return await _queryRelay(relayUrl, filter, timeout, isRetry: true);
+      }
+      return answer;
     } catch (_) {
       // Drop the failed connection so the next query reconnects.
       if (connection != null) await _drop(relayUrl, connection);
@@ -236,12 +253,26 @@ class RelayConnectionPool {
   Future<RelayPublishResult> _publishToRelay(
     String relayUrl,
     NostrEvent event,
-    Duration timeout,
-  ) async {
+    Duration timeout, {
+    bool isRetry = false,
+  }) async {
     _RelayConnection? connection;
     try {
       connection = await _connectionFor(relayUrl, timeout);
-      return await connection.publish(event, timeout);
+      final mark = connection.mark();
+      final result = await connection.publish(event, timeout);
+      if (result.outcome == RelayPublishOutcome.accepted ||
+          result.outcome == RelayPublishOutcome.rejected ||
+          !connection.silentSince(mark)) {
+        return result;
+      }
+
+      await _drop(relayUrl, connection);
+      // Resending is safe: relays treat a known event ID as a duplicate.
+      if (!isRetry && mark.wasAlive) {
+        return await _publishToRelay(relayUrl, event, timeout, isRetry: true);
+      }
+      return result;
     } catch (_) {
       if (connection != null) await _drop(relayUrl, connection);
       return const RelayPublishResult(RelayPublishOutcome.connectionFailed);
@@ -249,9 +280,14 @@ class RelayConnectionPool {
   }
 }
 
+typedef _TrafficMark = ({int received, bool wasAlive});
+
 class _RelayConnection {
   _RelayConnection(String relayUrl)
-    : _channel = WebSocketChannel.connect(Uri.parse(relayUrl)) {
+    : _channel = IOWebSocketChannel.connect(
+        Uri.parse(relayUrl),
+        pingInterval: _pingInterval,
+      ) {
     ready = _channel.ready;
     _streamSubscription = _channel.stream.listen(
       _handleMessage,
@@ -268,13 +304,23 @@ class _RelayConnection {
   final _completers = <String, Completer<void>>{};
   final _publishWaiters = PublishWaiters();
   bool _closed = false;
+  int _messagesReceived = 0;
+  int _activeSubscriptions = 0;
+  final _subscriptionSlots = <Completer<void>>[];
 
   Future<void> _dispatchQueue = Future.value();
 
   bool get isClosed => _closed;
 
+  _TrafficMark mark() =>
+      (received: _messagesReceived, wasAlive: _messagesReceived > 0);
+
+  /// Nothing at all arrived since [mark], so the socket is likely dead.
+  bool silentSince(_TrafficMark mark) => _messagesReceived == mark.received;
+
   /// Parses in parallel but handles in order, so EOSE can't beat events.
   void _handleMessage(dynamic raw) {
+    _messagesReceived++;
     if (raw is! String) return;
 
     final parsing = RelayMessageParser.instance
@@ -302,6 +348,10 @@ class _RelayConnection {
 
   void _fail() {
     _closed = true;
+    for (final slot in _subscriptionSlots) {
+      if (!slot.isCompleted) slot.complete();
+    }
+    _subscriptionSlots.clear();
     for (final completer in _completers.values) {
       if (!completer.isCompleted) completer.complete();
     }
@@ -310,11 +360,40 @@ class _RelayConnection {
     );
   }
 
+  Future<void> _acquireSubscriptionSlot() async {
+    while (!_closed && _activeSubscriptions >= _maxConcurrentSubscriptions) {
+      final slot = Completer<void>();
+      _subscriptionSlots.add(slot);
+      await slot.future;
+    }
+    _activeSubscriptions++;
+  }
+
+  void _releaseSubscriptionSlot() {
+    _activeSubscriptions--;
+    if (_subscriptionSlots.isNotEmpty) {
+      _subscriptionSlots.removeAt(0).complete();
+    }
+  }
+
   Future<({List<NostrEvent> events, bool eose})> subscribe(
     NostrFilter filter,
     Duration timeout,
   ) async {
     await ready;
+    await _acquireSubscriptionSlot();
+    try {
+      return await _subscribe(filter, timeout);
+    } finally {
+      _releaseSubscriptionSlot();
+    }
+  }
+
+  Future<({List<NostrEvent> events, bool eose})> _subscribe(
+    NostrFilter filter,
+    Duration timeout,
+  ) async {
+    if (_closed) return (events: const <NostrEvent>[], eose: false);
     final subscriptionId = _generateSubscriptionId();
     final events = <NostrEvent>[];
     final seenIds = <String>{};

@@ -177,4 +177,33 @@ void main() {
       expect(isLocalNetworkUrl('wss://localhost.example.com'), isFalse);
     });
   });
+  group('connectToAny', () {
+    test('falls back to the next address when one refuses', () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      final refusing = InternetAddress('127.0.0.2');
+
+      final socket = await connectToAny([
+        refusing,
+        InternetAddress.loopbackIPv4,
+      ], server.port).socket.timeout(const Duration(seconds: 5));
+      addTearDown(socket.destroy);
+
+      expect(socket.remoteAddress, InternetAddress.loopbackIPv4);
+    });
+
+    test('fails once every address has failed', () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final port = server.port;
+      await server.close();
+
+      await expectLater(
+        connectToAny([
+          InternetAddress('127.0.0.2'),
+          InternetAddress.loopbackIPv4,
+        ], port).socket.timeout(const Duration(seconds: 5)),
+        throwsA(isA<SocketException>()),
+      );
+    });
+  });
 }

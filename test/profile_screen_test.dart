@@ -75,6 +75,7 @@ void main() {
     profileCacheNotifier.value = const {};
     notesNotifier.value = const [];
     autoVerifyNip05Notifier.value = false;
+    confirmBeforeReactingNotifier.value = false;
   });
 
   testWidgets('with no active identity, shows a prompt instead of a profile', (

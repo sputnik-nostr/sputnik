@@ -37,7 +37,7 @@
 
 ## Media (current state)
 
-- [x] Show images in notes (tap to load by default)
+- [x] Show images in notes, with an option to tap to load them instead
 - [x] Show videos in notes (always tap to play)
 - [x] Check media against its SHA-256 and fall back to the author's Blossom servers
 - [x] Show video posters and blurhash placeholders (`image`, `thumb`, `blurhash`)
@@ -59,8 +59,8 @@
 - [ ] Test media on Android (the video lockdown options, the prebuilt `media_kit` libraries, saving to the gallery)
 - [ ] Check the hash rule against real hosts (e.g. nostr.build) so no existing notes break
 - [x] Load profile pictures and banners with the same size cap, redirect, and hash rules (HTTPS only)
-- [x] Load profile pictures and banners only once you turn it on (off by default)
-- [x] Check NIP-05 identifiers only on tap, or automatically once you turn it on (off by default)
+- [x] Load profile pictures and banners, with an option to turn them off
+- [x] Check NIP-05 identifiers automatically, with an option to check only on tap
 - [x] Reuse connections for images through one shared client that keeps the address checks
 - [x] Bundle libmpv in the Linux AppImage
 - [ ] Document that building from source on Linux needs libmpv

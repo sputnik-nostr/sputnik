@@ -148,34 +148,34 @@ void main() {
     expect(prefs.getKeys(), unorderedEquals(['theme_mode', 'load_media']));
   });
 
-  test('profile images default to off, the private choice', () async {
+  test('profile images default to on', () async {
     SharedPreferences.setMockInitialValues({});
 
     expect(await SettingsStore.loadLoadProfileImages(), isNull);
-    expect(loadProfileImagesNotifier.defaultValue, isFalse);
+    expect(loadProfileImagesNotifier.defaultValue, isTrue);
   });
 
   test('profile image loading persists once saved', () async {
     SharedPreferences.setMockInitialValues({});
 
-    await SettingsStore.saveLoadProfileImages(true);
+    await SettingsStore.saveLoadProfileImages(false);
 
-    expect(await SettingsStore.loadLoadProfileImages(), isTrue);
+    expect(await SettingsStore.loadLoadProfileImages(), isFalse);
   });
 
-  test('note images default to tap to load, the private choice', () async {
+  test('note images default to loading automatically', () async {
     SharedPreferences.setMockInitialValues({});
 
     expect(await SettingsStore.loadLoadNoteImages(), isNull);
-    expect(loadNoteImagesNotifier.defaultValue, isFalse);
+    expect(loadNoteImagesNotifier.defaultValue, isTrue);
   });
 
   test('note image loading persists once saved', () async {
     SharedPreferences.setMockInitialValues({});
 
-    await SettingsStore.saveLoadNoteImages(true);
+    await SettingsStore.saveLoadNoteImages(false);
 
-    expect(await SettingsStore.loadLoadNoteImages(), isTrue);
+    expect(await SettingsStore.loadLoadNoteImages(), isFalse);
   });
 
   test('hidden payment target types default to none hidden', () async {

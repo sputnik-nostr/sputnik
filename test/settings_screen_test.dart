@@ -111,11 +111,11 @@ void main() {
     themeModeNotifier.value = ThemeMode.dark;
     seedColorNotifier.value = AppSeedColor.red;
     selectedRelaysNotifier.value = {'wss://custom.example'};
-    loadProfileImagesNotifier.value = true;
-    loadNoteImagesNotifier.value = true;
-    autoVerifyNip05Notifier.value = true;
+    loadProfileImagesNotifier.value = false;
+    loadNoteImagesNotifier.value = false;
+    autoVerifyNip05Notifier.value = false;
     hiddenPaymentTargetTypesNotifier.value = {'monero'};
-    confirmBeforeReactingNotifier.value = true;
+    confirmBeforeReactingNotifier.value = false;
     identitiesNotifier.value = [
       Identity(pubkeyHex: 'a' * 64, createdAt: DateTime.now()),
     ];
@@ -138,11 +138,11 @@ void main() {
     expect(themeModeNotifier.value, ThemeMode.system);
     expect(seedColorNotifier.value, AppSeedColor.blue);
     expect(selectedRelaysNotifier.value, defaultRelays.toSet());
-    expect(loadProfileImagesNotifier.value, isFalse);
-    expect(loadNoteImagesNotifier.value, isFalse);
-    expect(autoVerifyNip05Notifier.value, isFalse);
+    expect(loadProfileImagesNotifier.value, isTrue);
+    expect(loadNoteImagesNotifier.value, isTrue);
+    expect(autoVerifyNip05Notifier.value, isTrue);
     expect(hiddenPaymentTargetTypesNotifier.value, isEmpty);
-    expect(confirmBeforeReactingNotifier.value, isFalse);
+    expect(confirmBeforeReactingNotifier.value, isTrue);
     expect(identitiesNotifier.value, hasLength(1));
   });
 }
