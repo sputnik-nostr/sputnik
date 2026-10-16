@@ -43,9 +43,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 : [
                     IconButton(
                       icon: const Icon(Icons.clear),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Clear',
                       onPressed: () {
                         _controller.clear();
                         setState(() => _query = '');
@@ -53,6 +51,9 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                   ],
             onChanged: (value) => setState(() => _query = value),
+            padding: const WidgetStatePropertyAll(
+              EdgeInsetsDirectional.only(start: 16, end: 8),
+            ),
             elevation: const WidgetStatePropertyAll(0),
             constraints: const BoxConstraints(minHeight: 40, maxHeight: 40),
             shape: const WidgetStatePropertyAll(

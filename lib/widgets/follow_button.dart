@@ -57,10 +57,11 @@ class FollowButton extends StatelessWidget {
         final isFollowing =
             myFollowing?.contains(targetPubkeyHex.toLowerCase()) ?? false;
         final style = dense
-            ? TextButton.styleFrom(
-                minimumSize: const Size(0, 32),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                visualDensity: VisualDensity.compact,
+            ? const ButtonStyle(
+                minimumSize: WidgetStatePropertyAll(Size(0, 32)),
+                padding: WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 12),
+                ),
               )
             : null;
 
