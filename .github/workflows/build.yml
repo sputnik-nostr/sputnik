@@ -53,8 +53,33 @@ jobs:
                 && chown "$OWNER" "/out/sputnik-$0.apk"' "$abi"
           done
           (cd dist && sha256sum sputnik-*.apk sputnik-x86_64.AppImage >SHA256SUMS)
+      # One unzipped artifact per installable file, named after the file.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: sputnik
-          path: dist/
+          path: dist/sputnik-x86_64.AppImage
+          archive: false
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: dist/sputnik-arm64-v8a.apk
+          archive: false
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: dist/sputnik-armeabi-v7a.apk
+          archive: false
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: dist/sputnik-x86_64.apk
+          archive: false
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: dist/SHA256SUMS
+          archive: false
+      # Only for comparing against a local `make dist`.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sputnik-unsigned-apks
+          path: dist/sputnik-*-unsigned.apk
           compression-level: 0
