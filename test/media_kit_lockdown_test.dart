@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_kit/media_kit.dart';
@@ -11,28 +10,15 @@ Map<String, String> _hostileFiles(String url) => {
       '#EXTM3U\n#EXT-X-VERSION:3\n#EXTINF:1,\n$url/hls\n#EXT-X-ENDLIST\n',
   'edl.mp4': '# mpv EDL v0\n$url/edl\n',
   'm3u.mp4': '#EXTM3U\n$url/m3u\n',
+  'dash.mp4':
+      '<?xml version="1.0"?>\n'
+      '<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" '
+      'mediaPresentationDuration="PT1S" minBufferTime="PT1S" '
+      'profiles="urn:mpeg:dash:profile:isoff-on-demand:2011"><Period>'
+      '<AdaptationSet mimeType="video/mp4"><Representation id="1" '
+      'bandwidth="1000"><BaseURL>$url/dash</BaseURL></Representation>'
+      '</AdaptationSet></Period></MPD>\n',
 };
-
-/// A silent mono 8 kHz WAV, so a normal playable file needs no fixtures.
-List<int> _silentWav(int seconds) {
-  const rate = 8000;
-  final data = rate * 2 * seconds;
-  final header = ByteData(44)
-    ..setUint32(4, 36 + data, Endian.little)
-    ..setUint32(16, 16, Endian.little)
-    ..setUint16(20, 1, Endian.little)
-    ..setUint16(22, 1, Endian.little)
-    ..setUint32(24, rate, Endian.little)
-    ..setUint32(28, rate * 2, Endian.little)
-    ..setUint16(32, 2, Endian.little)
-    ..setUint16(34, 16, Endian.little)
-    ..setUint32(40, data, Endian.little);
-  final bytes = header.buffer.asUint8List();
-  bytes.setAll(0, 'RIFF'.codeUnits);
-  bytes.setAll(8, 'WAVEfmt '.codeUnits);
-  bytes.setAll(36, 'data'.codeUnits);
-  return [...bytes, ...Uint8List(data)];
-}
 
 void main() {
   late bool libmpv;
@@ -116,11 +102,12 @@ void main() {
 
   test('a normal file still plays with the lockdown applied', () async {
     if (!libmpv) return markTestSkipped('libmpv is not installed');
-    await File('${dir.path}/good.wav').writeAsBytes(_silentWav(5));
     final player = await newPlayer();
     try {
       await lockDownPlayer(player);
-      await player.open(Media('${dir.path}/good.wav'));
+      await player.open(
+        Media(File('test/fixtures/black_5s.mp4').absolute.path),
+      );
 
       // Otherwise a player that opens nothing would pass too.
       final duration = await player.stream.duration
@@ -145,7 +132,7 @@ void main() {
 
       final platform = player.platform as NativePlayer;
       for (final option in videoPlayerOptions.entries) {
-        expect(await platform.getProperty(option.key), option.value);
+        expect(await platform.getProperty(option.key), readBack(option.value));
       }
     } finally {
       await player.dispose();
