@@ -27,6 +27,26 @@ void main() {
     },
   );
 
+  testWidgets('shows the identifier as parsed, naming the fetched host', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              Nip05Badge(identifier: ' Bob@Example.COM '),
+              Nip05Badge(identifier: '_@example.org'),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('bob@example.com'), findsOneWidget);
+    expect(find.text('example.org'), findsOneWidget);
+  });
+
   testWidgets('an unchecked identifier verifies only when tapped', (
     tester,
   ) async {

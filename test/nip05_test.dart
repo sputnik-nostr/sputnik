@@ -33,6 +33,26 @@ void main() {
     test('rejects an identifier with no domain', () {
       expect(parseNip05('bob@'), isNull);
     });
+
+    test('lowercases the domain', () {
+      expect(parseNip05('bob@Example.COM')?.domain, 'example.com');
+    });
+
+    test('rejects a domain that would point the fetch at another host', () {
+      for (final identifier in [
+        'bob@trusted.example@evil.example',
+        'bob@trusted.example:8443',
+        'bob@trusted.example/path',
+        'bob@trusted.example?x=1',
+        'bob@trusted.example#x',
+        'bob@[::1]',
+        'bob@localhost',
+        'bob@-bad.example',
+        'bob@trusted.example.',
+      ]) {
+        expect(parseNip05(identifier), isNull, reason: identifier);
+      }
+    });
   });
 
   group('verifyNip05', () {

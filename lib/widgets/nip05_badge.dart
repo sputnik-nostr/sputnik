@@ -18,8 +18,14 @@ class Nip05Badge extends StatelessWidget {
   /// Set while unchecked; tapping the icon starts the check.
   final VoidCallback? onVerify;
 
-  String get _displayIdentifier =>
-      identifier.startsWith('_@') ? identifier.substring(2) : identifier;
+  /// The parsed form, so a verified badge names the host that was asked.
+  String get _displayIdentifier {
+    final parsed = parseNip05(identifier);
+    if (parsed == null) return identifier;
+    return parsed.local == '_'
+        ? parsed.domain
+        : '${parsed.local}@${parsed.domain}';
+  }
 
   @override
   Widget build(BuildContext context) {

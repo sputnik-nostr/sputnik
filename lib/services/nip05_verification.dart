@@ -53,15 +53,12 @@ Future<Nip05Status> _fetchAndVerify(
 
 /// Fetches and checks [parsed], always closing the client, even on timeout.
 Future<Nip05Status> _check(Nip05Identifier parsed, String pubkeyHex) async {
-  final Uri uri;
-  try {
-    uri = Uri.https(parsed.domain, '/.well-known/nostr.json', {
-      'name': parsed.local,
-    });
-  } on FormatException {
-    return Nip05Status.unreachable;
-  }
-
+  final uri = Uri(
+    scheme: 'https',
+    host: parsed.domain,
+    path: '/.well-known/nostr.json',
+    queryParameters: {'name': parsed.local},
+  );
   final client = guardedHttpClient()..connectionTimeout = _fetchTimeout;
   try {
     return await _fetchAndVerify(

@@ -15,6 +15,12 @@ typedef Nip05Identifier = ({String local, String domain});
 
 final _localPartPattern = RegExp(r'^[a-z0-9-_.]+$');
 
+/// A plain DNS hostname: no userinfo, port, or path to redirect the fetch.
+final _domainPattern = RegExp(
+  r'^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+'
+  r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$',
+);
+
 /// A bare domain means the `_@domain` root identifier, per the spec.
 Nip05Identifier? parseNip05(String identifier) {
   final trimmed = identifier.trim();
@@ -23,8 +29,13 @@ Nip05Identifier? parseNip05(String identifier) {
   final atIndex = trimmed.indexOf('@');
   final local = (atIndex == -1 ? '_' : trimmed.substring(0, atIndex))
       .toLowerCase();
-  final domain = atIndex == -1 ? trimmed : trimmed.substring(atIndex + 1);
-  if (domain.isEmpty || !_localPartPattern.hasMatch(local)) return null;
+  final domain = (atIndex == -1 ? trimmed : trimmed.substring(atIndex + 1))
+      .toLowerCase();
+  if (domain.length > 253 ||
+      !_domainPattern.hasMatch(domain) ||
+      !_localPartPattern.hasMatch(local)) {
+    return null;
+  }
 
   return (local: local, domain: domain);
 }
