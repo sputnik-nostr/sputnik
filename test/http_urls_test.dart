@@ -32,4 +32,17 @@ void main() {
       expect(withoutUrls(longer, {url}), longer);
     });
   });
+  group('trimUrlEnd', () {
+    test('drops sentence punctuation and unmatched closers', () {
+      expect(trimUrlEnd('https://a.example/x).'), 'https://a.example/x');
+      expect(trimUrlEnd('https://a.example/(x)'), 'https://a.example/(x)');
+    });
+
+    test('handles a long run of closers quickly', () {
+      final watch = Stopwatch()..start();
+      final url = 'https://a.example/${')' * 200000}';
+      expect(trimUrlEnd(url), 'https://a.example/');
+      expect(watch.elapsed, lessThan(const Duration(seconds: 1)));
+    });
+  });
 }
