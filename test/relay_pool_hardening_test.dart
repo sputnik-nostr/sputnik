@@ -215,4 +215,22 @@ void main() {
       );
     });
   });
+  group('relay messages are size-limited', () {
+    test('drops a relay that sends an oversized message', () async {
+      final event = sign();
+      final server = await _serve(
+        (sub) => [
+          jsonEncode(['NOTICE', 'x' * (2 << 20)]),
+          _eventMsg(sub, event),
+          _eose(sub),
+        ],
+      );
+      addTearDown(() => server.close(force: true));
+
+      final result = await query(server, const NostrFilter(kinds: [1]));
+
+      expect(result.events, isEmpty);
+      expect(result.allRelaysAnswered, isFalse);
+    });
+  });
 }

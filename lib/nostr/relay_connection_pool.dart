@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -13,24 +14,35 @@ import 'relay_message_parser.dart';
 
 final _random = Random();
 
-/// How long to wait for a relay's first message before giving up on it.
+/// Time to wait for the first reply to a subscription before giving up.
 const _firstResponseTimeout = Duration(seconds: 2);
 
-/// Cap on total subscription time, however steadily the relay keeps sending.
+/// Cap on a subscription's length, even if the relay keeps sending events. A
+/// longer caller timeout takes precedence.
 const _maxSubscriptionDuration = Duration(seconds: 30);
 
-/// Cap on events kept per subscription, bounding what a chatty relay can send.
+/// Maximum number of events per subscription.
 const _maxEventsPerSubscription = 2000;
 
-/// Below the 20 that common relays allow before refusing more REQs.
+/// Maximum number of concurrent subscriptions per relay. This is below the 20
+/// that common relays will allow before refusing more REQs.
 const _maxConcurrentSubscriptions = 10;
 
-/// Detects a socket the OS dropped silently, e.g. while Android was paused.
+/// Ping interval, to detect a socket that the OS silently dropped (for
+/// example, while Android was paused).
 const _pingInterval = Duration(seconds: 20);
 
 /// How long a relay that failed is skipped, doubling up to [_maxCooldown].
 const _firstCooldown = Duration(seconds: 5);
 const _maxCooldown = Duration(minutes: 2);
+
+/// Maximum message length; well above common relay event limits, so it will
+/// only be reached by abuse.
+const _maxMessageLength = 1 << 20;
+
+/// Maximum length of text waiting to be parsed on one connection before its
+/// relay is counted as flooding.
+const _maxPendingParseLength = 32 << 20;
 
 class _RelayCoolingDown implements Exception {
   const _RelayCoolingDown();
@@ -225,7 +237,8 @@ class RelayConnectionPool {
       connection = await _connectionFor(relayUrl, timeout);
       final mark = connection.mark();
       final answer = await connection.subscribe(filter, timeout);
-      if (answer.eose || !connection.silentSince(mark)) {
+      if (!connection.flooded &&
+          (answer.eose || !connection.silentSince(mark))) {
         _cooldowns.remove(relayUrl);
         return answer;
       }
@@ -258,7 +271,13 @@ class RelayConnectionPool {
     // An existing connection may still be connecting, so it gets a timeout too.
     final connection = existing != null && !existing.isClosed
         ? existing
-        : _connections[relayUrl] = _RelayConnection(relayUrl);
+        : _connections[relayUrl] = _RelayConnection(
+            relayUrl,
+            onFlood: (flooding) {
+              _drop(relayUrl, flooding);
+              _noteFailure(relayUrl);
+            },
+          );
     try {
       await connection.ready.timeout(connectTimeout);
     } catch (_) {
@@ -298,9 +317,10 @@ class RelayConnectionPool {
       connection = await _connectionFor(relayUrl, timeout);
       final mark = connection.mark();
       final result = await connection.publish(event, timeout);
-      if (result.outcome == RelayPublishOutcome.accepted ||
-          result.outcome == RelayPublishOutcome.rejected ||
-          !connection.silentSince(mark)) {
+      if (!connection.flooded &&
+          (result.outcome == RelayPublishOutcome.accepted ||
+              result.outcome == RelayPublishOutcome.rejected ||
+              !connection.silentSince(mark))) {
         _cooldowns.remove(relayUrl);
         return result;
       }
@@ -322,10 +342,14 @@ class RelayConnectionPool {
 typedef _TrafficMark = ({int received, bool wasAlive});
 
 class _RelayConnection {
-  _RelayConnection(String relayUrl)
-    : _channel = IOWebSocketChannel.connect(
-        Uri.parse(relayUrl),
-        pingInterval: _pingInterval,
+  _RelayConnection(String relayUrl, {required this.onFlood})
+    : _channel = IOWebSocketChannel(
+        // Compression off, so a small frame can't inflate into a huge one.
+        WebSocket.connect(
+          relayUrl,
+          compression: CompressionOptions.compressionOff,
+          maxPayloadLength: _maxMessageLength,
+        ).then((socket) => socket..pingInterval = _pingInterval),
       ) {
     ready = _channel.ready;
     _streamSubscription = _channel.stream.listen(
@@ -336,6 +360,7 @@ class _RelayConnection {
   }
 
   final WebSocketChannel _channel;
+  final void Function(_RelayConnection connection) onFlood;
   late final Future<void> ready;
   late final StreamSubscription<dynamic> _streamSubscription;
 
@@ -345,6 +370,8 @@ class _RelayConnection {
   bool _closed = false;
   int _messagesReceived = 0;
   int _activeSubscriptions = 0;
+  int _pendingParseLength = 0;
+  bool flooded = false;
   final _subscriptionSlots = <Completer<void>>[];
 
   Future<void> _dispatchQueue = Future.value();
@@ -360,7 +387,14 @@ class _RelayConnection {
   /// Parses in parallel but handles in order, so EOSE can't beat events.
   void _handleMessage(dynamic raw) {
     _messagesReceived++;
-    if (raw is! String) return;
+    // Fragmented messages can still exceed the per-frame cap.
+    if (raw is! String || raw.length > _maxMessageLength || _closed) return;
+    if (_pendingParseLength + raw.length > _maxPendingParseLength) {
+      flooded = true;
+      onFlood(this);
+      return;
+    }
+    _pendingParseLength += raw.length;
 
     final parsing = RelayMessageParser.instance
         .parse(raw, subscriptionIds: _handlers.keys.toSet())
@@ -382,7 +416,9 @@ class _RelayConnection {
       }
       _handlers[parsed.subscriptionId]?.call(parsed);
     });
-    _dispatchQueue = dispatched.catchError((Object _) {});
+    _dispatchQueue = dispatched
+        .catchError((Object _) {})
+        .whenComplete(() => _pendingParseLength -= raw.length);
   }
 
   void _fail() {
