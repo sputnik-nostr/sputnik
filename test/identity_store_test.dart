@@ -50,6 +50,7 @@ void main() {
     SettingsStore.secretStore = store;
     identitiesNotifier.value = const [];
     activeIdentityPubkeyNotifier.value = null;
+    IdentityStore.status.value = IdentityStatus.ready;
   });
 
   group('load', () {
@@ -85,6 +86,63 @@ void main() {
         expect(reported, hasLength(1));
       },
     );
+  });
+
+  group('status', () {
+    test(
+      'is ready once the identities are read, even when there are none',
+      () async {
+        await IdentityStore.load();
+
+        expect(IdentityStore.status.value, IdentityStatus.ready);
+      },
+    );
+
+    test('says they are being read, then that they cannot be', () async {
+      captureReportedErrors();
+      SettingsStore.secretStore = FaultySecretStore(store, failCall: 1);
+      final seen = <IdentityStatus>[];
+      void record() => seen.add(IdentityStore.status.value);
+      IdentityStore.status.addListener(record);
+      addTearDown(() => IdentityStore.status.removeListener(record));
+
+      await IdentityStore.load();
+
+      expect(seen, [IdentityStatus.loading, IdentityStatus.unavailable]);
+    });
+
+    test('a retry reads what the first attempt could not', () async {
+      captureReportedErrors();
+      final held = _newIdentity();
+      final inner = FakeSecretStore(_storageHolding([held]));
+      SettingsStore.secretStore = FaultySecretStore(inner, failCall: 1);
+      await IdentityStore.load();
+      expect(IdentityStore.status.value, IdentityStatus.unavailable);
+      expect(identitiesNotifier.value, isEmpty);
+
+      SettingsStore.secretStore = inner;
+      await IdentityStore.load();
+
+      expect(IdentityStore.status.value, IdentityStatus.ready);
+      expect(_shown(), [held.identity.pubkeyHex]);
+    });
+
+    test('nothing is added or removed until the identities are read', () async {
+      final held = _newIdentity();
+      store = FakeSecretStore(_storageHolding([held]));
+      final watched = FaultySecretStore(store);
+      SettingsStore.secretStore = watched;
+      IdentityStore.status.value = IdentityStatus.unavailable;
+
+      await expectLater(
+        IdentityStore.add('a' * 64, 'secret'),
+        throwsStateError,
+      );
+      await expectLater(IdentityStore.remove(held.identity), throwsStateError);
+
+      expect(watched.calls, isEmpty);
+      expect(store.values, _storageHolding([held]));
+    });
   });
 
   group('add', () {

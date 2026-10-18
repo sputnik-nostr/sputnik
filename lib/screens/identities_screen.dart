@@ -241,63 +241,114 @@ class IdentitiesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Identities'),
-        actions: [
-          SizedBox(
-            width: kToolbarHeight,
-            child: Center(
-              child: IconButton(
-                key: const Key('importIdentityButton'),
-                icon: const Icon(Icons.key_outlined),
-                tooltip: 'Import private key',
-                onPressed: () => _importIdentity(context),
+    return ValueListenableBuilder<IdentityStatus>(
+      valueListenable: IdentityStore.status,
+      builder: (context, status, _) {
+        // Nothing is added or removed while the identities are unknown.
+        final ready = status == IdentityStatus.ready;
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Identities'),
+            actions: [
+              SizedBox(
+                width: kToolbarHeight,
+                child: Center(
+                  child: IconButton(
+                    key: const Key('importIdentityButton'),
+                    icon: const Icon(Icons.key_outlined),
+                    tooltip: 'Import private key',
+                    onPressed: ready ? () => _importIdentity(context) : null,
+                  ),
+                ),
               ),
-            ),
-          ),
-          SizedBox(
-            width: kToolbarHeight,
-            child: Center(
-              child: IconButton(
-                key: const Key('generateIdentityButton'),
-                icon: const Icon(Icons.add),
-                tooltip: 'Generate new key pair',
-                onPressed: () => _generateIdentity(context),
+              SizedBox(
+                width: kToolbarHeight,
+                child: Center(
+                  child: IconButton(
+                    key: const Key('generateIdentityButton'),
+                    icon: const Icon(Icons.add),
+                    tooltip: 'Generate new key pair',
+                    onPressed: ready ? () => _generateIdentity(context) : null,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-      body: ValueListenableBuilder<List<Identity>>(
-        valueListenable: identitiesNotifier,
-        builder: (context, identities, _) {
-          if (identities.isEmpty) {
-            return const PlaceholderTab(
-              icon: Icons.key_outlined,
-              label: 'No identities yet',
-            );
-          }
+          body: !ready
+              ? _IdentitiesUnavailable(
+                  retrying: status == IdentityStatus.loading,
+                )
+              : ValueListenableBuilder<List<Identity>>(
+                  valueListenable: identitiesNotifier,
+                  builder: (context, identities, _) {
+                    if (identities.isEmpty) {
+                      return const PlaceholderTab(
+                        icon: Icons.key_outlined,
+                        label: 'No identities yet',
+                      );
+                    }
 
-          return ValueListenableBuilder<String?>(
-            valueListenable: activeIdentityPubkeyNotifier,
-            builder: (context, activePubkey, _) {
-              return ListView(
-                children: [
-                  for (final identity in identities)
-                    _IdentityTile(
-                      identity: identity,
-                      active: identity.pubkeyHex == activePubkey,
-                      onSelect: () => activeIdentityPubkeyNotifier.value =
-                          identity.pubkeyHex,
-                      onShowNsec: () => _showNsec(context, identity),
-                      onDelete: () => _confirmDeleteIdentity(context, identity),
-                    ),
-                ],
-              );
-            },
-          );
-        },
+                    return ValueListenableBuilder<String?>(
+                      valueListenable: activeIdentityPubkeyNotifier,
+                      builder: (context, activePubkey, _) {
+                        return ListView(
+                          children: [
+                            for (final identity in identities)
+                              _IdentityTile(
+                                identity: identity,
+                                active: identity.pubkeyHex == activePubkey,
+                                onSelect: () =>
+                                    activeIdentityPubkeyNotifier.value =
+                                        identity.pubkeyHex,
+                                onShowNsec: () => _showNsec(context, identity),
+                                onDelete: () =>
+                                    _confirmDeleteIdentity(context, identity),
+                              ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                ),
+        );
+      },
+    );
+  }
+}
+
+/// Shown instead of the list when the identities could not be read, so the
+/// empty screen is not mistaken for having none.
+class _IdentitiesUnavailable extends StatelessWidget {
+  const _IdentitiesUnavailable({required this.retrying});
+
+  final bool retrying;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const PlaceholderTab(
+              icon: Icons.lock_outline,
+              label: 'Could not read your identities',
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Secure storage could not be read, so identities cannot be '
+              'added or removed for now. Nothing has been deleted.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              key: const Key('retryIdentitiesButton'),
+              onPressed: retrying ? null : IdentityStore.load,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
       ),
     );
   }

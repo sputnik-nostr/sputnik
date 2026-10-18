@@ -1,9 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sputnik/app_state.dart';
 import 'package:sputnik/main.dart';
+import 'package:sputnik/models/identity.dart';
+import 'package:sputnik/models/identity_index.dart';
+import 'package:sputnik/nostr/nostr.dart';
+import 'package:sputnik/services/identity_store.dart';
 import 'package:sputnik/services/settings_store.dart';
 
 import 'support/fake_secret_store.dart';
@@ -29,8 +35,27 @@ class _UnwritableIndexSecretStore extends FakeSecretStore {
   }
 }
 
+// Fails every read of the identity index while locked, like a keyring whose
+// unlock prompt was dismissed, and answers only once [answer] completes.
+class _LockedIndexSecretStore extends FakeSecretStore {
+  _LockedIndexSecretStore([super.initial]);
+
+  var locked = true;
+  Completer<void>? answer;
+
+  @override
+  Future<String?> read(String key) async {
+    if (key == 'identities') {
+      await answer?.future;
+      if (locked) throw PlatformException(code: 'KeyringLocked');
+    }
+    return super.read(key);
+  }
+}
+
 void main() {
   setUp(() {
+    IdentityStore.status.value = IdentityStatus.ready;
     // Without posts, HomeScreen's spinner keeps pumpAndSettle going forever.
     notesNotifier.value = const [];
     identitiesNotifier.value = const [];
@@ -130,6 +155,149 @@ void main() {
     expect(identitiesNotifier.value, isEmpty);
     expect(activeIdentityPubkeyNotifier.value, isNull);
     expect(await SettingsStore.loadPrivateKey(pubkeyHex), isNull);
+  });
+
+  group('when the identities cannot be read', () {
+    final held = generateNostrKeyPair();
+    late _LockedIndexSecretStore store;
+
+    bool disabled(WidgetTester tester, String key) =>
+        tester.widget<IconButton>(find.byKey(Key(key))).onPressed == null;
+
+    setUp(() {
+      store = _LockedIndexSecretStore({
+        'identities': IdentityIndex.empty
+            .withIdentity(
+              Identity(pubkeyHex: held.publicKeyHex, createdAt: DateTime(2026)),
+            )
+            .encode(),
+        'identity_secret_${held.publicKeyHex}': held.privateKeyHex,
+      });
+      SettingsStore.secretStore = store;
+    });
+
+    testWidgets('says so instead of showing none, and adds nothing', (
+      tester,
+    ) async {
+      await IdentityStore.load();
+      expect(tester.takeException(), isA<PlatformException>());
+      await openIdentitiesScreen(tester);
+
+      expect(find.text('Could not read your identities'), findsOneWidget);
+      expect(find.text('No identities yet'), findsNothing);
+      expect(find.byKey(const Key('retryIdentitiesButton')), findsOneWidget);
+      expect(disabled(tester, 'generateIdentityButton'), isTrue);
+      expect(disabled(tester, 'importIdentityButton'), isTrue);
+
+      await tester.tap(
+        find.byKey(const Key('generateIdentityButton')),
+        warnIfMissed: false,
+      );
+      await tester.pumpAndSettle();
+
+      expect(identitiesNotifier.value, isEmpty);
+      expect(store.values.keys, [
+        'identities',
+        'identity_secret_${held.publicKeyHex}',
+      ]);
+    });
+
+    testWidgets('Retry lists the identities once storage answers', (
+      tester,
+    ) async {
+      await IdentityStore.load();
+      expect(tester.takeException(), isA<PlatformException>());
+      await openIdentitiesScreen(tester);
+
+      store.locked = false;
+      await tester.tap(find.byKey(const Key('retryIdentitiesButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not read your identities'), findsNothing);
+      expect(find.byType(ListTile), findsOneWidget);
+      expect(identitiesNotifier.value.single.pubkeyHex, held.publicKeyHex);
+      expect(disabled(tester, 'generateIdentityButton'), isFalse);
+      expect(disabled(tester, 'importIdentityButton'), isFalse);
+    });
+
+    testWidgets('what is generated after a retry joins the identities that '
+        'could not be read before', (tester) async {
+      await IdentityStore.load();
+      expect(tester.takeException(), isA<PlatformException>());
+      await openIdentitiesScreen(tester);
+      store.locked = false;
+      await tester.tap(find.byKey(const Key('retryIdentitiesButton')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('generateIdentityButton')));
+      await tester.pumpAndSettle();
+
+      // What a restart finds: the earlier identity and the new one.
+      final listed = (await SettingsStore.loadIdentityIndex()).identities;
+      expect(listed.map((i) => i.pubkeyHex), [
+        held.publicKeyHex,
+        identitiesNotifier.value.last.pubkeyHex,
+      ]);
+      expect(identitiesNotifier.value, hasLength(2));
+    });
+
+    testWidgets('offers no way to delete an identity it has listed', (
+      tester,
+    ) async {
+      identitiesNotifier.value = [
+        Identity(pubkeyHex: held.publicKeyHex, createdAt: DateTime(2026)),
+      ];
+      await IdentityStore.load();
+      expect(tester.takeException(), isA<PlatformException>());
+      await openIdentitiesScreen(tester);
+
+      expect(find.byType(PopupMenuButton<String>), findsNothing);
+      expect(find.byType(ListTile), findsNothing);
+    });
+
+    testWidgets('Retry cannot be pressed again while it is reading', (
+      tester,
+    ) async {
+      await IdentityStore.load();
+      expect(tester.takeException(), isA<PlatformException>());
+      await openIdentitiesScreen(tester);
+      store.locked = false;
+      store.answer = Completer<void>();
+      bool retryDisabled() =>
+          tester
+              .widget<FilledButton>(
+                find.byKey(const Key('retryIdentitiesButton')),
+              )
+              .onPressed ==
+          null;
+      expect(retryDisabled(), isFalse);
+
+      await tester.tap(find.byKey(const Key('retryIdentitiesButton')));
+      await tester.pump();
+
+      expect(find.text('Could not read your identities'), findsOneWidget);
+      expect(retryDisabled(), isTrue);
+
+      store.answer!.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Could not read your identities'), findsNothing);
+      expect(identitiesNotifier.value.single.pubkeyHex, held.publicKeyHex);
+    });
+
+    testWidgets('a retry that fails again keeps saying so', (tester) async {
+      await IdentityStore.load();
+      expect(tester.takeException(), isA<PlatformException>());
+      await openIdentitiesScreen(tester);
+
+      await tester.tap(find.byKey(const Key('retryIdentitiesButton')));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isA<PlatformException>());
+      expect(find.text('Could not read your identities'), findsOneWidget);
+      expect(disabled(tester, 'generateIdentityButton'), isTrue);
+      expect(identitiesNotifier.value, isEmpty);
+    });
   });
 
   const seckeyHex =
