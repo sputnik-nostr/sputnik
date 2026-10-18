@@ -20,16 +20,22 @@ enum Fault {
   crashAfter,
 }
 
-/// A [SecretStore] that fails one numbered call, to show that no single
-/// failure loses a key or leaves the index pointing at nothing.
+/// A [SecretStore] that fails numbered calls, to show that no failure loses a
+/// key or leaves the index pointing at nothing.
 class FaultySecretStore implements SecretStore {
-  FaultySecretStore(this.inner, {this.failCall, this.fault = Fault.transient});
+  /// Fails call [failCall] as [fault] says, counting from 1, and every call in
+  /// [faults] as it says; no call if neither is given.
+  FaultySecretStore(
+    this.inner, {
+    int? failCall,
+    Fault fault = Fault.transient,
+    Map<int, Fault> faults = const {},
+  }) : faults = {?failCall: fault, ...faults};
 
   final SecretStore inner;
 
-  /// The call to fail, counting from 1; none if null.
-  final int? failCall;
-  final Fault fault;
+  /// How each call to fail behaves, by its number.
+  final Map<int, Fault> faults;
 
   /// Every call made so far, such as `write identities`.
   final calls = <String>[];
@@ -39,7 +45,8 @@ class FaultySecretStore implements SecretStore {
   Future<T> _call<T>(String call, Future<T> Function() run) async {
     calls.add(call);
     if (_dead) throw StateError('process gone: $call');
-    if (calls.length != failCall) return run();
+    final fault = faults[calls.length];
+    if (fault == null) return run();
 
     switch (fault) {
       case Fault.transient:
