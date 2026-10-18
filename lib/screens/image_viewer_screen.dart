@@ -33,6 +33,9 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
   var _zoomed = false;
   var _saving = false;
 
+  /// The pages whose image has decoded, the only ones Save is offered for.
+  final _decoded = <int>{};
+
   @override
   void dispose() {
     _pages.dispose();
@@ -52,6 +55,17 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
   void _say(String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _setDecoded(int index, bool decoded) {
+    if (_decoded.contains(index) == decoded) return;
+    setState(() {
+      if (decoded) {
+        _decoded.add(index);
+      } else {
+        _decoded.remove(index);
+      }
+    });
   }
 
   Future<void> _save() async {
@@ -89,7 +103,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
             key: const Key('saveImageButton'),
             icon: const Icon(Icons.file_download_outlined),
             tooltip: 'Save image',
-            onPressed: _saving ? null : _save,
+            onPressed: _saving || !_decoded.contains(_index) ? null : _save,
           ),
         ],
       ),
@@ -119,6 +133,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
                   onZoomChanged: (zoomed) {
                     if (zoomed != _zoomed) setState(() => _zoomed = zoomed);
                   },
+                  onDecodedChanged: (decoded) => _setDecoded(index, decoded),
                 ),
               ),
               // A mouse can't swipe, so desktop gets buttons as well as keys.
@@ -183,10 +198,14 @@ class _ViewerPage extends StatefulWidget {
     super.key,
     required this.source,
     required this.onZoomChanged,
+    required this.onDecodedChanged,
   });
 
   final MediaSource source;
   final ValueChanged<bool> onZoomChanged;
+
+  /// Whether the image on this page has decoded, as it changes.
+  final ValueChanged<bool> onDecodedChanged;
 
   @override
   State<_ViewerPage> createState() => _ViewerPageState();
@@ -194,6 +213,9 @@ class _ViewerPage extends StatefulWidget {
 
 class _ViewerPageState extends State<_ViewerPage> {
   final _transform = TransformationController();
+
+  /// What the viewer was last told; null until the first build says.
+  bool? _reportedDecoded;
 
   @override
   void initState() {
@@ -207,6 +229,14 @@ class _ViewerPageState extends State<_ViewerPage> {
   void dispose() {
     _transform.dispose();
     super.dispose();
+  }
+
+  void _markDecoded(bool decoded) {
+    if (_reportedDecoded == decoded) return;
+    _reportedDecoded = decoded;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onDecodedChanged(decoded);
+    });
   }
 
   @override
@@ -225,18 +255,22 @@ class _ViewerPageState extends State<_ViewerPage> {
           ),
           fit: BoxFit.contain,
           frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            _markDecoded(frame != null);
             if (frame != null) return child;
             return const Center(
               child: CircularProgressIndicator(color: Colors.white),
             );
           },
-          errorBuilder: (context, error, stackTrace) => const Center(
-            child: Icon(
-              Icons.broken_image_outlined,
-              color: Colors.white54,
-              size: 48,
-            ),
-          ),
+          errorBuilder: (context, error, stackTrace) {
+            _markDecoded(false);
+            return const Center(
+              child: Icon(
+                Icons.broken_image_outlined,
+                color: Colors.white54,
+                size: 48,
+              ),
+            );
+          },
         ),
       ),
     );
