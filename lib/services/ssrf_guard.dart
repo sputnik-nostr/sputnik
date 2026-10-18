@@ -161,6 +161,11 @@ ConnectionTask<Socket> connectToAny(List<InternetAddress> addresses, int port) {
   });
 }
 
+/// Looks up the addresses of a host name; replaced in tests.
+@visibleForTesting
+Future<List<InternetAddress>> Function(String host) resolveHost =
+    InternetAddress.lookup;
+
 /// Connects only to vetted addresses so DNS can't rebind; ignores proxies.
 Future<ConnectionTask<Socket>> guardedConnectionFactory(
   Uri url,
@@ -168,7 +173,7 @@ Future<ConnectionTask<Socket>> guardedConnectionFactory(
   int? proxyPort,
 ) async {
   final addresses = [
-    for (final candidate in await InternetAddress.lookup(url.host))
+    for (final candidate in await resolveHost(url.host))
       if (!isBlockedAddress(candidate)) candidate,
   ];
   if (addresses.isEmpty) {

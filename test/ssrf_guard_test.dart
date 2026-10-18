@@ -3,7 +3,12 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/services/ssrf_guard.dart';
 
+import 'support/fake_connector.dart';
+import 'support/guard_seams.dart';
+
 void main() {
+  restoreGuardSeams();
+
   group('effectivePort', () {
     // Mirrors how dart:io's WebSocket.connect rewrites a wss/ws url.
     Uri rewriteLikeWebSocketConnect(String url) {
@@ -154,6 +159,62 @@ void main() {
         );
       }
       expect(served, 0);
+    });
+
+    group('with a replaced resolver', () {
+      /// Opens a connection that must fail, however the failure is reported.
+      Future<void> dial(FakeConnector connector, String url) {
+        return connector.run(
+          () => expectLater(
+            guardedConnectionFactory(
+              Uri.parse(url),
+              null,
+              null,
+            ).then((task) => task.socket),
+            throwsA(isA<SocketException>()),
+          ),
+        );
+      }
+
+      test(
+        'dials only the public addresses of a name with private ones',
+        () async {
+          resolveHost = (_) async => [
+            InternetAddress('10.0.0.5'),
+            InternetAddress('8.8.8.8'),
+            InternetAddress('::ffff:192.168.1.5'),
+            InternetAddress('127.0.0.1'),
+            InternetAddress('2606:4700:4700::1111'),
+            InternetAddress('fd00::5'),
+          ];
+          final connector = FakeConnector()
+            ..onAttempt = (attempt) => attempt.fail();
+
+          await dial(connector, 'http://mixed.test:8080/');
+
+          expect(
+            connector.attempts.map((attempt) => attempt.address.address),
+            unorderedEquals(['8.8.8.8', '2606:4700:4700::1111']),
+          );
+          expect(
+            connector.attempts.map((attempt) => attempt.port),
+            everyElement(8080),
+          );
+        },
+      );
+
+      test('does not dial a name that only has private addresses', () async {
+        resolveHost = (_) async => [
+          InternetAddress('10.0.0.5'),
+          InternetAddress('169.254.169.254'),
+          InternetAddress('::1'),
+        ];
+        final connector = FakeConnector();
+
+        await dial(connector, 'http://internal.test/');
+
+        expect(connector.attempts, isEmpty);
+      });
     });
   });
 
