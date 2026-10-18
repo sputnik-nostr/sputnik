@@ -37,7 +37,8 @@ List<List<String>> _tagsFromJson(Object? raw) {
 
 final _needsEscape = RegExp(r'[\x00-\x1f"\\]');
 
-/// NIP-01's escapes only; [jsonEncode] escapes more, changing the ID.
+/// NIP-01's escapes only, and every other character is written as it is.
+/// [jsonEncode] escapes more, changing the ID; see [_isAuthentic].
 const _nip01Escapes = {
   0x08: r'\b',
   0x09: r'\t',
@@ -79,32 +80,56 @@ String _encodeJson(Object? value) => switch (value) {
 };
 
 /// Shared by signing and verification so the two can't drift apart.
-Uint8List _canonicalSerialization({
+String _canonicalSerialization({
   required String pubkey,
   required Object? createdAt,
   required Object? kind,
   required Object? tags,
   required Object? content,
 }) {
-  return utf8.encode(_encodeJson([0, pubkey, createdAt, kind, tags, content]));
+  return _encodeJson([0, pubkey, createdAt, kind, tags, content]);
 }
 
+Uint8List _hash(String serialization) =>
+    Uint8List.fromList(sha256.convert(utf8.encode(serialization)).bytes);
+
+/// [serialization] with the controls NIP-01 leaves raw written as \u00xx.
+String _withEscapedControls(String serialization) =>
+    serialization.replaceAllMapped(
+      _unescapedControls,
+      (match) =>
+          '\\u00${match[0]!.codeUnitAt(0).toRadixString(16).padLeft(2, '0')}',
+    );
+
 /// Uses the raw JSON, since the ID covers what was signed, not sanitized.
+///
+/// The controls NIP-01 leaves raw are hashed either as they are, as the NIP
+/// says, or as \u00xx, as most JSON encoders write them, and an ID that
+/// matches either is accepted. That can't admit a forgery: both are encodings
+/// of the same fields, the ID commits to one byte string, which decodes to
+/// exactly those fields, and the signature commits to the ID. So the key
+/// holder signed these fields whichever way they were written.
 bool _isAuthentic(
   Map<String, dynamic> json,
   String id,
   String pubkey,
   String sig,
 ) {
-  final serialized = _canonicalSerialization(
+  final expectedId = hexDecode(id);
+  final literal = _canonicalSerialization(
     pubkey: pubkey,
     createdAt: json['created_at'],
     kind: json['kind'],
     tags: json['tags'],
     content: json['content'],
   );
-  final computedId = Uint8List.fromList(sha256.convert(serialized).bytes);
-  if (!_bytesEqual(computedId, hexDecode(id))) return false;
+  var computedId = _hash(literal);
+  if (!_bytesEqual(computedId, expectedId)) {
+    // Without such a control there is only one way to write the event.
+    if (!_unescapedControls.hasMatch(literal)) return false;
+    computedId = _hash(_withEscapedControls(literal));
+    if (!_bytesEqual(computedId, expectedId)) return false;
+  }
 
   return verifySchnorrSignature(
     msg32: computedId,
@@ -207,7 +232,7 @@ NostrEvent signEvent({
     tags: signedTags,
     content: signedContent,
   );
-  final idBytes = Uint8List.fromList(sha256.convert(serialized).bytes);
+  final idBytes = _hash(serialized);
   final sigBytes = signSchnorrSignature(secretKey: secretKey, msg32: idBytes);
 
   final event = NostrEvent(
