@@ -59,7 +59,7 @@ Builds the Linux AppImage and unsigned Android APKs inside a pinned container, s
 make dist
 ```
 
-The outputs and a `SHA256SUMS` file end up in `dist/`.
+The outputs end up in `dist/`, with `SHA256SUMS` for the AppImage and `SHA256SUMS.unsigned` for the unsigned APKs. [`docs/RELEASING.md`](./docs/RELEASING.md) says how to check a release against a build of your own.
 
 ### Local build
 

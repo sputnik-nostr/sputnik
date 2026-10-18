@@ -3,6 +3,8 @@
 # then downloads itself (Maven dependencies, Flutter's engine artifacts) is not.
 FROM ubuntu:22.04@sha256:5ec03bb3441e8b0bf3b4f9cd4629a1ae763010dc3035bb8da3ae6cf026486401
 
+# The AppImage bundles libraries from this snapshot, and nothing updates them on
+# a user's machine: move it forward at every release (docs/RELEASING.md).
 ARG UBUNTU_SNAPSHOT=20261001T000000Z
 ARG FLUTTER_VERSION=3.47.7
 ARG FLUTTER_COMMIT=abaf9c523780a608bd46686fd5e53740a07077f8
