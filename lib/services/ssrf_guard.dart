@@ -81,6 +81,10 @@ int effectivePort(Uri url) =>
 /// Head start each address gets before the next one is tried too (RFC 8305).
 const _connectAttemptDelay = Duration(milliseconds: 250);
 
+/// Most addresses raced for one connection. A hostile name can return
+/// hundreds, and every attempt that gets no answer holds a socket.
+const _maxRacedAddresses = 6;
+
 /// Alternates IPv6 and IPv4, so one broken family can't stall every attempt.
 List<InternetAddress> _interleaveFamilies(List<InternetAddress> addresses) {
   if (addresses.isEmpty) return addresses;
@@ -193,7 +197,7 @@ Future<ConnectionTask<Socket>> guardedConnectionFactory(
   }
 
   final rawTask = connectToAny(
-    _interleaveFamilies(addresses),
+    _interleaveFamilies(addresses).take(_maxRacedAddresses).toList(),
     effectivePort(url),
   );
   if (url.scheme != 'https') return rawTask;

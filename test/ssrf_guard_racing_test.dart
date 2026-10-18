@@ -7,6 +7,7 @@ import 'package:sputnik/services/ssrf_guard.dart';
 import 'support/black_hole.dart';
 import 'support/eventually.dart';
 import 'support/fake_connector.dart';
+import 'support/guard_seams.dart';
 
 /// Where a future stands, without waiting for it.
 class _Outcome {
@@ -44,6 +45,8 @@ Future<List<Object>> _uncaughtDuring(Future<void> Function() body) async {
 }
 
 void main() {
+  restoreGuardSeams();
+
   // connectToAny never vets, and the fake connector never connects anywhere.
   final addresses = [for (var i = 1; i <= 3; i++) InternetAddress('8.8.8.$i')];
 
@@ -265,5 +268,87 @@ void main() {
       expect(outcome.error, isA<SocketException>());
       await eventually(() => hole.pendingConnects == 0);
     }, skip: BlackHole.isSupported ? false : 'needs /proc/net/tcp');
+  });
+
+  group('guardedConnectionFactory race', () {
+    /// Names that resolve to [count] public addresses nobody answers.
+    void resolveToBlackHoles(int count) {
+      resolveHost = (_) async => [
+        for (var i = 0; i < count; i++)
+          InternetAddress('12.0.${i ~/ 250}.${i % 250 + 1}'),
+      ];
+    }
+
+    testWidgets('dials at most six of the hundreds a hostile name returns', (
+      tester,
+    ) async {
+      resolveToBlackHoles(500);
+      final connector = FakeConnector();
+      await connector.run(() async {
+        final task = await guardedConnectionFactory(
+          Uri.parse('http://hostile.test/'),
+          null,
+          null,
+        );
+        final outcome = _Outcome(task.socket);
+
+        await tester.pump(const Duration(seconds: 60)); // 240 staggers
+        expect(connector.attempts, hasLength(6));
+        expect(connector.open, hasLength(6));
+
+        task.cancel();
+        await tester.pump(Duration.zero);
+        expect(connector.open, isEmpty);
+        expect(outcome.error, isA<SocketException>());
+      });
+    });
+
+    testWidgets('dials every address of a name with only a few', (
+      tester,
+    ) async {
+      resolveToBlackHoles(4);
+      final connector = FakeConnector();
+      await connector.run(() async {
+        final task = await guardedConnectionFactory(
+          Uri.parse('http://few.test/'),
+          null,
+          null,
+        );
+        final outcome = _Outcome(task.socket);
+        await tester.pump(const Duration(seconds: 10));
+        expect(connector.attempts, hasLength(4));
+        task.cancel();
+        await tester.pump(Duration.zero);
+        expect(outcome.error, isA<SocketException>());
+      });
+    });
+
+    testWidgets('keeps the other family within the six it dials', (
+      tester,
+    ) async {
+      // The only IPv4 address comes last, behind a hundred IPv6 ones.
+      resolveHost = (_) async => [
+        for (var i = 1; i <= 100; i++)
+          InternetAddress('2a00:1450:4001:81b::$i'),
+        InternetAddress('142.250.74.46'),
+      ];
+      final connector = FakeConnector();
+      await connector.run(() async {
+        final task = await guardedConnectionFactory(
+          Uri.parse('http://dual.test/'),
+          null,
+          null,
+        );
+        final outcome = _Outcome(task.socket);
+        await tester.pump(const Duration(seconds: 10));
+        expect(
+          connector.attempts.map((attempt) => attempt.address.type),
+          contains(InternetAddressType.IPv4),
+        );
+        task.cancel();
+        await tester.pump(Duration.zero);
+        expect(outcome.error, isA<SocketException>());
+      });
+    });
   });
 }
