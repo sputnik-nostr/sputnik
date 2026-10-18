@@ -24,6 +24,9 @@ if [[ $mode == check ]]; then
     flutter analyze
     contrib/tests/run.sh
     make test
+    # Bundles the libraries as the release does, and checks that they resolve.
+    flutter build linux --release
+    contrib/package_appimage.sh --appdir-only
     exit 0
 fi
 
