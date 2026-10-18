@@ -372,6 +372,8 @@ class _RelayConnection {
   int _messagesReceived = 0;
   int _activeSubscriptions = 0;
   int _pendingParseLength = 0;
+
+  /// Set once the relay broke a limit, and the connection is being dropped.
   bool flooded = false;
   final _subscriptionSlots = <Completer<void>>[];
 
@@ -385,14 +387,26 @@ class _RelayConnection {
   /// Nothing at all arrived since [mark], so the socket is likely dead.
   bool silentSince(_TrafficMark mark) => _messagesReceived == mark.received;
 
+  /// Drops the relay, so that a message the limits kept out is never followed
+  /// by an EOSE that vouches for a complete answer.
+  void _breakLimit() {
+    if (flooded) return;
+    flooded = true;
+    onFlood(this);
+  }
+
   /// Parses in parallel but handles in order, so EOSE can't beat events.
   void _handleMessage(dynamic raw) {
     _messagesReceived++;
-    // Fragmented messages can still exceed the per-frame cap.
-    if (raw is! String || raw.length > _maxMessageLength || _closed) return;
+    if (_closed) return;
+    // The per-frame cap lets a fragmented message through, and a binary one
+    // is not Nostr.
+    if (raw is! String || raw.length > _maxMessageLength) {
+      _breakLimit();
+      return;
+    }
     if (_pendingParseLength + raw.length > _maxPendingParseLength) {
-      flooded = true;
-      onFlood(this);
+      _breakLimit();
       return;
     }
     _pendingParseLength += raw.length;
