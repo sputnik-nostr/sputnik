@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../models/text_limits.dart';
 import '../nostr/http_urls.dart';
 import '../nostr/models/nostr_metadata.dart';
 import '../nostr/nip19.dart';
@@ -45,6 +46,7 @@ class LinkifiedText extends StatefulWidget {
     this.style,
     this.selectable = true,
     this.maxLines,
+    this.maxLength = maxNoteLength,
   });
 
   final String text;
@@ -56,6 +58,9 @@ class LinkifiedText extends StatefulWidget {
   /// Ends the text with an ellipsis past this many lines.
   final int? maxLines;
 
+  /// Cuts the text, and ends it with "...", past this many UTF-16 code units.
+  final int maxLength;
+
   @override
   State<LinkifiedText> createState() => _LinkifiedTextState();
 }
@@ -64,21 +69,25 @@ class _LinkifiedTextState extends State<LinkifiedText> {
   final _recognizers = <String, TapGestureRecognizer>{};
   bool _opening = false;
 
-  /// Avoids re-scanning unchanged text on every rebuild.
-  String? _parsedText;
-  List<_Link>? _links;
+  /// What is laid out and where its links are, found again only when the text
+  /// changes rather than on every rebuild.
+  late String _shown;
+  late bool _cut;
+  late List<_Link> _links;
 
-  List<_Link> _linksFor(String text) {
-    if (_parsedText == text) return _links!;
-    _parsedText = text;
-    return _links = _linksIn(text);
+  void _parse() {
+    _shown = truncateText(widget.text, widget.maxLength);
+    _cut = _shown.length < widget.text.length;
+    _links = _linksIn(_shown, cut: _cut);
   }
 
-  /// The first [_maxLinks] links of [text]; the rest of it stays plain.
-  List<_Link> _linksIn(String text) {
+  /// The first [_maxLinks] links of [text]; the rest of it stays plain. So does
+  /// a link that runs up to a cut, as it may be only the start of an address.
+  List<_Link> _linksIn(String text, {required bool cut}) {
     final links = <_Link>[];
     var tappable = 0;
     for (final match in linkPattern.allMatches(text)) {
+      if (cut && match.end == text.length) break;
       final link = _linkFor(match);
       if (link.httpUrl != null || link.target != null) {
         if (++tappable > _maxLinks) break;
@@ -115,19 +124,24 @@ class _LinkifiedTextState extends State<LinkifiedText> {
   @override
   void initState() {
     super.initState();
+    _parse();
     _lookUpMentions();
   }
 
   @override
   void didUpdateWidget(LinkifiedText oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.text != widget.text) _lookUpMentions();
+    if (oldWidget.text != widget.text ||
+        oldWidget.maxLength != widget.maxLength) {
+      _parse();
+      _lookUpMentions();
+    }
   }
 
   /// Names arrive through the profile cache, which the build listens to.
   void _lookUpMentions() {
     final missing = <String>{
-      for (final link in _linksFor(widget.text))
+      for (final link in _links)
         if (link.target?.pubkeyHex case final pubkey?)
           if (!profileCacheNotifier.value.containsKey(pubkey) &&
               !_lookedUp.contains(pubkey))
@@ -157,7 +171,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
 
   @override
   Widget build(BuildContext context) {
-    final links = _linksFor(widget.text);
+    final links = _links;
     if (links.every((link) => link.target?.pubkeyHex == null)) {
       return _buildText(context, links, const {});
     }
@@ -174,7 +188,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     }
     return name.length <= _maxMentionNameLength
         ? '@$name'
-        : '@${name.substring(0, _maxMentionNameLength - 3)}...';
+        : '@${truncateText(name, _maxMentionNameLength - 3)}...';
   }
 
   /// A note ID is long and unreadable; keep just enough to tell them apart.
@@ -198,7 +212,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
 
     for (final link in links) {
       if (link.start > start) {
-        spans.add(TextSpan(text: widget.text.substring(start, link.start)));
+        spans.add(TextSpan(text: _shown.substring(start, link.start)));
       }
 
       final matchedText = link.text;
@@ -240,9 +254,10 @@ class _LinkifiedTextState extends State<LinkifiedText> {
       start = link.end;
     }
 
-    if (start < widget.text.length) {
-      spans.add(TextSpan(text: widget.text.substring(start)));
+    if (start < _shown.length) {
+      spans.add(TextSpan(text: _shown.substring(start)));
     }
+    if (_cut) spans.add(const TextSpan(text: '...'));
 
     for (final key in _recognizers.keys.toList()) {
       if (!live.contains(key)) _recognizers.remove(key)?.dispose();
