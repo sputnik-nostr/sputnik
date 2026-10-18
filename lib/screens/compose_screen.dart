@@ -4,6 +4,7 @@ import '../app_state.dart';
 import '../models/avatar_initial.dart';
 import '../models/identity.dart';
 import '../models/note.dart';
+import '../models/text_limits.dart';
 import '../nostr/nip10.dart';
 import '../nostr/nostr.dart';
 import '../services/profiles.dart';
@@ -304,7 +305,7 @@ class _ReplyContext extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            note.content,
+            truncateText(note.content, maxNoteLength),
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodyMedium?.copyWith(
@@ -342,7 +343,7 @@ class _QuoteContext extends StatelessWidget {
               NoteAuthorLine(note: note),
               const SizedBox(height: 6),
               Text(
-                note.content,
+                truncateText(note.content, maxNoteLength),
                 maxLines: 4,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium,

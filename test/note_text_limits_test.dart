@@ -1,4 +1,7 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sputnik/app_state.dart';
@@ -7,6 +10,7 @@ import 'package:sputnik/nostr/bech32.dart';
 import 'package:sputnik/nostr/hex.dart';
 import 'package:sputnik/nostr/models/nostr_media.dart';
 import 'package:sputnik/nostr/relay_client.dart';
+import 'package:sputnik/screens/compose_screen.dart';
 import 'package:sputnik/screens/post_screen.dart';
 import 'package:sputnik/widgets/linkified_text.dart';
 import 'package:sputnik/widgets/note_tile.dart';
@@ -60,6 +64,12 @@ List<String> _paragraphs(WidgetTester tester, {Finder? within}) {
       rich.text.toPlainText(),
   ];
 }
+
+/// The longest text, in code units, that any paragraph on screen holds.
+int _longestParagraph(WidgetTester tester) => tester.allRenderObjects
+    .whereType<RenderParagraph>()
+    .map((paragraph) => paragraph.text.toPlainText().length)
+    .fold(0, max);
 
 int _tappableSpans(WidgetTester tester) {
   var count = 0;
@@ -271,6 +281,28 @@ void main() {
 
       expect(find.byType(QuotedNote), findsOneWidget);
       expect(find.text('Show more'), findsNothing);
+    });
+  });
+
+  group('the note shown above the composer', () {
+    final long = 'word ' * 4000;
+
+    testWidgets('of a reply is cut', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(home: ComposeScreen(replyTo: _note(long))),
+      );
+      await tester.pumpAndSettle();
+
+      expect(_longestParagraph(tester), lessThanOrEqualTo(8000));
+    });
+
+    testWidgets('of a quote is cut', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(home: ComposeScreen(quoting: _note(long))),
+      );
+      await tester.pumpAndSettle();
+
+      expect(_longestParagraph(tester), lessThanOrEqualTo(8000));
     });
   });
 }
