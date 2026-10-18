@@ -325,10 +325,16 @@ class _PostHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final npub = npubFromHex(note.pubkey);
     final myPubkeyHex = activeIdentityPubkeyNotifier.value?.toLowerCase();
-    final reactionNote = note.copyWith(
-      likedByMe: likerPubkeys?.contains(myPubkeyHex) ?? note.likedByMe,
-      repostedByMe: reposterPubkeys?.contains(myPubkeyHex) ?? note.repostedByMe,
-    );
+    final likers = likerPubkeys;
+    final reposters = reposterPubkeys;
+    // Who reacted, once the thread has loaded, beats what the note came with.
+    final reactionNote = likers == null || reposters == null
+        ? note
+        : note.copyWith(
+            likedByMe: likers.contains(myPubkeyHex),
+            repostedByMe: reposters.contains(myPubkeyHex),
+            reactionsOf: myPubkeyHex,
+          );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

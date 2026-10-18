@@ -187,7 +187,9 @@ void main() {
       await expectNothingRetracted(
         tester,
         kind: 7,
-        button: LikeButton(note: noteOfA.copyWith(likedByMe: true)),
+        button: LikeButton(
+          note: noteOfA.copyWith(likedByMe: true, reactionsOf: a.publicKeyHex),
+        ),
         icon: Icons.favorite,
         content: '+',
       );
@@ -197,7 +199,12 @@ void main() {
       await expectNothingRetracted(
         tester,
         kind: 6,
-        button: RepostButton(note: noteOfA.copyWith(repostedByMe: true)),
+        button: RepostButton(
+          note: noteOfA.copyWith(
+            repostedByMe: true,
+            reactionsOf: a.publicKeyHex,
+          ),
+        ),
         icon: Icons.repeat,
         content: '',
       );

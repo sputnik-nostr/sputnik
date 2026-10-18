@@ -25,6 +25,7 @@ class Note {
     this.isReply = false,
     this.likedByMe = false,
     this.repostedByMe = false,
+    this.reactionsOf,
     this.media = const [],
     this.repostedByPubkey,
     this.repostedByDisplayName,
@@ -48,6 +49,7 @@ class Note {
       isReply: json['isReply'] as bool? ?? false,
       likedByMe: json['likedByMe'] as bool? ?? false,
       repostedByMe: json['repostedByMe'] as bool? ?? false,
+      reactionsOf: json['reactionsOf'] as String?,
       media: _mediaFromJson(json['media']),
       repostedByPubkey: json['repostedByPubkey'] as String?,
       repostedByDisplayName: json['repostedByDisplayName'] as String?,
@@ -68,15 +70,29 @@ class Note {
   final int likeCount;
   final bool isReply;
 
-  /// Per the relays' reaction data, for the active identity.
+  /// Per the relays' reaction data, for [reactionsOf] and nobody else: a note
+  /// outlives a switch of identity, in a feed as in the bookmarks.
   final bool likedByMe;
   final bool repostedByMe;
+
+  /// The hex pubkey of the identity [likedByMe] and [repostedByMe] describe.
+  final String? reactionsOf;
   final List<NostrMedia> media;
 
   /// Set when this entry is a repost; [createdAt] is still the original's.
   final String? repostedByPubkey;
   final String? repostedByDisplayName;
   final DateTime? repostedAt;
+
+  /// Whether the relays showed [pubkeyHex] liking this when it was loaded.
+  bool likedBy(String? pubkeyHex) => likedByMe && _describes(pubkeyHex);
+
+  /// Whether the relays showed [pubkeyHex] reposting this when it was loaded.
+  bool repostedBy(String? pubkeyHex) => repostedByMe && _describes(pubkeyHex);
+
+  bool _describes(String? pubkeyHex) =>
+      pubkeyHex != null &&
+      pubkeyHex.toLowerCase() == reactionsOf?.toLowerCase();
 
   Note copyWith({
     String? displayName,
@@ -86,6 +102,7 @@ class Note {
     int? likeCount,
     bool? likedByMe,
     bool? repostedByMe,
+    String? reactionsOf,
   }) {
     return Note(
       id: id,
@@ -100,6 +117,7 @@ class Note {
       isReply: isReply,
       likedByMe: likedByMe ?? this.likedByMe,
       repostedByMe: repostedByMe ?? this.repostedByMe,
+      reactionsOf: reactionsOf ?? this.reactionsOf,
       media: media,
       repostedByPubkey: repostedByPubkey,
       repostedByDisplayName: repostedByDisplayName,
@@ -121,6 +139,7 @@ class Note {
       if (isReply) 'isReply': true,
       if (likedByMe) 'likedByMe': true,
       if (repostedByMe) 'repostedByMe': true,
+      if (reactionsOf != null) 'reactionsOf': reactionsOf,
       if (media.isNotEmpty) 'media': [for (final m in media) m.toJson()],
       if (repostedByPubkey != null) 'repostedByPubkey': repostedByPubkey,
       if (repostedByDisplayName != null)

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app_state.dart';
 import '../models/note.dart';
 import '../screens/compose_screen.dart';
 import '../services/reaction_actions.dart';
@@ -20,16 +21,18 @@ class LikeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _ReactionToggle(
-      scope: note.id,
-      active: note.likedByMe,
-      count: note.likeCount,
-      showCount: showCount,
-      size: size,
-      icon: (liked) => liked ? Icons.favorite : Icons.favorite_border,
-      tooltip: (liked) => liked ? 'Liked' : 'Like',
-      toggle: (liked) =>
-          liked ? unlikeNote(context, note) : likeNote(context, note),
+    return _ForActiveIdentity(
+      builder: (me) => _ReactionToggle(
+        scope: (note.id, me),
+        active: note.likedBy(me),
+        count: note.likeCount,
+        showCount: showCount,
+        size: size,
+        icon: (liked) => liked ? Icons.favorite : Icons.favorite_border,
+        tooltip: (liked) => liked ? 'Liked' : 'Like',
+        toggle: (liked) =>
+            liked ? unlikeNote(context, note) : likeNote(context, note),
+      ),
     );
   }
 }
@@ -49,18 +52,35 @@ class RepostButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _ReactionToggle(
-      scope: note.id,
-      active: note.repostedByMe,
-      count: note.repostCount,
-      showCount: showCount,
-      size: size,
-      icon: (_) => Icons.repeat,
-      tooltip: (reposted) =>
-          '${reposted ? 'Reposted' : 'Repost'} (hold to quote)',
-      toggle: (reposted) =>
-          reposted ? unrepostNote(context, note) : repostNote(context, note),
-      onLongPress: () => openQuoteComposer(context, note),
+    return _ForActiveIdentity(
+      builder: (me) => _ReactionToggle(
+        scope: (note.id, me),
+        active: note.repostedBy(me),
+        count: note.repostCount,
+        showCount: showCount,
+        size: size,
+        icon: (_) => Icons.repeat,
+        tooltip: (reposted) =>
+            '${reposted ? 'Reposted' : 'Repost'} (hold to quote)',
+        toggle: (reposted) =>
+            reposted ? unrepostNote(context, note) : repostNote(context, note),
+        onLongPress: () => openQuoteComposer(context, note),
+      ),
+    );
+  }
+}
+
+/// Builds with the pubkey of the active identity, and again when it changes.
+class _ForActiveIdentity extends StatelessWidget {
+  const _ForActiveIdentity({required this.builder});
+
+  final Widget Function(String? pubkeyHex) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<String?>(
+      valueListenable: activeIdentityPubkeyNotifier,
+      builder: (context, me, _) => builder(me),
     );
   }
 }
@@ -78,8 +98,9 @@ class _ReactionToggle extends StatefulWidget {
     this.onLongPress,
   });
 
-  /// What [active] and a tap are about. When it changes this button is showing
-  /// something else, and what it did for the previous scope no longer applies.
+  /// The note and the identity [active] and a tap are about. When it changes
+  /// this button is showing something else, and what it did for the previous
+  /// scope no longer applies.
   final Object scope;
 
   /// Whether the relays say the active identity already reacted.
