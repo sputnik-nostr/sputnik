@@ -215,6 +215,93 @@ void main() {
 
         expect(connector.attempts, isEmpty);
       });
+
+      group('on a machine with a public address of its own', () {
+        // A public IPv4 address, and an IPv6 one from a /64 shared with the
+        // rest of the LAN.
+        setUp(() {
+          ownAddresses = OwnAddresses(
+            list: () async => [
+              InternetAddress('93.184.216.34'),
+              InternetAddress('2606:4700:4700:a1:4278:3bff:1d0f:7b0d'),
+            ],
+          );
+        });
+
+        test('does not dial its own addresses or its LAN neighbours', () async {
+          resolveHost = (_) async => [
+            InternetAddress('2606:4700:4700:a1::1'),
+            InternetAddress('93.184.216.34'),
+            InternetAddress('::ffff:93.184.216.34'),
+            InternetAddress('2606:4700:4700:a2::1'),
+            InternetAddress('93.184.216.35'),
+          ];
+          final connector = FakeConnector()
+            ..onAttempt = (attempt) => attempt.fail();
+
+          await dial(connector, 'http://neighbours.test/');
+
+          expect(
+            connector.attempts.map((attempt) => attempt.address.address),
+            unorderedEquals(['2606:4700:4700:a2::1', '93.184.216.35']),
+          );
+        });
+
+        test(
+          'does not dial a name that only leads to its own network',
+          () async {
+            resolveHost = (_) async => [
+              InternetAddress('2606:4700:4700:a1::1'),
+              InternetAddress('::ffff:93.184.216.34'),
+            ];
+            final connector = FakeConnector();
+
+            await dial(connector, 'http://neighbours.test/');
+
+            expect(connector.attempts, isEmpty);
+          },
+        );
+
+        test('does not dial an address literal on its own network', () async {
+          final connector = FakeConnector();
+
+          await dial(connector, 'https://[2606:4700:4700:a1::1]:8443/');
+          await dial(connector, 'http://93.184.216.34:8080/');
+
+          expect(connector.attempts, isEmpty);
+        });
+
+        test('looks past a long run of addresses on its own network', () async {
+          resolveHost = (_) async => [
+            for (var i = 1; i <= 10; i++)
+              InternetAddress('2606:4700:4700:a1::$i'),
+            InternetAddress('2606:4700:4700:a2::1'),
+          ];
+          final connector = FakeConnector()
+            ..onAttempt = (attempt) => attempt.fail();
+
+          await dial(connector, 'http://neighbours.test/');
+
+          expect(connector.attempts.map((attempt) => attempt.address.address), [
+            '2606:4700:4700:a2::1',
+          ]);
+        });
+
+        test('dials as before when the interfaces cannot be listed', () async {
+          ownAddresses = OwnAddresses(
+            list: () async => throw const OSError('not allowed', 13),
+          );
+          resolveHost = (_) async => [InternetAddress('2606:4700:4700:a1::1')];
+          final connector = FakeConnector()
+            ..onAttempt = (attempt) => attempt.fail();
+
+          await dial(connector, 'http://neighbours.test/');
+
+          expect(connector.attempts.map((attempt) => attempt.address.address), [
+            '2606:4700:4700:a1::1',
+          ]);
+        });
+      });
     });
   });
 

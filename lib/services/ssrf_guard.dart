@@ -177,16 +177,101 @@ ConnectionTask<Socket> connectToAny(List<InternetAddress> addresses, int port) {
   });
 }
 
+/// The IPv4 address behind an IPv4-mapped IPv6 address (::ffff:a.b.c.d).
+List<int>? _mappedV4(List<int> bytes) {
+  final mapped =
+      bytes.length == 16 &&
+      bytes.take(10).every((byte) => byte == 0) &&
+      bytes[10] == 0xff &&
+      bytes[11] == 0xff;
+  return mapped ? bytes.sublist(12) : null;
+}
+
+/// Whether [address] is one of [own] or shares a /64 with one of them.
+///
+/// A public address of this machine passes [isBlockedAddress], and so does a
+/// neighbour on its IPv6 LAN, but a request to either reaches a service on or
+/// next to the machine. Interfaces don't report their prefix length, so IPv6
+/// neighbours are the addresses of the same /64, the size of a LAN subnet;
+/// for IPv4 only the address itself counts.
+@visibleForTesting
+bool isOwnNetworkAddress(
+  InternetAddress address,
+  Iterable<InternetAddress> own,
+) {
+  // The OS connects to ::ffff:a.b.c.d over IPv4.
+  final bytes = address.rawAddress;
+  final comparable = _mappedV4(bytes) ?? bytes;
+  final bits = comparable.length == 4 ? 32 : 64;
+  for (final mine in own) {
+    final theirs = mine.rawAddress;
+    if (theirs.length == comparable.length &&
+        _inCidr(comparable, theirs, bits)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+Future<List<InternetAddress>> _listInterfaceAddresses() async => [
+  // Loopback too: a public address can be assigned to it.
+  for (final interface in await NetworkInterface.list(includeLoopback: true))
+    ...interface.addresses,
+];
+
+/// The addresses of this host's own network interfaces.
+///
+/// A burst of connections shares one listing, and a changed network is picked
+/// up once [maxAge] has passed. If the interfaces can't be listed there is
+/// nothing to compare with, and the blocklist alone applies as it always did.
+@visibleForTesting
+class OwnAddresses {
+  OwnAddresses({
+    Future<List<InternetAddress>> Function()? list,
+    this.maxAge = const Duration(seconds: 60),
+  }) : _list = list ?? _listInterfaceAddresses;
+
+  final Future<List<InternetAddress>> Function() _list;
+  final Duration maxAge;
+  Future<List<InternetAddress>>? _addresses;
+  final _age = Stopwatch();
+
+  Future<List<InternetAddress>> get addresses {
+    final current = _addresses;
+    if (current != null && _age.elapsed < maxAge) return current;
+    _age
+      ..reset()
+      ..start();
+    return _addresses = _load();
+  }
+
+  Future<List<InternetAddress>> _load() async {
+    try {
+      return await _list();
+    } catch (_) {
+      return const [];
+    }
+  }
+}
+
+/// The interfaces the guard compares addresses with; replaced in tests.
+@visibleForTesting
+OwnAddresses ownAddresses = OwnAddresses();
+
 /// Looks up the addresses of a host name; replaced in tests.
 @visibleForTesting
 Future<List<InternetAddress>> Function(String host) resolveHost =
     InternetAddress.lookup;
 
-/// The public addresses of [host], in the order they are tried.
+/// The addresses of [host] that are public and off this host's own network, in
+/// the order they are tried.
 Future<List<InternetAddress>> _vettedAddresses(String host) async {
+  final resolved = await resolveHost(host);
+  final own = await ownAddresses.addresses;
   final addresses = [
-    for (final candidate in await resolveHost(host))
-      if (!isBlockedAddress(candidate)) candidate,
+    for (final candidate in resolved)
+      if (!isBlockedAddress(candidate) && !isOwnNetworkAddress(candidate, own))
+        candidate,
   ];
   if (addresses.isEmpty) {
     throw SocketException('No public address found for $host');
