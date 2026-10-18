@@ -53,7 +53,8 @@ class RelayContactsRepository {
     ]..sort(compareNewestFirst);
 
     if (own.isEmpty) {
-      return result.mostRelaysAnswered ? const <String>[] : null;
+      // A silent relay may hold it, and an empty answer stays for the session.
+      return result.allRelaysAnswered ? const <String>[] : null;
     }
 
     return _followedPubkeys(own.first);

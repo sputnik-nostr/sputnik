@@ -155,4 +155,37 @@ void main() {
       'cc' * 32,
     ]);
   });
+
+  group('the list shown for an identity', () {
+    Future<List<String>?> shown(RelayClient client) =>
+        RelayContactsRepository(client: client)
+            .fetchFollowingOrNull(me.publicKeyHex, relays);
+
+    test(
+      'is unknown while a relay that may hold it has not answered',
+      () async {
+        for (final answered in [0, 1, 2, 3]) {
+          final client = _PartlyAnswering([], answered: answered);
+
+          expect(
+            await shown(client),
+            isNull,
+            reason: '$answered of 4 answered',
+          );
+        }
+      },
+    );
+
+    test('is empty only when every relay said there is none', () async {
+      expect(await shown(_PartlyAnswering([], answered: 4)), <String>[]);
+    });
+
+    test('is the list that was found, however few relays answered', () async {
+      final client = _PartlyAnswering([
+        contactList([alice], age: const Duration(days: 30)),
+      ], answered: 1);
+
+      expect(await shown(client), [alice]);
+    });
+  });
 }

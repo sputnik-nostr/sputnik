@@ -17,6 +17,9 @@ enum _Relays {
 
   // One relay says "nothing here"; the one holding the list is unreachable.
   partiallyDown,
+
+  // Two of three relays say "nothing here"; the third is silent.
+  mostlyEmpty,
   up,
 }
 
@@ -51,6 +54,12 @@ class _FlakyRelay extends RelayClient {
           events: [],
           answeredRelays: 1,
           queriedRelays: 2,
+        );
+      case _Relays.mostlyEmpty:
+        return const RelayQueryResult(
+          events: [],
+          answeredRelays: 2,
+          queriedRelays: 3,
         );
       case _Relays.up:
         return RelayQueryResult(
@@ -226,6 +235,21 @@ void main() {
     relay.relays = _Relays.partiallyDown;
     await load();
     expect(myFollowingNotifier.value, isNull);
+
+    relay.relays = _Relays.up;
+    await load();
+    expect(myFollowingNotifier.value, {alice, bob});
+  });
+
+  test('"nothing here" from most relays is not kept as "follows nobody" for '
+      'the session', () async {
+    final relay = _FlakyRelay(me, [alice, bob])..relays = _Relays.mostlyEmpty;
+    RelayClient.instance = relay;
+    Future<void> load() => ensureMyFollowingLoaded({'wss://relay.example'});
+
+    await load();
+    expect(myFollowingNotifier.value, isNull);
+    expect(CacheStore.freshFollowing(me), isNull);
 
     relay.relays = _Relays.up;
     await load();
