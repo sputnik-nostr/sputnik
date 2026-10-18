@@ -91,6 +91,10 @@ class SettingsStore {
   @visibleForTesting
   static SecretStore secretStore = const _SecureSecretStore();
 
+  /// How [loadSecretKey] turns stored hex into a key; tests watch the keys.
+  @visibleForTesting
+  static SecretKey Function(String hex) secretKeyFromHex = SecretKey.fromHex;
+
   static Future<bool?> _loadFlag(String key) async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(key);
@@ -238,15 +242,28 @@ class SettingsStore {
     return secretStore.read('$_identitySecretPrefix$pubkeyHex');
   }
 
-  /// [loadPrivateKey] as a [SecretKey], or null if missing or malformed.
+  /// [loadPrivateKey] as a [SecretKey], or null if it is missing, malformed or
+  /// not the key of [pubkeyHex], so a key kept under the wrong name never
+  /// signs.
   static Future<SecretKey?> loadSecretKey(String pubkeyHex) async {
     final privkeyHex = await loadPrivateKey(pubkeyHex);
     if (privkeyHex == null) return null;
+
+    final SecretKey secretKey;
     try {
-      return SecretKey.fromHex(privkeyHex);
+      secretKey = secretKeyFromHex(privkeyHex);
     } on ArgumentError {
       return null;
     }
+    var matches = false;
+    try {
+      matches = xonlyPubkeyHex(secretKey) == pubkeyHex;
+    } on ArgumentError {
+      // Valid hex, but not a point on the curve (zero, or above the order).
+    } finally {
+      if (!matches) secretKey.wipe();
+    }
+    return matches ? secretKey : null;
   }
 
   static Future<void> savePrivateKey(String pubkeyHex, String privkeyHex) {
