@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -89,6 +90,7 @@ class SettingsStore {
   static const _identitiesKey = 'identities';
   static const _activeIdentityPubkeyKey = 'active_identity_pubkey';
   static const _identitySecretPrefix = 'identity_secret_';
+  static const _plaintextIdentitiesBackupKey = 'identities_from_preferences';
   // Named before note images had their own switch; kept so the setting stays.
   static const _loadProfileImagesKey = 'load_media';
   static const _loadNoteImagesKey = 'load_note_images';
@@ -96,7 +98,10 @@ class SettingsStore {
   static const _hiddenPaymentTargetTypesKey = 'hidden_payment_target_types';
   static const _confirmBeforeReactingKey = 'confirm_before_reacting';
 
-  /// Keys earlier versions wrote and nothing reads now.
+  /// Keys earlier versions wrote and nothing reads now. Not `identities`: while
+  /// it holds private keys in plaintext it holds the only copy of them, and
+  /// this runs alongside the startup, in no particular order, so only
+  /// [_adoptPlaintextIdentities] may remove it, once the keys are stored.
   static const _obsoleteKeys = [
     'profile_cache',
     'bookmarked_ids',
@@ -259,18 +264,101 @@ class SettingsStore {
   }
 
   /// The identity index, after bringing what older versions stored up to date:
-  /// private keys inside the index or named after their pubkey move into slots
-  /// of their own, and the active identity moves in from preferences.
+  /// identities kept in preferences, private keys inside the index or named
+  /// after their pubkey, and the active identity kept in preferences.
   ///
   /// Throws if the index can't be read. Until it can, nothing may be added or
   /// removed: every change starts from the index in storage.
   static Future<IdentityIndex> loadIdentityIndex() => _serialized(() async {
     // Each step starts from the index in storage, so a step that failed after
     // its write took effect cannot leave the next one working on a stale copy.
+    await _adoptPlaintextIdentities();
     await _moveKeysToSlots();
     await _adoptActivePointer();
     return _readIndex();
   });
+
+  /// Builds from before private keys moved to secure storage kept the
+  /// identities, keys included, in preferences. Moves them into secure storage.
+  ///
+  /// Each key goes into a slot and the identities into the index, both read
+  /// back, and only then does the entry leave preferences. Anything the entry
+  /// holds that can't become an identity as it is (damaged JSON, a key that is
+  /// not its pubkey's, a different key stored for that pubkey already) is first
+  /// copied as it was into secure storage, so that nothing is lost silently. A
+  /// failure leaves the entry in preferences, to be tried again at the next
+  /// start.
+  static Future<void> _adoptPlaintextIdentities() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.get(_identitiesKey);
+      if (raw == null) return;
+
+      final plain = _parsePlaintextIdentities(raw);
+      var complete = plain.complete;
+      final index = await _readIndex();
+      var adopted = index;
+      for (final held in plain.held) {
+        final pubkeyHex = held.identity.pubkeyHex;
+        if (adopted.contains(pubkeyHex) &&
+            adopted.identities.every((i) => i.pubkeyHex != pubkeyHex)) {
+          complete = false; // An entry this version cannot read names it.
+          continue;
+        }
+        final stored = await _readKey(adopted, pubkeyHex);
+        if (stored != null && stored != held.privkeyHex) {
+          complete = false; // The key that is stored stays.
+          continue;
+        }
+        if (stored == null) {
+          final slot = adopted.slotOf(pubkeyHex) ?? _newSlot();
+          await _writeVerified(_secretName(slot), held.privkeyHex);
+          adopted = adopted.contains(pubkeyHex)
+              ? adopted.withSlot(pubkeyHex, slot)
+              : adopted.withIdentity(held.identity, slot: slot);
+        } else if (!adopted.contains(pubkeyHex)) {
+          adopted = adopted.withIdentity(held.identity);
+        }
+      }
+      if (adopted.encode() != index.encode()) {
+        await _writeVerified(_identitiesKey, adopted.encode());
+      }
+      if (!complete) {
+        await _writeVerified(_plaintextIdentitiesBackupKey, '$raw');
+      }
+      await prefs.remove(_identitiesKey);
+    } catch (error, stack) {
+      reportError('moving identities out of preferences', error, stack);
+    }
+  }
+
+  /// The identities in a plaintext preferences entry whose private key is their
+  /// own, and whether those are all it holds.
+  static ({List<({Identity identity, String privkeyHex})> held, bool complete})
+  _parsePlaintextIdentities(Object raw) {
+    final held = <({Identity identity, String privkeyHex})>[];
+    final List<dynamic> items;
+    try {
+      items = jsonDecode(raw as String) as List<dynamic>;
+    } catch (_) {
+      return (held: held, complete: false);
+    }
+    var complete = true;
+    for (final item in items) {
+      try {
+        final map = item as Map<String, dynamic>;
+        final identity = Identity.fromJson(map);
+        final privkeyHex = map['privkeyHex'] as String;
+        if (_pubkeyHexOf(privkeyHex) != identity.pubkeyHex) {
+          throw const FormatException("the key is not the identity's");
+        }
+        held.add((identity: identity, privkeyHex: privkeyHex));
+      } catch (_) {
+        complete = false;
+      }
+    }
+    return (held: held, complete: complete);
+  }
 
   /// Gives each private key that is not in a slot yet one: those an older
   /// version stored inside the index, and those it named after the pubkey.

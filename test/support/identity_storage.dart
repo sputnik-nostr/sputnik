@@ -40,6 +40,12 @@ Map<String, String> legacyStorage(List<HeldIdentity> held) => {
   for (final h in held) 'identity_secret_${h.pubkeyHex}': h.privkeyHex,
 };
 
+/// What builds that kept identities in preferences stored there: the list with
+/// each private key inline.
+String plaintextIdentities(List<HeldIdentity> held) => jsonEncode([
+  for (final h in held) {...h.identity.toJson(), 'privkeyHex': h.privkeyHex},
+]);
+
 /// Secure storage as the versions that kept each key inside the index left it.
 Map<String, String> inlineStorage(List<HeldIdentity> held) => {
   'identities': jsonEncode([
