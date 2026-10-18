@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -6,17 +8,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_seed_color.dart';
 import '../models/identity.dart';
+import '../models/identity_index.dart';
 import '../models/relay.dart';
+import '../nostr/hex.dart';
 import '../nostr/keys.dart';
 import 'error_reporting.dart';
 
 /// Storage seam so tests can fake [SettingsStore.secretStore].
 abstract class SecretStore {
   Future<String?> read(String key);
+  Future<Map<String, String>> readAll();
   Future<void> write(String key, String value);
   Future<void> delete(String key);
 }
 
+/// flutter_secure_storage, which stores entries differently per platform. On
+/// Android each one is encrypted on its own, but entry names stay plaintext,
+/// so a key's entry is named after a random slot rather than after its pubkey.
+/// On Linux they all share one libsecret item, a JSON object that is decrypted
+/// whole on every call and found by the application ID, so changing that ID
+/// hides every key until they are migrated.
 class _SecureSecretStore implements SecretStore {
   const _SecureSecretStore();
 
@@ -27,6 +38,9 @@ class _SecureSecretStore implements SecretStore {
 
   @override
   Future<String?> read(String key) => _storage.read(key: key);
+
+  @override
+  Future<Map<String, String>> readAll() => _storage.readAll();
 
   @override
   Future<void> write(String key, String value) =>
@@ -62,6 +76,10 @@ Future<void> bindPersisted<T>(
   });
 }
 
+/// A private key in secure storage that no identity in the index refers to,
+/// stored under [name]: the identity it belongs to is [pubkeyHex].
+typedef UnlistedKey = ({String name, String pubkeyHex});
+
 class SettingsStore {
   SettingsStore._();
 
@@ -72,6 +90,7 @@ class SettingsStore {
   static const _identitiesKey = 'identities';
   static const _activeIdentityPubkeyKey = 'active_identity_pubkey';
   static const _identitySecretPrefix = 'identity_secret_';
+  static const _plaintextIdentitiesBackupKey = 'identities_from_preferences';
   // Named before note images had their own switch; kept so the setting stays.
   static const _loadProfileImagesKey = 'load_media';
   static const _loadNoteImagesKey = 'load_note_images';
@@ -79,7 +98,10 @@ class SettingsStore {
   static const _hiddenPaymentTargetTypesKey = 'hidden_payment_target_types';
   static const _confirmBeforeReactingKey = 'confirm_before_reacting';
 
-  /// Keys earlier versions wrote and nothing reads now.
+  /// Keys earlier versions wrote and nothing reads now. Not `identities`: while
+  /// it holds private keys in plaintext it holds the only copy of them, and
+  /// this runs alongside the startup, in no particular order, so only
+  /// [_adoptPlaintextIdentities] may remove it, once the keys are stored.
   static const _obsoleteKeys = [
     'profile_cache',
     'bookmarked_ids',
@@ -90,6 +112,10 @@ class SettingsStore {
   /// Backs the identity index and each identity's private key.
   @visibleForTesting
   static SecretStore secretStore = const _SecureSecretStore();
+
+  /// How [loadSecretKey] turns stored hex into a key; tests watch the keys.
+  @visibleForTesting
+  static SecretKey Function(String hex) secretKeyFromHex = SecretKey.fromHex;
 
   static Future<bool?> _loadFlag(String key) async {
     final prefs = await SharedPreferences.getInstance();
@@ -171,90 +197,407 @@ class SettingsStore {
     await prefs.setStringList(_customRelaysKey, relays.toList());
   }
 
-  static Future<List<Identity>> loadIdentities() async {
-    final raw = await secretStore.read(_identitiesKey);
-    if (raw == null) return [];
+  /// The index change in progress, if any.
+  static Future<void>? _running;
 
-    final decoded = jsonDecode(raw) as List<dynamic>;
-    final identities = <Identity>[];
-    var migratedAny = false;
-    var migrationFailed = false;
-
-    for (final item in decoded) {
-      final Identity identity;
-      final String? legacyPrivkeyHex;
-      try {
-        final map = item as Map<String, dynamic>;
-        identity = Identity.fromJson(map);
-        final legacy = map['privkeyHex'];
-        legacyPrivkeyHex = legacy is String ? legacy : null;
-      } catch (_) {
-        // Skip malformed identity entries.
-        continue;
-      }
-      identities.add(identity);
-      if (legacyPrivkeyHex == null) continue;
-
-      // Migrate a private key that used to live inline here.
-      try {
-        if (await loadPrivateKey(identity.pubkeyHex) == null) {
-          await savePrivateKey(identity.pubkeyHex, legacyPrivkeyHex);
-        }
-        migratedAny = true;
-      } catch (_) {
-        migrationFailed = true;
-      }
+  /// Runs index changes one at a time. Each starts from the index in storage,
+  /// so none may begin before the one ahead of it has written.
+  static Future<T> _serialized<T>(Future<T> Function() change) async {
+    for (var running = _running; running != null; running = _running) {
+      await running;
     }
-
-    // Rewriting the index would drop an inline key that failed to migrate.
-    if (migratedAny && !migrationFailed) await saveIdentities(identities);
-
-    return identities;
-  }
-
-  static Future<void> saveIdentities(List<Identity> identities) async {
-    await secretStore.write(
-      _identitiesKey,
-      jsonEncode([for (final identity in identities) identity.toJson()]),
-    );
-  }
-
-  static Future<String?> loadActiveIdentityPubkey() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_activeIdentityPubkeyKey);
-  }
-
-  static Future<void> saveActiveIdentityPubkey(String? pubkeyHex) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (pubkeyHex == null) {
-      await prefs.remove(_activeIdentityPubkeyKey);
-    } else {
-      await prefs.setString(_activeIdentityPubkeyKey, pubkeyHex);
-    }
-  }
-
-  /// One secure-storage entry per identity, read only when needed.
-  static Future<String?> loadPrivateKey(String pubkeyHex) {
-    return secretStore.read('$_identitySecretPrefix$pubkeyHex');
-  }
-
-  /// [loadPrivateKey] as a [SecretKey], or null if missing or malformed.
-  static Future<SecretKey?> loadSecretKey(String pubkeyHex) async {
-    final privkeyHex = await loadPrivateKey(pubkeyHex);
-    if (privkeyHex == null) return null;
+    final done = Completer<void>();
+    _running = done.future;
     try {
-      return SecretKey.fromHex(privkeyHex);
+      return await change();
+    } finally {
+      _running = null;
+      done.complete();
+    }
+  }
+
+  static Future<IdentityIndex> _readIndex() async {
+    final raw = await secretStore.read(_identitiesKey);
+    return raw == null ? IdentityIndex.empty : IdentityIndex.parse(raw);
+  }
+
+  /// Stores [value] and reads it back, so it only counts as stored once it
+  /// can be read again.
+  static Future<void> _writeVerified(String key, String value) async {
+    await secretStore.write(key, value);
+    if (await secretStore.read(key) != value) {
+      throw StateError('secure storage did not keep $key');
+    }
+  }
+
+  static String _secretName(String name) => '$_identitySecretPrefix$name';
+
+  static final _random = Random.secure();
+
+  /// A name for a key's entry that says nothing about whose key it holds.
+  static String _newSlot() =>
+      hexEncode([for (var i = 0; i < 16; i++) _random.nextInt(256)]);
+
+  /// The pubkey of [privkeyHex], or null if it is not a secp256k1 key.
+  static String? _pubkeyHexOf(String privkeyHex) {
+    try {
+      final secretKey = SecretKey.fromHex(privkeyHex);
+      try {
+        return xonlyPubkeyHex(secretKey);
+      } finally {
+        secretKey.wipe();
+      }
     } on ArgumentError {
       return null;
     }
   }
 
-  static Future<void> savePrivateKey(String pubkeyHex, String privkeyHex) {
-    return secretStore.write('$_identitySecretPrefix$pubkeyHex', privkeyHex);
+  /// The private key kept for [pubkeyHex]: in its slot or, if it has none or
+  /// the slot is empty, under the name older versions gave it.
+  static Future<String?> _readKey(IdentityIndex index, String pubkeyHex) async {
+    final slot = index.slotOf(pubkeyHex);
+    if (slot != null) {
+      final stored = await secretStore.read(_secretName(slot));
+      if (stored != null) return stored;
+    }
+    return secretStore.read(_secretName(pubkeyHex));
   }
 
-  static Future<void> deletePrivateKey(String pubkeyHex) {
-    return secretStore.delete('$_identitySecretPrefix$pubkeyHex');
+  /// The identity index, after bringing what older versions stored up to date:
+  /// identities kept in preferences, private keys inside the index or named
+  /// after their pubkey, and the active identity kept in preferences.
+  ///
+  /// Throws if the index can't be read. Until it can, nothing may be added or
+  /// removed: every change starts from the index in storage.
+  static Future<IdentityIndex> loadIdentityIndex() => _serialized(() async {
+    // Each step starts from the index in storage, so a step that failed after
+    // its write took effect cannot leave the next one working on a stale copy.
+    await _adoptPlaintextIdentities();
+    await _moveKeysToSlots();
+    await _adoptActivePointer();
+    return _readIndex();
+  });
+
+  /// Builds from before private keys moved to secure storage kept the
+  /// identities, keys included, in preferences. Moves them into secure storage.
+  ///
+  /// Each key goes into a slot and the identities into the index, both read
+  /// back, and only then does the entry leave preferences. Anything the entry
+  /// holds that can't become an identity as it is (damaged JSON, a key that is
+  /// not its pubkey's, a different key stored for that pubkey already) is first
+  /// copied as it was into secure storage, so that nothing is lost silently. A
+  /// failure leaves the entry in preferences, to be tried again at the next
+  /// start.
+  static Future<void> _adoptPlaintextIdentities() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.get(_identitiesKey);
+      if (raw == null) return;
+
+      final plain = _parsePlaintextIdentities(raw);
+      var complete = plain.complete;
+      final index = await _readIndex();
+      var adopted = index;
+      for (final held in plain.held) {
+        final pubkeyHex = held.identity.pubkeyHex;
+        if (adopted.contains(pubkeyHex) &&
+            adopted.identities.every((i) => i.pubkeyHex != pubkeyHex)) {
+          complete = false; // An entry this version cannot read names it.
+          continue;
+        }
+        final stored = await _readKey(adopted, pubkeyHex);
+        if (stored != null && stored != held.privkeyHex) {
+          complete = false; // The key that is stored stays.
+          continue;
+        }
+        if (stored == null) {
+          final slot = adopted.slotOf(pubkeyHex) ?? _newSlot();
+          await _writeVerified(_secretName(slot), held.privkeyHex);
+          adopted = adopted.contains(pubkeyHex)
+              ? adopted.withSlot(pubkeyHex, slot)
+              : adopted.withIdentity(held.identity, slot: slot);
+        } else if (!adopted.contains(pubkeyHex)) {
+          adopted = adopted.withIdentity(held.identity);
+        }
+      }
+      if (adopted.encode() != index.encode()) {
+        await _writeVerified(_identitiesKey, adopted.encode());
+      }
+      if (!complete) {
+        await _writeVerified(_plaintextIdentitiesBackupKey, '$raw');
+      }
+      await prefs.remove(_identitiesKey);
+    } catch (error, stack) {
+      reportError('moving identities out of preferences', error, stack);
+    }
+  }
+
+  /// The identities in a plaintext preferences entry whose private key is their
+  /// own, and whether those are all it holds.
+  static ({List<({Identity identity, String privkeyHex})> held, bool complete})
+  _parsePlaintextIdentities(Object raw) {
+    final held = <({Identity identity, String privkeyHex})>[];
+    final List<dynamic> items;
+    try {
+      items = jsonDecode(raw as String) as List<dynamic>;
+    } catch (_) {
+      return (held: held, complete: false);
+    }
+    var complete = true;
+    for (final item in items) {
+      try {
+        final map = item as Map<String, dynamic>;
+        final identity = Identity.fromJson(map);
+        final privkeyHex = map['privkeyHex'] as String;
+        if (_pubkeyHexOf(privkeyHex) != identity.pubkeyHex) {
+          throw const FormatException("the key is not the identity's");
+        }
+        held.add((identity: identity, privkeyHex: privkeyHex));
+      } catch (_) {
+        complete = false;
+      }
+    }
+    return (held: held, complete: complete);
+  }
+
+  /// Gives each private key that is not in a slot yet one: those an older
+  /// version stored inside the index, and those it named after the pubkey.
+  ///
+  /// A key is copied and read back first, then the index naming its slot is
+  /// saved and read back, and only then is the old pubkey-named copy deleted. A
+  /// failure at any step leaves every key where it was found, at worst also in
+  /// a slot nothing refers to. What can't be moved stays where it is, in the
+  /// index too, and is tried again at the next start.
+  static Future<void> _moveKeysToSlots() async {
+    final index = await _readIndex();
+    var moved = index;
+    final namedAfterPubkey = <String>[];
+    for (final pending in index.keysToMove) {
+      try {
+        final pubkeyHex = pending.pubkeyHex;
+        final existingSlot = pending.slot;
+        final inSlot = existingSlot == null
+            ? null
+            : await secretStore.read(_secretName(existingSlot));
+        final named = await secretStore.read(_secretName(pubkeyHex));
+        final copies = {?inSlot, ?named, ?pending.inlineKey};
+        if (copies.isEmpty) continue;
+        if (copies.length > 1) {
+          throw StateError(
+            'different private keys are stored for one identity',
+          );
+        }
+        final privkeyHex = copies.single;
+        if (_pubkeyHexOf(privkeyHex) != pubkeyHex) {
+          throw StateError("the stored private key is not the identity's");
+        }
+
+        final slot = existingSlot ?? _newSlot();
+        if (inSlot == null) {
+          await _writeVerified(_secretName(slot), privkeyHex);
+        }
+        moved = moved.withSlot(pubkeyHex, slot).withoutInlineKey(pubkeyHex);
+        if (named != null) namedAfterPubkey.add(pubkeyHex);
+      } catch (error, stack) {
+        reportError('moving a private key into its own entry', error, stack);
+      }
+    }
+    if (moved.encode() == index.encode()) return;
+
+    try {
+      await _writeVerified(_identitiesKey, moved.encode());
+    } catch (error, stack) {
+      reportError('saving the identity index', error, stack);
+      return;
+    }
+    for (final pubkeyHex in namedAfterPubkey) {
+      try {
+        await secretStore.delete(_secretName(pubkeyHex));
+      } catch (error, stack) {
+        reportError(
+          'deleting a private key entry named after its pubkey',
+          error,
+          stack,
+        );
+      }
+    }
+  }
+
+  /// Moves the active identity from preferences, which anyone who can read the
+  /// app's files can read, into the index.
+  static Future<void> _adoptActivePointer() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final pubkeyHex = prefs.getString(_activeIdentityPubkeyKey);
+      if (pubkeyHex == null) return;
+
+      final index = await _readIndex();
+      if (index.active == null && index.contains(pubkeyHex)) {
+        await _writeVerified(
+          _identitiesKey,
+          index.withActive(pubkeyHex).encode(),
+        );
+      }
+      await prefs.remove(_activeIdentityPubkeyKey);
+    } catch (error, stack) {
+      reportError('moving the active identity into the index', error, stack);
+    }
+  }
+
+  /// Stores [privkeyHex] in a slot of its own for [identity] and lists the
+  /// identity.
+  ///
+  /// The key goes first, so an identity is never listed without one. Throws if
+  /// either can't be saved, and then the identity is not listed.
+  static Future<IdentityIndex> addIdentity(
+    Identity identity,
+    String privkeyHex,
+  ) => _serialized(() async {
+    final index = await _readIndex();
+    if (index.contains(identity.pubkeyHex)) return index;
+
+    final slot = _newSlot();
+    await _writeVerified(_secretName(slot), privkeyHex);
+    final next = index.withIdentity(identity, slot: slot);
+    await _writeVerified(_identitiesKey, next.encode());
+    return next;
+  });
+
+  /// Deletes the key of [pubkeyHex], then unlists the identity.
+  ///
+  /// Throws if the key can't be deleted, and then the identity stays listed:
+  /// unlisting it first would leave a key that nothing refers to any more. If
+  /// only the unlisting fails, the identity stays listed without a key and can
+  /// be deleted again.
+  static Future<IdentityIndex> removeIdentity(String pubkeyHex) =>
+      _serialized(() async {
+        final index = await _readIndex();
+        final slot = index.slotOf(pubkeyHex);
+        if (slot != null) await secretStore.delete(_secretName(slot));
+        // The copy older versions named after the pubkey, if never moved.
+        await secretStore.delete(_secretName(pubkeyHex));
+        final next = index.without(pubkeyHex);
+        await _writeVerified(_identitiesKey, next.encode());
+        return next;
+      });
+
+  /// Looks through the private keys in secure storage for ones the index does
+  /// not account for, such as a key whose identity never made it into the
+  /// index, and returns those of identities that are not listed so that they
+  /// can be listed again.
+  ///
+  /// Any other copy of the key of a listed identity, which a failure part way
+  /// through a move can leave behind, is deleted when the identity's own entry
+  /// holds the same key.
+  ///
+  /// This hands every stored key to the app for as long as it takes to look at
+  /// it, so it is not meant to run more often than a start.
+  static Future<List<UnlistedKey>> reconcileStoredKeys() =>
+      _serialized(() async {
+        final index = await _readIndex();
+        final stored = await secretStore.readAll();
+        final unlisted = <UnlistedKey>[];
+        final strayCopies = <String>[];
+        for (final entry in stored.entries) {
+          if (!entry.key.startsWith(_identitySecretPrefix)) continue;
+          final name = entry.key.substring(_identitySecretPrefix.length);
+          if (index.refersTo(name)) continue;
+          final pubkeyHex = _pubkeyHexOf(entry.value);
+          if (pubkeyHex == null) continue;
+
+          if (!index.contains(pubkeyHex)) {
+            if (unlisted.every((key) => key.pubkeyHex != pubkeyHex)) {
+              unlisted.add((name: name, pubkeyHex: pubkeyHex));
+            }
+            continue;
+          }
+          final own = stored[_secretName(index.slotOf(pubkeyHex) ?? pubkeyHex)];
+          if (own == entry.value) strayCopies.add(name);
+        }
+
+        for (final name in strayCopies) {
+          try {
+            await secretStore.delete(_secretName(name));
+          } catch (error, stack) {
+            reportError('deleting a stray copy of a private key', error, stack);
+          }
+        }
+        return unlisted..sort((a, b) => a.pubkeyHex.compareTo(b.pubkeyHex));
+      });
+
+  /// Lists the identity of [key] again, with the key where it is.
+  ///
+  /// Throws if the key is gone or no longer the identity's, and then nothing
+  /// is changed.
+  static Future<IdentityIndex> restoreIdentity(UnlistedKey key) =>
+      _serialized(() async {
+        final index = await _readIndex();
+        if (index.contains(key.pubkeyHex)) return index;
+
+        final stored = await secretStore.read(_secretName(key.name));
+        if (stored == null || _pubkeyHexOf(stored) != key.pubkeyHex) {
+          throw StateError('the key is no longer stored');
+        }
+        final identity = Identity(
+          pubkeyHex: key.pubkeyHex,
+          createdAt: DateTime.now(),
+        );
+        // A key named after its pubkey has no slot: the next start moves it.
+        final next = index.withIdentity(
+          identity,
+          slot: key.name == key.pubkeyHex ? null : key.name,
+        );
+        await _writeVerified(_identitiesKey, next.encode());
+        return next;
+      });
+
+  /// Records the active identity in the index, where only the app can read it.
+  /// Does nothing for a pubkey that is not listed.
+  static Future<void> saveActiveIdentityPubkey(String? pubkeyHex) =>
+      _serialized(() async {
+        final index = await _readIndex();
+        if (pubkeyHex != null && !index.contains(pubkeyHex)) return;
+        if (index.active == pubkeyHex) return;
+        await _writeVerified(
+          _identitiesKey,
+          index.withActive(pubkeyHex).encode(),
+        );
+      });
+
+  /// Read from secure storage each time it is needed, never cached.
+  static Future<String?> loadPrivateKey(String pubkeyHex) async =>
+      _readKey(await _readIndex(), pubkeyHex);
+
+  /// [loadPrivateKey] as a [SecretKey], or null if it is missing, malformed or
+  /// not the key of [pubkeyHex], so a key kept under the wrong name never
+  /// signs.
+  static Future<SecretKey?> loadSecretKey(String pubkeyHex) async {
+    final privkeyHex = await loadPrivateKey(pubkeyHex);
+    if (privkeyHex == null) return null;
+
+    final SecretKey secretKey;
+    try {
+      secretKey = secretKeyFromHex(privkeyHex);
+    } on ArgumentError {
+      return null;
+    }
+    var matches = false;
+    try {
+      matches = xonlyPubkeyHex(secretKey) == pubkeyHex;
+    } on ArgumentError {
+      // Valid hex, but not a point on the curve (zero, or above the order).
+    } finally {
+      if (!matches) secretKey.wipe();
+    }
+    return matches ? secretKey : null;
+  }
+
+  /// Stores a key under the name versions before slots gave it, which
+  /// [loadPrivateKey] still finds. Tests use it to give an identity a key
+  /// without an index; [addIdentity] is how the app stores one.
+  @visibleForTesting
+  static Future<void> savePrivateKey(String pubkeyHex, String privkeyHex) {
+    return secretStore.write(_secretName(pubkeyHex), privkeyHex);
   }
 
   static Future<bool?> loadLoadProfileImages() =>

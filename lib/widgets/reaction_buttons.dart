@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app_state.dart';
 import '../models/note.dart';
 import '../screens/compose_screen.dart';
 import '../services/reaction_actions.dart';
@@ -20,15 +21,18 @@ class LikeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _ReactionToggle(
-      active: note.likedByMe,
-      count: note.likeCount,
-      showCount: showCount,
-      size: size,
-      icon: (liked) => liked ? Icons.favorite : Icons.favorite_border,
-      tooltip: (liked) => liked ? 'Liked' : 'Like',
-      toggle: (liked) =>
-          liked ? unlikeNote(context, note) : likeNote(context, note),
+    return _ForActiveIdentity(
+      builder: (me) => _ReactionToggle(
+        scope: (note.id, me),
+        active: note.likedBy(me),
+        count: note.likeCount,
+        showCount: showCount,
+        size: size,
+        icon: (liked) => liked ? Icons.favorite : Icons.favorite_border,
+        tooltip: (liked) => liked ? 'Liked' : 'Like',
+        toggle: (liked) =>
+            liked ? unlikeNote(context, note) : likeNote(context, note),
+      ),
     );
   }
 }
@@ -48,23 +52,42 @@ class RepostButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _ReactionToggle(
-      active: note.repostedByMe,
-      count: note.repostCount,
-      showCount: showCount,
-      size: size,
-      icon: (_) => Icons.repeat,
-      tooltip: (reposted) =>
-          '${reposted ? 'Reposted' : 'Repost'} (hold to quote)',
-      toggle: (reposted) =>
-          reposted ? unrepostNote(context, note) : repostNote(context, note),
-      onLongPress: () => openQuoteComposer(context, note),
+    return _ForActiveIdentity(
+      builder: (me) => _ReactionToggle(
+        scope: (note.id, me),
+        active: note.repostedBy(me),
+        count: note.repostCount,
+        showCount: showCount,
+        size: size,
+        icon: (_) => Icons.repeat,
+        tooltip: (reposted) =>
+            '${reposted ? 'Reposted' : 'Repost'} (hold to quote)',
+        toggle: (reposted) =>
+            reposted ? unrepostNote(context, note) : repostNote(context, note),
+        onLongPress: () => openQuoteComposer(context, note),
+      ),
+    );
+  }
+}
+
+/// Builds with the pubkey of the active identity, and again when it changes.
+class _ForActiveIdentity extends StatelessWidget {
+  const _ForActiveIdentity({required this.builder});
+
+  final Widget Function(String? pubkeyHex) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<String?>(
+      valueListenable: activeIdentityPubkeyNotifier,
+      builder: (context, me, _) => builder(me),
     );
   }
 }
 
 class _ReactionToggle extends StatefulWidget {
   const _ReactionToggle({
+    required this.scope,
     required this.active,
     required this.count,
     required this.showCount,
@@ -74,6 +97,11 @@ class _ReactionToggle extends StatefulWidget {
     required this.toggle,
     this.onLongPress,
   });
+
+  /// The note and the identity [active] and a tap are about. When it changes
+  /// this button is showing something else, and what it did for the previous
+  /// scope no longer applies.
+  final Object scope;
 
   /// Whether the relays say the active identity already reacted.
   final bool active;
@@ -99,11 +127,24 @@ class _ReactionToggleState extends State<_ReactionToggle> {
   /// Set once this button has toggled itself; null defers to [widget.active].
   bool? _localOverride;
 
+  /// How often the scope changed, so a tap can tell that it was overtaken.
+  int _scopeChanges = 0;
+
+  @override
+  void didUpdateWidget(_ReactionToggle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.scope == oldWidget.scope) return;
+    _localOverride = null;
+    _pending = false;
+    _scopeChanges++;
+  }
+
   Future<void> _tap() async {
     final active = _localOverride ?? widget.active;
+    final scopeChanges = _scopeChanges;
     setState(() => _pending = true);
     final succeeded = await widget.toggle(active);
-    if (!mounted) return;
+    if (!mounted || scopeChanges != _scopeChanges) return;
     setState(() {
       _pending = false;
       if (succeeded) _localOverride = !active;

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../models/avatar_initial.dart';
 import '../models/note.dart';
+import '../models/text_limits.dart';
 import '../models/time_format.dart';
 import '../nostr/nostr.dart';
 import '../screens/compose_screen.dart';
@@ -34,9 +35,6 @@ class NoteTile extends StatelessWidget {
     final theme = Theme.of(context);
 
     final repostedByPubkey = note.repostedByPubkey;
-    final isOwnNote =
-        note.pubkey.toLowerCase() ==
-        activeIdentityPubkeyNotifier.value?.toLowerCase();
 
     return InkWell(
       onTap: () => _openPost(context),
@@ -59,9 +57,14 @@ class NoteTile extends StatelessWidget {
                         color: theme.colorScheme.outline,
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        '${note.repostedByDisplayName} reposted',
-                        style: theme.metadata,
+                      Flexible(
+                        child: Text(
+                          '${boundedName(note.repostedByDisplayName ?? '')} '
+                          'reposted',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.metadata,
+                        ),
                       ),
                     ],
                   ),
@@ -92,7 +95,7 @@ class NoteTile extends StatelessWidget {
                             child: GestureDetector(
                               onTap: () => openProfile(context, note.pubkey),
                               child: Text(
-                                note.displayName,
+                                boundedName(note.displayName),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.avatarName,
@@ -112,30 +115,7 @@ class NoteTile extends StatelessWidget {
                         selectable: false,
                       ),
                       const SizedBox(height: 8),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            NoteActionButton(
-                              key: const Key('replyButton'),
-                              icon: Icons.chat_bubble_outline,
-                              count: note.replyCount,
-                              tooltip: 'Reply',
-                              onTap: () => openReplyComposer(context, note),
-                            ),
-                            const SizedBox(width: 20),
-                            RepostButton(note: note),
-                            const SizedBox(width: 20),
-                            LikeButton(note: note),
-                            const SizedBox(width: 20),
-                            BookmarkButton(note: note),
-                            if (isOwnNote) ...[
-                              const SizedBox(width: 20),
-                              DeleteButton(note: note),
-                            ],
-                          ],
-                        ),
-                      ),
+                      _NoteActions(note: note),
                     ],
                   ),
                 ),
@@ -144,6 +124,63 @@ class NoteTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Where in [notes] the row keyed [key] is now, for a list's
+/// `findItemIndexCallback`.
+///
+/// Rows are keyed `ValueKey(note.id)`. With this, what a row remembers, such
+/// as a like it just made, moves with its note when the list shifts instead of
+/// being dropped. Two rows with one key would break that, so [notes] must hold
+/// each note once, as a feed's cursor and the map of bookmarks make sure.
+int? indexOfNoteRow(List<Note> notes, Key key) {
+  if (key is! ValueKey<String>) return null;
+  final index = notes.indexWhere((note) => note.id == key.value);
+  return index < 0 ? null : index;
+}
+
+/// Reply, repost, like, bookmark and, on the active identity's own notes,
+/// delete.
+class _NoteActions extends StatelessWidget {
+  const _NoteActions({required this.note});
+
+  final Note note;
+
+  @override
+  Widget build(BuildContext context) {
+    // Tiles outlive an identity switch, so what they offer has to follow it.
+    return ValueListenableBuilder<String?>(
+      valueListenable: activeIdentityPubkeyNotifier,
+      builder: (context, activePubkey, _) {
+        final isOwnNote =
+            note.pubkey.toLowerCase() == activePubkey?.toLowerCase();
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              NoteActionButton(
+                key: const Key('replyButton'),
+                icon: Icons.chat_bubble_outline,
+                count: note.replyCount,
+                tooltip: 'Reply',
+                onTap: () => openReplyComposer(context, note),
+              ),
+              const SizedBox(width: 20),
+              RepostButton(note: note),
+              const SizedBox(width: 20),
+              LikeButton(note: note),
+              const SizedBox(width: 20),
+              BookmarkButton(note: note),
+              if (isOwnNote) ...[
+                const SizedBox(width: 20),
+                DeleteButton(note: note),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

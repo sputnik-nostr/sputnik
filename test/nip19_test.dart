@@ -129,4 +129,97 @@ void main() {
     );
     expect(decodeNostrUri('not a nostr identifier'), isNull);
   });
+
+  group('decodeNostrUri with uppercase', () {
+    // QR codes carry URIs in uppercase; BIP-173 allows an entity in all
+    // lowercase or all uppercase, never a mix of the two.
+    const nprofile =
+        'nprofile1qqsrhuxx8l9ex335q7he0f09aej04zpazpl0ne2cgukyawd24mayt8gpp4mhxue69uhhytnc9e3k7mgpz4mhxue69uhkg6nzv9ejuumpv34kytnrdaksjlyr9p';
+    final entities = {
+      'npub': (npub1, (pubkeyHex: hex1, eventIdHex: null)),
+      'nprofile': (nprofile, (pubkeyHex: hex1, eventIdHex: null)),
+      'note': (noteFromHex(hex1), (pubkeyHex: null, eventIdHex: hex1)),
+      'nevent': (
+        neventFromHex(hex1, authorPubkeyHex: hex2),
+        (pubkeyHex: null, eventIdHex: hex1),
+      ),
+    };
+
+    /// [entity] with its last lowercase letter in uppercase.
+    String oneUppercase(String entity) {
+      final letter = entity.lastIndexOf(RegExp('[a-z]'));
+      return entity.substring(0, letter) +
+          entity[letter].toUpperCase() +
+          entity.substring(letter + 1);
+    }
+
+    for (final MapEntry(key: kind, value: (entity, target))
+        in entities.entries) {
+      group(kind, () {
+        test('decodes the lowercase form', () {
+          expect(decodeNostrUri(entity), target);
+          expect(decodeNostrUri('nostr:$entity'), target);
+        });
+
+        test('decodes the uppercase form', () {
+          expect(decodeNostrUri(entity.toUpperCase()), target);
+          expect(decodeNostrUri('nostr:${entity.toUpperCase()}'), target);
+          expect(decodeNostrUri('NOSTR:${entity.toUpperCase()}'), target);
+        });
+
+        test('decodes a scheme in any case before a whole entity', () {
+          expect(decodeNostrUri('NOSTR:$entity'), target);
+          expect(decodeNostrUri('Nostr:$entity'), target);
+        });
+
+        test('rejects an entity that mixes cases', () {
+          final upper = entity.toUpperCase();
+          final firstCapital = entity[0].toUpperCase() + entity.substring(1);
+          final lowercasePrefix = entity.substring(0, entity.indexOf('1') + 1);
+          final upperPrefix = lowercasePrefix.toUpperCase();
+
+          for (final mixed in [
+            oneUppercase(entity),
+            firstCapital,
+            // Only the prefix, or only the rest, in uppercase.
+            upperPrefix + entity.substring(lowercasePrefix.length),
+            lowercasePrefix + upper.substring(lowercasePrefix.length),
+          ]) {
+            expect(decodeNostrUri(mixed), isNull, reason: mixed);
+            expect(decodeNostrUri('nostr:$mixed'), isNull, reason: mixed);
+            expect(decodeNostrUri('NOSTR:$mixed'), isNull, reason: mixed);
+          }
+        });
+
+        test('still checks the checksum of the uppercase form', () {
+          final upper = entity.toUpperCase();
+          // The last character is part of the checksum; "Q" is 0 and "P" is 1.
+          final last = upper.endsWith('Q') ? 'P' : 'Q';
+
+          expect(
+            decodeNostrUri(upper.substring(0, upper.length - 1) + last),
+            isNull,
+          );
+        });
+      });
+    }
+
+    test('never decodes an nsec, in any case', () {
+      const nsec =
+          'nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5';
+
+      expect(decodeNostrUri(nsec.toUpperCase()), isNull);
+      expect(decodeNostrUri('NOSTR:${nsec.toUpperCase()}'), isNull);
+    });
+
+    test('returns null for text too short to be an entity', () {
+      for (final text in ['', 'n', 'NOSTR', 'nostr:', 'NOSTR:', 'NPUB1']) {
+        expect(decodeNostrUri(text), isNull, reason: text);
+      }
+    });
+
+    test('hexFromNpub decodes the uppercase form too', () {
+      expect(hexFromNpub(npub1.toUpperCase()), hex1);
+    });
+  });
 }

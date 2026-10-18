@@ -30,6 +30,9 @@ final _followingCursor = PostCursor(
 
 List<String> _followingAuthors = const [];
 
+/// The identity the Following feed was last loaded for.
+String? _followingFor;
+
 ValueListenable<bool> get globalFeedHasMore => _globalCursor.hasMore;
 ValueListenable<bool> get followingFeedHasMore => _followingCursor.hasMore;
 
@@ -44,6 +47,12 @@ Future<void> loadMoreGlobalFeed() => _appendPosts(_globalCursor, notesNotifier);
 Future<void> loadFollowingFeed() async {
   final relayUrls = selectedRelaysNotifier.value;
   final myPubkeyHex = activeIdentityPubkeyNotifier.value;
+  if (_followingFor != myPubkeyHex) {
+    // Loads still running were for the previous identity. This is before the
+    // first await, so they are cut off by the time the listener returns.
+    _followingFor = myPubkeyHex;
+    _followingCursor.invalidate();
+  }
   if (myPubkeyHex == null) {
     followingNotesNotifier.value = const [];
     _followingCursor.hasMore.value = false;
@@ -55,35 +64,59 @@ Future<void> loadFollowingFeed() async {
   if (activeIdentityPubkeyNotifier.value != myPubkeyHex) return;
 
   _followingAuthors = {...?myFollowingNotifier.value, myPubkeyHex}.toList();
-  await _loadFirst(_followingCursor, relayUrls, followingNotesNotifier);
+  await _loadFirst(
+    _followingCursor,
+    relayUrls,
+    followingNotesNotifier,
+    isWanted: _stillActive(myPubkeyHex),
+  );
 }
 
 /// Appends the next older page to [followingNotesNotifier].
-Future<void> loadMoreFollowingFeed() =>
-    _appendPosts(_followingCursor, followingNotesNotifier);
+Future<void> loadMoreFollowingFeed() => _appendPosts(
+  _followingCursor,
+  followingNotesNotifier,
+  isWanted: _stillActive(activeIdentityPubkeyNotifier.value),
+);
 
+bool _always() => true;
+
+/// For a load begun as [pubkeyHex]: whether that is still the active identity.
+bool Function() _stillActive(String? pubkeyHex) =>
+    () => activeIdentityPubkeyNotifier.value == pubkeyHex;
+
+/// Stops once [isWanted] says no, which it is asked after each wait.
 Future<void> _appendPosts(
   PostCursor cursor,
-  ValueNotifier<List<Note>?> target,
-) async {
+  ValueNotifier<List<Note>?> target, {
+  bool Function() isWanted = _always,
+}) async {
   final posts = await cursor.more();
-  if (posts.isEmpty) return;
+  if (posts.isEmpty || !isWanted()) return;
 
   target.value = [
     ...?target.value,
     ...notesFromPosts(posts, profileCacheNotifier.value),
   ];
-  await _hydrateInto(target, posts, selectedRelaysNotifier.value);
+  await _hydrateInto(
+    target,
+    posts,
+    selectedRelaysNotifier.value,
+    isCurrent: isWanted,
+  );
 }
 
 /// Shows the newest page at once, then again with profiles and counts.
+///
+/// Stops once [isWanted] says no, which it is asked after each wait.
 Future<void> _loadFirst(
   PostCursor cursor,
   Set<String> relayUrls,
-  ValueNotifier<List<Note>?> target,
-) async {
+  ValueNotifier<List<Note>?> target, {
+  bool Function() isWanted = _always,
+}) async {
   final posts = await cursor.first();
-  if (posts == null) return;
+  if (posts == null || !isWanted()) return;
   final generation = cursor.generation;
 
   target.value = notesFromPosts(posts, profileCacheNotifier.value);
@@ -91,7 +124,7 @@ Future<void> _loadFirst(
     target,
     posts,
     relayUrls,
-    isCurrent: () => cursor.generation == generation,
+    isCurrent: () => cursor.generation == generation && isWanted(),
   );
 }
 

@@ -81,6 +81,10 @@ int effectivePort(Uri url) =>
 /// Head start each address gets before the next one is tried too (RFC 8305).
 const _connectAttemptDelay = Duration(milliseconds: 250);
 
+/// Most addresses raced for one connection. A hostile name can return
+/// hundreds, and every attempt that gets no answer holds a socket.
+const _maxRacedAddresses = 6;
+
 /// Alternates IPv6 and IPv4, so one broken family can't stall every attempt.
 List<InternetAddress> _interleaveFamilies(List<InternetAddress> addresses) {
   if (addresses.isEmpty) return addresses;
@@ -101,19 +105,25 @@ List<InternetAddress> _interleaveFamilies(List<InternetAddress> addresses) {
   ];
 }
 
+/// What one connection races: both families, and not more than a handful.
+List<InternetAddress> _raced(List<InternetAddress> addresses) =>
+    _interleaveFamilies(addresses).take(_maxRacedAddresses).toList();
+
 /// Races [addresses] in staggered order, as dart:io does for a hostname.
+///
+/// Like any [ConnectionTask], cancelling it closes every attempt and fails
+/// its socket with a [SocketException].
 @visibleForTesting
 ConnectionTask<Socket> connectToAny(List<InternetAddress> addresses, int port) {
   final result = Completer<Socket>();
   final tasks = <ConnectionTask<Socket>>[];
   var next = 0;
   var failed = 0;
-  var cancelled = false;
   Timer? stagger;
 
   void startNext() {
     stagger?.cancel();
-    if (cancelled || result.isCompleted || next >= addresses.length) return;
+    if (result.isCompleted || next >= addresses.length) return;
     final address = addresses[next++];
     stagger = Timer(_connectAttemptDelay, startNext);
 
@@ -127,8 +137,17 @@ ConnectionTask<Socket> connectToAny(List<InternetAddress> addresses, int port) {
       }
     }
 
-    Socket.startConnect(address, port).then((task) {
-      if (cancelled || result.isCompleted) {
+    // An error thrown straight away fails this attempt like any other.
+    Future<ConnectionTask<Socket>> started;
+    try {
+      started = Socket.startConnect(address, port);
+    } catch (error, stack) {
+      started = Future.error(error, stack);
+    }
+    started.then((task) {
+      if (result.isCompleted) {
+        // Nobody wants it any more: close whatever it still manages to open.
+        task.socket.then((socket) => socket.destroy(), onError: (_) {});
         task.cancel();
         return;
       }
@@ -153,38 +172,186 @@ ConnectionTask<Socket> connectToAny(List<InternetAddress> addresses, int port) {
     startNext();
   }
   return ConnectionTask.fromSocket(result.future, () {
-    cancelled = true;
+    if (result.isCompleted) return;
     stagger?.cancel();
     for (final task in tasks) {
       task.cancel();
     }
+    result.completeError(const SocketException('Connection attempt cancelled'));
   });
 }
 
-/// Connects only to vetted addresses so DNS can't rebind; ignores proxies.
+/// The IPv4 address behind an IPv4-mapped IPv6 address (::ffff:a.b.c.d).
+List<int>? _mappedV4(List<int> bytes) {
+  final mapped =
+      bytes.length == 16 &&
+      bytes.take(10).every((byte) => byte == 0) &&
+      bytes[10] == 0xff &&
+      bytes[11] == 0xff;
+  return mapped ? bytes.sublist(12) : null;
+}
+
+/// Whether [address] is one of [own] or shares a /64 with one of them.
+///
+/// A public address of this machine passes [isBlockedAddress], and so does a
+/// neighbour on its IPv6 LAN, but a request to either reaches a service on or
+/// next to the machine. Interfaces don't report their prefix length, so IPv6
+/// neighbours are the addresses of the same /64, the size of a LAN subnet;
+/// for IPv4 only the address itself counts.
+@visibleForTesting
+bool isOwnNetworkAddress(
+  InternetAddress address,
+  Iterable<InternetAddress> own,
+) {
+  // The OS connects to ::ffff:a.b.c.d over IPv4.
+  final bytes = address.rawAddress;
+  final comparable = _mappedV4(bytes) ?? bytes;
+  final bits = comparable.length == 4 ? 32 : 64;
+  for (final mine in own) {
+    final theirs = mine.rawAddress;
+    if (theirs.length == comparable.length &&
+        _inCidr(comparable, theirs, bits)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+Future<List<InternetAddress>> _listInterfaceAddresses() async => [
+  // Loopback too: a public address can be assigned to it.
+  for (final interface in await NetworkInterface.list(includeLoopback: true))
+    ...interface.addresses,
+];
+
+/// The addresses of this host's own network interfaces.
+///
+/// A burst of connections shares one listing, and a changed network is picked
+/// up once [maxAge] has passed. If the interfaces can't be listed there is
+/// nothing to compare with, and the blocklist alone applies as it always did.
+@visibleForTesting
+class OwnAddresses {
+  OwnAddresses({
+    Future<List<InternetAddress>> Function()? list,
+    this.maxAge = const Duration(seconds: 60),
+  }) : _list = list ?? _listInterfaceAddresses;
+
+  final Future<List<InternetAddress>> Function() _list;
+  final Duration maxAge;
+  Future<List<InternetAddress>>? _addresses;
+  final _age = Stopwatch();
+
+  Future<List<InternetAddress>> get addresses {
+    final current = _addresses;
+    if (current != null && _age.elapsed < maxAge) return current;
+    _age
+      ..reset()
+      ..start();
+    return _addresses = _load();
+  }
+
+  Future<List<InternetAddress>> _load() async {
+    try {
+      return await _list();
+    } catch (_) {
+      return const [];
+    }
+  }
+}
+
+/// The interfaces the guard compares addresses with; replaced in tests.
+@visibleForTesting
+OwnAddresses ownAddresses = OwnAddresses();
+
+/// Looks up the addresses of a host name; replaced in tests.
+@visibleForTesting
+Future<List<InternetAddress>> Function(String host) resolveHost =
+    InternetAddress.lookup;
+
+/// The addresses of [host] that are public and off this host's own network, in
+/// the order they are tried.
+Future<List<InternetAddress>> _vettedAddresses(String host) async {
+  final resolved = await resolveHost(host);
+  final own = await ownAddresses.addresses;
+  final addresses = [
+    for (final candidate in resolved)
+      if (!isBlockedAddress(candidate) && !isOwnNetworkAddress(candidate, own))
+        candidate,
+  ];
+  if (addresses.isEmpty) {
+    throw SocketException('No public address found for $host');
+  }
+  return _raced(addresses);
+}
+
+/// Connects only to vetted addresses so DNS can't rebind.
+///
+/// Through a proxy (dart:io reads http_proxy, https_proxy and no_proxy) it
+/// dials the proxy, not the server, and hands HttpClient a plain socket.
+/// HttpClient asks the proxy for a tunnel and does the TLS handshake with the
+/// server itself, so the credentials of the proxy reach the proxy and nobody
+/// else. The user chose the proxy, so its address is not vetted, but the host
+/// asked for must still resolve here to a public address, and that is checked
+/// before the proxy is dialled. The proxy resolves the name again and makes
+/// the last hop, so rebinding goes unnoticed on this path. Plain http through
+/// a proxy is refused: HttpClient reuses the connection to the proxy for the
+/// next http host, a redirect target for one, without asking this factory, so
+/// that host would never be vetted.
+///
+/// The task is handed back at once, with the lookup, the connect and the TLS
+/// handshake still ahead of it: dart:io applies connectionTimeout and
+/// close(force: true) only to a task it holds. Cancelling fails it at once.
 Future<ConnectionTask<Socket>> guardedConnectionFactory(
   Uri url,
   String? proxyHost,
   int? proxyPort,
-) async {
-  final addresses = [
-    for (final candidate in await InternetAddress.lookup(url.host))
-      if (!isBlockedAddress(candidate)) candidate,
-  ];
-  if (addresses.isEmpty) {
-    throw SocketException('No public address found for ${url.host}');
+) {
+  final result = Completer<Socket>();
+  ConnectionTask<Socket>? racing;
+
+  Future<void> connect() async {
+    if (proxyHost != null && url.scheme != 'https') {
+      throw SocketException(
+        'Plain ${url.scheme} can\'t go through a proxy: ${url.host}',
+      );
+    }
+    final addresses = await _vettedAddresses(url.host);
+    if (result.isCompleted) return; // cancelled during the lookup
+    final ConnectionTask<Socket> task;
+    if (proxyHost == null) {
+      task = connectToAny(addresses, effectivePort(url));
+    } else {
+      // Not vetted: the user chose the proxy, often one on this machine.
+      final proxyAddresses = await resolveHost(proxyHost);
+      if (result.isCompleted) return; // cancelled during the second lookup
+      task = connectToAny(_raced(proxyAddresses), proxyPort!);
+    }
+    racing = task;
+    var socket = await task.socket;
+    // connectionFactory doesn't wrap HTTPS in TLS itself, but through a proxy
+    // HttpClient does, once the tunnel is up. A handshake under way can't be
+    // aborted, so after a cancel its socket is closed once it ends.
+    if (proxyHost == null && url.scheme == 'https' && !result.isCompleted) {
+      socket = await SecureSocket.secure(socket, host: url.host);
+    }
+    if (result.isCompleted) {
+      socket.destroy(); // cancelled while connecting
+    } else {
+      result.complete(socket);
+    }
   }
 
-  final rawTask = connectToAny(
-    _interleaveFamilies(addresses),
-    effectivePort(url),
+  connect().catchError((Object error, StackTrace stack) {
+    if (!result.isCompleted) result.completeError(error, stack);
+  }).ignore();
+  return Future.value(
+    ConnectionTask.fromSocket(result.future, () {
+      if (result.isCompleted) return;
+      racing?.cancel();
+      result.completeError(
+        const SocketException('Connection attempt cancelled'),
+      );
+    }),
   );
-  if (url.scheme != 'https') return rawTask;
-
-  // connectionFactory doesn't wrap HTTPS in TLS itself.
-  final rawSocket = await rawTask.socket;
-  final secureSocket = SecureSocket.secure(rawSocket, host: url.host);
-  return ConnectionTask.fromSocket(secureSocket, rawTask.cancel);
 }
 
 /// An HttpClient that refuses non-public addresses.

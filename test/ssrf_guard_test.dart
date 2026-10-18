@@ -3,7 +3,12 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/services/ssrf_guard.dart';
 
+import 'support/fake_connector.dart';
+import 'support/guard_seams.dart';
+
 void main() {
+  restoreGuardSeams();
+
   group('effectivePort', () {
     // Mirrors how dart:io's WebSocket.connect rewrites a wss/ws url.
     Uri rewriteLikeWebSocketConnect(String url) {
@@ -145,7 +150,9 @@ void main() {
         '[::ffff:7f00:1]',
       ]) {
         final client = HttpClient()
-          ..connectionFactory = guardedConnectionFactory;
+          ..connectionFactory = guardedConnectionFactory
+          // Whatever http_proxy says on the machine that runs the tests.
+          ..findProxy = (_) => 'DIRECT';
         addTearDown(() => client.close(force: true));
         await expectLater(
           client.getUrl(Uri.parse('http://$host:${server.port}/')),
@@ -154,6 +161,149 @@ void main() {
         );
       }
       expect(served, 0);
+    });
+
+    group('with a replaced resolver', () {
+      /// Opens a connection that must fail, however the failure is reported.
+      Future<void> dial(FakeConnector connector, String url) {
+        return connector.run(
+          () => expectLater(
+            guardedConnectionFactory(
+              Uri.parse(url),
+              null,
+              null,
+            ).then((task) => task.socket),
+            throwsA(isA<SocketException>()),
+          ),
+        );
+      }
+
+      test(
+        'dials only the public addresses of a name with private ones',
+        () async {
+          resolveHost = (_) async => [
+            InternetAddress('10.0.0.5'),
+            InternetAddress('8.8.8.8'),
+            InternetAddress('::ffff:192.168.1.5'),
+            InternetAddress('127.0.0.1'),
+            InternetAddress('2606:4700:4700::1111'),
+            InternetAddress('fd00::5'),
+          ];
+          final connector = FakeConnector()
+            ..onAttempt = (attempt) => attempt.fail();
+
+          await dial(connector, 'http://mixed.test:8080/');
+
+          expect(
+            connector.attempts.map((attempt) => attempt.address.address),
+            unorderedEquals(['8.8.8.8', '2606:4700:4700::1111']),
+          );
+          expect(
+            connector.attempts.map((attempt) => attempt.port),
+            everyElement(8080),
+          );
+        },
+      );
+
+      test('does not dial a name that only has private addresses', () async {
+        resolveHost = (_) async => [
+          InternetAddress('10.0.0.5'),
+          InternetAddress('169.254.169.254'),
+          InternetAddress('::1'),
+        ];
+        final connector = FakeConnector();
+
+        await dial(connector, 'http://internal.test/');
+
+        expect(connector.attempts, isEmpty);
+      });
+
+      group('on a machine with a public address of its own', () {
+        // A public IPv4 address, and an IPv6 one from a /64 shared with the
+        // rest of the LAN.
+        setUp(() {
+          ownAddresses = OwnAddresses(
+            list: () async => [
+              InternetAddress('93.184.216.34'),
+              InternetAddress('2606:4700:4700:a1:4278:3bff:1d0f:7b0d'),
+            ],
+          );
+        });
+
+        test('does not dial its own addresses or its LAN neighbours', () async {
+          resolveHost = (_) async => [
+            InternetAddress('2606:4700:4700:a1::1'),
+            InternetAddress('93.184.216.34'),
+            InternetAddress('::ffff:93.184.216.34'),
+            InternetAddress('2606:4700:4700:a2::1'),
+            InternetAddress('93.184.216.35'),
+          ];
+          final connector = FakeConnector()
+            ..onAttempt = (attempt) => attempt.fail();
+
+          await dial(connector, 'http://neighbours.test/');
+
+          expect(
+            connector.attempts.map((attempt) => attempt.address.address),
+            unorderedEquals(['2606:4700:4700:a2::1', '93.184.216.35']),
+          );
+        });
+
+        test(
+          'does not dial a name that only leads to its own network',
+          () async {
+            resolveHost = (_) async => [
+              InternetAddress('2606:4700:4700:a1::1'),
+              InternetAddress('::ffff:93.184.216.34'),
+            ];
+            final connector = FakeConnector();
+
+            await dial(connector, 'http://neighbours.test/');
+
+            expect(connector.attempts, isEmpty);
+          },
+        );
+
+        test('does not dial an address literal on its own network', () async {
+          final connector = FakeConnector();
+
+          await dial(connector, 'https://[2606:4700:4700:a1::1]:8443/');
+          await dial(connector, 'http://93.184.216.34:8080/');
+
+          expect(connector.attempts, isEmpty);
+        });
+
+        test('looks past a long run of addresses on its own network', () async {
+          resolveHost = (_) async => [
+            for (var i = 1; i <= 10; i++)
+              InternetAddress('2606:4700:4700:a1::$i'),
+            InternetAddress('2606:4700:4700:a2::1'),
+          ];
+          final connector = FakeConnector()
+            ..onAttempt = (attempt) => attempt.fail();
+
+          await dial(connector, 'http://neighbours.test/');
+
+          expect(connector.attempts.map((attempt) => attempt.address.address), [
+            '2606:4700:4700:a2::1',
+          ]);
+        });
+
+        test('dials as before when the interfaces cannot be listed', () async {
+          ownAddresses = OwnAddresses(
+            list: () async => throw const OSError('not allowed', 13),
+          );
+          resolveHost = (_) async => [InternetAddress('2606:4700:4700:a1::1')];
+          final connector = FakeConnector()
+            ..onAttempt = (attempt) => attempt.fail();
+
+          await dial(connector, 'http://neighbours.test/');
+
+          expect(connector.attempts.map((attempt) => attempt.address.address), [
+            '2606:4700:4700:a1::1',
+          ]);
+        });
+      });
     });
   });
 

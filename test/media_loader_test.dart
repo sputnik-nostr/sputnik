@@ -8,7 +8,16 @@ import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/services/media_loader.dart';
 
+import 'support/eventually.dart';
+
 class _RealHttp extends HttpOverrides {}
+
+/// What dart:io does when the environment holds no proxy.
+class _NoProxy extends HttpOverrides {
+  @override
+  String findProxyFromEnvironment(Uri url, Map<String, String>? environment) =>
+      super.findProxyFromEnvironment(url, const {});
+}
 
 // The test binding replaces every HttpClient with one that answers 400.
 HttpClient _realClient() =>
@@ -382,6 +391,35 @@ void main() {
       );
     });
 
+    test('keeps at most six connections to one host', () async {
+      var holding = true;
+      final held = <HttpRequest>[];
+      void answer(HttpRequest request) {
+        request.response
+          ..add([1])
+          ..close();
+      }
+
+      serve((request) => holding ? held.add(request) : answer(request));
+
+      await HttpOverrides.runWithHttpOverrides(() async {
+        final fetches = [
+          for (var i = 0; i < 9; i++)
+            fetchImageBytes(
+              base.resolve('/$i'),
+              clientFactory: sharedImageClient,
+            ),
+        ];
+        await eventually(() => held.length >= 6);
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(held, hasLength(6)); // the rest wait for one of the six
+
+        holding = false;
+        held.forEach(answer);
+        expect(await Future.wait(fetches), everyElement([1]));
+      }, _NoProxy());
+    });
+
     test('a redirect body that never ends is cut off', () async {
       serve((request) async {
         request.response
@@ -558,6 +596,88 @@ void main() {
       },
     );
 
+    test('still asks the servers when the URL is not valid UTF-8', () async {
+      const url = 'https://one.example/%FF';
+      final log = <String>[];
+      final source = MediaSource(
+        url: url,
+        sha256: hash,
+        serverLookup: () async => ['https://blossom.example'],
+      );
+
+      final got = await source.fetch(attempts(log, failing: {url}));
+
+      expect(got, 'https://blossom.example/$hash');
+      expect(log, [url, got]);
+    });
+
+    test(
+      'builds the Blossom URL from the hash, not from the URL text',
+      () async {
+        for (final url in [
+          'https://one.example/a.png%3Fx%3D1',
+          'https://one.example/a.png%2F..%2F..%2Fadmin',
+          'https://one.example/a.torrent',
+        ]) {
+          final log = <String>[];
+          final source = MediaSource(
+            url: url,
+            sha256: hash,
+            serverLookup: () async => ['https://blossom.example'],
+          );
+
+          await source.fetch(attempts(log, failing: {url}));
+
+          expect(log, [url, 'https://blossom.example/$hash'], reason: url);
+        }
+      },
+    );
+
+    test('skips a server it cannot make a URL from', () async {
+      final log = <String>[];
+      final source = MediaSource(
+        url: primary,
+        sha256: hash,
+        serverLookup: () async => ['https://[bad', 'https://blossom.example'],
+      );
+
+      final got = await source.fetch(attempts(log, failing: {primary}));
+
+      expect(got, 'https://blossom.example/$hash.png');
+    });
+
+    test('skips a server with a port nothing could connect to', () async {
+      final log = <String>[];
+      final source = MediaSource(
+        url: primary,
+        sha256: hash,
+        serverLookup: () async => [
+          'https://big.example:99999999999999999999999',
+          'https://past.example:65536',
+          'https://blossom.example',
+        ],
+      );
+
+      final got = await source.fetch(attempts(log, failing: {primary}));
+
+      expect(got, 'https://blossom.example/$hash.png');
+      expect(log, [primary, got]);
+    });
+
+    test('still asks the servers when the URL does not parse', () async {
+      final log = <String>[];
+      final source = MediaSource(
+        url: 'https://[bad',
+        sha256: hash,
+        serverLookup: () async => ['https://blossom.example'],
+      );
+
+      final got = await source.fetch(attempts(log));
+
+      expect(got, 'https://blossom.example/$hash');
+      expect(log, [got]);
+    });
+
     test('a cancelled download stops the search immediately', () async {
       final log = <String>[];
       final source = MediaSource(
@@ -635,6 +755,11 @@ void main() {
 
     test('names no hash for an ordinary URL', () {
       expect(profileImageSource('https://cdn.example/me.png').sha256, isNull);
+    });
+
+    test('names no hash for a URL it cannot read', () {
+      expect(profileImageSource('https://cdn.example/%FF').sha256, isNull);
+      expect(profileImageSource('https://[bad').sha256, isNull);
     });
   });
 

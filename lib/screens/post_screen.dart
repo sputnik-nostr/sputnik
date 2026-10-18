@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../models/avatar_initial.dart';
 import '../models/note.dart';
+import '../models/text_limits.dart';
 import '../models/time_format.dart';
 import '../nostr/nostr.dart';
 import '../services/error_reporting.dart';
@@ -187,14 +188,17 @@ class _PostScreenState extends State<PostScreen> {
         slivers: [
           SliverList.builder(
             itemCount: ancestors.length,
-            itemBuilder: (context, index) => Column(
-              key: index == 0 ? _parentKey : null,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                NoteTile(note: ancestors[ancestors.length - 1 - index]),
-                const Divider(height: 1),
-              ],
-            ),
+            itemBuilder: (context, index) {
+              final ancestor = ancestors[ancestors.length - 1 - index];
+              return Column(
+                key: index == 0 ? _parentKey : null,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  NoteTile(key: ValueKey(ancestor.id), note: ancestor),
+                  const Divider(height: 1),
+                ],
+              );
+            },
           ),
           SliverToBoxAdapter(
             key: _focusKey,
@@ -276,7 +280,7 @@ class _NestedReply extends StatelessWidget {
                       ),
                     ),
                   ),
-            child: NoteTile(note: note),
+            child: NoteTile(key: ValueKey(note.id), note: note),
           ),
         ),
         const Divider(height: 1),
@@ -322,10 +326,16 @@ class _PostHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final npub = npubFromHex(note.pubkey);
     final myPubkeyHex = activeIdentityPubkeyNotifier.value?.toLowerCase();
-    final reactionNote = note.copyWith(
-      likedByMe: likerPubkeys?.contains(myPubkeyHex) ?? note.likedByMe,
-      repostedByMe: reposterPubkeys?.contains(myPubkeyHex) ?? note.repostedByMe,
-    );
+    final likers = likerPubkeys;
+    final reposters = reposterPubkeys;
+    // Who reacted, once the thread has loaded, beats what the note came with.
+    final reactionNote = likers == null || reposters == null
+        ? note
+        : note.copyWith(
+            likedByMe: likers.contains(myPubkeyHex),
+            repostedByMe: reposters.contains(myPubkeyHex),
+            reactionsOf: myPubkeyHex,
+          );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,7 +364,7 @@ class _PostHeader extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            note.displayName,
+                            boundedName(note.displayName),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.avatarName,
@@ -371,7 +381,11 @@ class _PostHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              NoteContent(note: note, style: theme.textTheme.bodyMedium),
+              NoteContent(
+                note: note,
+                style: theme.textTheme.bodyMedium,
+                full: true,
+              ),
               const SizedBox(height: 16),
               Text(formatAbsoluteTime(note.createdAt), style: theme.metadata),
             ],
@@ -415,8 +429,13 @@ class _PostHeader extends StatelessWidget {
               RepostButton(note: reactionNote, showCount: false, size: 20),
               LikeButton(note: reactionNote, showCount: false, size: 20),
               BookmarkButton(note: note, size: 20),
-              if (note.pubkey.toLowerCase() == myPubkeyHex)
-                DeleteButton(note: note, size: 20, onDeleted: onDeleted),
+              ValueListenableBuilder<String?>(
+                valueListenable: activeIdentityPubkeyNotifier,
+                builder: (context, activePubkey, _) =>
+                    note.pubkey.toLowerCase() == activePubkey?.toLowerCase()
+                    ? DeleteButton(note: note, size: 20, onDeleted: onDeleted)
+                    : const SizedBox.shrink(),
+              ),
             ],
           ),
         ),

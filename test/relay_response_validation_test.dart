@@ -271,18 +271,22 @@ void main() {
 
     final me = generateNostrKeyPair();
 
-    Future<({Map<String, RelayPublishResult> results, Set<String> following})>
-    apply(RelayClient client, Map<String, bool> changes) {
-      return RelayContactsRepository(client: client).applyFollowChanges(
-        secretKey: SecretKey.fromHex(me.privateKeyHex),
-        myPubkeyHex: me.publicKeyHex,
-        changes: changes,
-        relayUrls: {'wss://r'},
-      );
+    Future<FollowPublished> apply(
+      RelayClient client,
+      Map<String, bool> changes,
+    ) async {
+      final update = await RelayContactsRepository(client: client)
+          .applyFollowChanges(
+            secretKey: SecretKey.fromHex(me.privateKeyHex),
+            myPubkeyHex: me.publicKeyHex,
+            changes: changes,
+            relayUrls: {'wss://r'},
+          );
+      return update as FollowPublished;
     }
 
-    test('applies changes on top of the relay list, preserving kept tags and '
-        'adding bare tags for new ones', () async {
+    test('applies changes on top of the relay list, keeping its other tags and '
+        'adding bare tags for new follows', () async {
       final client = _RelayReturningAndPublishing([
         event(
           pubkey: me.publicKeyHex,
@@ -290,7 +294,7 @@ void main() {
           tags: [
             ['p', other, 'wss://their-relay', 'petname'],
             ['p', victim],
-            ['not-p', 'dropped'],
+            ['not-p', 'kept'],
           ],
         ),
       ]);
@@ -307,7 +311,88 @@ void main() {
       expect(outcome.following, {other, attacker});
       expect(client.lastPublished!.tags, [
         ['p', other, 'wss://their-relay', 'petname'],
+        ['not-p', 'kept'],
         ['p', attacker],
+      ]);
+    });
+
+    test('keeps the hashtags and the content of a list written by another '
+        'client', () async {
+      const relayMap = '{"wss://relay.example":{"read":true,"write":true}}';
+      final client = _RelayReturningAndPublishing([
+        event(
+          pubkey: me.publicKeyHex,
+          kind: 3,
+          content: relayMap,
+          tags: [
+            ['p', other, 'wss://their-relay', 'petname'],
+            ['t', 'bitcoin'],
+            ['t', 'nostr'],
+          ],
+        ),
+      ]);
+
+      await apply(client, {attacker: true});
+
+      final published = client.lastPublished!;
+      expect(published.tags, [
+        ['p', other, 'wss://their-relay', 'petname'],
+        ['t', 'bitcoin'],
+        ['t', 'nostr'],
+        ['p', attacker],
+      ]);
+      expect(published.content, relayMap);
+      // The content is part of what was signed.
+      expect(NostrEvent.fromJson(published.toJson()).content, relayMap);
+    });
+
+    test(
+      'an unfollow removes only the p tags of that person, in place',
+      () async {
+        final client = _RelayReturningAndPublishing([
+          event(
+            pubkey: me.publicKeyHex,
+            kind: 3,
+            tags: [
+              ['t', 'nostr'],
+              ['p', victim, 'wss://their-relay'],
+              ['e', victim],
+              ['p', other],
+              ['t', victim],
+              ['p', victim.toUpperCase()],
+            ],
+          ),
+        ]);
+
+        final outcome = await apply(client, {victim: false});
+
+        expect(client.lastPublished!.tags, [
+          ['t', 'nostr'],
+          ['e', victim],
+          ['p', other],
+          ['t', victim],
+        ]);
+        expect(outcome.following, {other});
+      },
+    );
+
+    test('following someone already followed keeps the tag it had', () async {
+      final client = _RelayReturningAndPublishing([
+        event(
+          pubkey: me.publicKeyHex,
+          kind: 3,
+          tags: [
+            ['p', other, 'wss://their-relay', 'petname'],
+            ['t', 'nostr'],
+          ],
+        ),
+      ]);
+
+      await apply(client, {other: true});
+
+      expect(client.lastPublished!.tags, [
+        ['p', other, 'wss://their-relay', 'petname'],
+        ['t', 'nostr'],
       ]);
     });
 

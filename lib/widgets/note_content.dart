@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../models/note.dart';
+import '../models/text_limits.dart';
 import '../nostr/http_urls.dart';
 import '../nostr/models/nostr_media.dart';
 import '../nostr/nip27.dart';
@@ -16,6 +17,7 @@ import 'note_video.dart';
 import 'open_url.dart';
 import 'platform.dart';
 import 'quoted_note.dart';
+import 'truncation_notice.dart';
 
 /// URLs tapped this session, so a tile scrolled back into view stays loaded.
 final _approved = BoundedSet<String>(500);
@@ -55,27 +57,41 @@ List<_Part> _partsOf(String content) {
 }
 
 /// A note's text, cited notes, and media, per [loadNoteImagesNotifier].
+///
+/// A long text is cut, and a notice follows it.
 class NoteContent extends StatelessWidget {
   const NoteContent({
     super.key,
     required this.note,
     this.style,
     this.selectable = true,
+    this.full = false,
   });
 
   final Note note;
   final TextStyle? style;
   final bool selectable;
 
+  /// True on the note's own screen, which shows more of a long text than a row.
+  final bool full;
+
   @override
   Widget build(BuildContext context) {
-    final parts = _partsOf(note.content);
+    final limit = full ? maxPostLength : maxNoteLength;
+    final content = truncateText(note.content, limit);
+    final truncated = content.length < note.content.length;
+    final parts = _partsOf(content);
     final hasQuotes = parts.any((part) => part.quote != null);
 
     if (note.media.isEmpty) {
-      return hasQuotes
-          ? _body(parts, const [])
-          : LinkifiedText(note.content, style: style, selectable: selectable);
+      return hasQuotes || truncated
+          ? _body(parts, const [], limit: limit, truncated: truncated)
+          : LinkifiedText(
+              content,
+              style: style,
+              selectable: selectable,
+              maxLength: limit,
+            );
     }
 
     return ValueListenableBuilder<bool>(
@@ -108,27 +124,38 @@ class NoteContent extends StatelessWidget {
           };
         }
 
-        return _body(parts, [
-          note.media.length == 1
-              ? tile(note.media.single)
-              : _ScrollingRow(
-                  count: note.media.length,
-                  itemBuilder: (index, maxWidth) => tile(
-                    note.media[index],
-                    height: _rowHeight,
-                    maxWidth: maxWidth,
+        return _body(
+          parts,
+          [
+            note.media.length == 1
+                ? tile(note.media.single)
+                : _ScrollingRow(
+                    count: note.media.length,
+                    itemBuilder: (index, maxWidth) => tile(
+                      note.media[index],
+                      height: _rowHeight,
+                      maxWidth: maxWidth,
+                    ),
                   ),
-                ),
-        ]);
+          ],
+          limit: limit,
+          truncated: truncated,
+        );
       },
     );
   }
 
-  /// The [parts] in order, then [media].
-  Widget _body(List<_Part> parts, List<Widget> media) {
+  /// The [parts] in order, then a notice if [truncated], then [media].
+  Widget _body(
+    List<_Part> parts,
+    List<Widget> media, {
+    required int limit,
+    required bool truncated,
+  }) {
     final urls = {for (final item in note.media) item.url};
     final children = <Widget>[];
-    for (final part in parts) {
+    for (var i = 0; i < parts.length; i++) {
+      final part = parts[i];
       final quote = part.quote;
       if (quote != null) {
         children.add(
@@ -142,9 +169,19 @@ class NoteContent extends StatelessWidget {
       }
       final text = urls.isEmpty ? part.text! : withoutUrls(part.text!, urls);
       if (text.isNotEmpty) {
-        children.add(LinkifiedText(text, style: style, selectable: selectable));
+        children.add(
+          LinkifiedText(
+            text,
+            style: style,
+            selectable: selectable,
+            maxLength: limit,
+            // The cut fell at the end of the last part.
+            truncated: truncated && i == parts.length - 1,
+          ),
+        );
       }
     }
+    if (truncated) children.add(TruncationNotice(full: full));
     children.addAll(media);
 
     return Column(

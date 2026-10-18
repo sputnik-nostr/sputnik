@@ -6,7 +6,11 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Holds the signing secrets, which only master can use.
+    # The signing secrets must exist only in this environment, whose deployment
+    # branches are limited to master, so that only runs on master get them. A
+    # copy at repository or organization level is available to every workflow
+    # and branch, and is used in place of a missing one here. docs/RELEASING.md
+    # lists the settings to check.
     environment: release
     permissions:
       contents: read
@@ -18,6 +22,11 @@ jobs:
           submodules: recursive
           persist-credentials: false
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          # Pinned by digest like the actions, since the BuildKit daemon runs
+          # every step of the image. Dependabot does not update it:
+          # docs/RELEASING.md says how to.
+          driver-opts: image=moby/buildkit:v0.33.1@sha256:cec9f139f45e93c5c69c60f8b07cfad9f43f4ef6b6a6cd917527fea5ff2e3dea
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         env:
           DOCKER_BUILD_RECORD_UPLOAD: false
@@ -57,7 +66,9 @@ jobs:
                 --out "/out/sputnik-$0.apk" "/out/sputnik-$0-unsigned.apk" \
                 && chown "$OWNER" "/out/sputnik-$0.apk"' "$abi"
           done
-          (cd dist && sha256sum sputnik-*.apk sputnik-x86_64.AppImage >SHA256SUMS)
+          # What can be installed. The unsigned APKs are in SHA256SUMS.unsigned.
+          (cd dist && sha256sum sputnik-x86_64.AppImage sputnik-armeabi-v7a.apk \
+            sputnik-arm64-v8a.apk sputnik-x86_64.apk >SHA256SUMS)
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: |
@@ -91,5 +102,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sputnik-unsigned-apks
-          path: dist/sputnik-*-unsigned.apk
+          path: |
+            dist/sputnik-*-unsigned.apk
+            dist/SHA256SUMS.unsigned
           compression-level: 0

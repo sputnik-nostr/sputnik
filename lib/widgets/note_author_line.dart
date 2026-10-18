@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/avatar_initial.dart';
 import '../models/note.dart';
+import '../models/text_limits.dart';
 import '../models/time_format.dart';
 import '../theme/app_text_styles.dart';
 import 'fade_in_avatar.dart';
@@ -31,7 +32,7 @@ class NoteAuthorLine extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            note.displayName,
+            boundedName(note.displayName),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.avatarName,
