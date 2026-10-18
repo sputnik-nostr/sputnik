@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:sputnik/app_state.dart';
@@ -6,6 +7,17 @@ import 'package:sputnik/main.dart';
 import 'package:sputnik/services/settings_store.dart';
 
 import 'support/fake_secret_store.dart';
+
+// Refuses to delete anything, like a locked keyring whose prompt was dismissed.
+class _UndeletableSecretStore extends FakeSecretStore {
+  var failDeletes = false;
+
+  @override
+  Future<void> delete(String key) {
+    if (failDeletes) throw PlatformException(code: 'KeyringLocked');
+    return super.delete(key);
+  }
+}
 
 void main() {
   setUp(() {
@@ -68,6 +80,45 @@ void main() {
     expect(identitiesNotifier.value, isEmpty);
     expect(activeIdentityPubkeyNotifier.value, isNull);
     expect(find.text('No identities yet'), findsOneWidget);
+    expect(await SettingsStore.loadPrivateKey(pubkeyHex), isNull);
+  });
+
+  Future<void> deleteFirstIdentity(WidgetTester tester) async {
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('a key that cannot be deleted keeps its identity and says so', (
+    tester,
+  ) async {
+    final store = _UndeletableSecretStore();
+    SettingsStore.secretStore = store;
+    await openIdentitiesScreen(tester);
+    await tester.tap(find.byKey(const Key('generateIdentityButton')));
+    await tester.pumpAndSettle();
+    final pubkeyHex = identitiesNotifier.value.single.pubkeyHex;
+
+    store.failDeletes = true;
+    await deleteFirstIdentity(tester);
+
+    // The failure is reported, not swallowed.
+    expect(tester.takeException(), isA<PlatformException>());
+    expect(find.text('Could not delete this key'), findsOneWidget);
+    expect(identitiesNotifier.value.single.pubkeyHex, pubkeyHex);
+    expect(activeIdentityPubkeyNotifier.value, pubkeyHex);
+    expect(find.text('No identities yet'), findsNothing);
+    expect(await SettingsStore.loadPrivateKey(pubkeyHex), isNotNull);
+
+    // Once storage cooperates again, the same delete goes through.
+    store.failDeletes = false;
+    await deleteFirstIdentity(tester);
+
+    expect(identitiesNotifier.value, isEmpty);
+    expect(activeIdentityPubkeyNotifier.value, isNull);
     expect(await SettingsStore.loadPrivateKey(pubkeyHex), isNull);
   });
 

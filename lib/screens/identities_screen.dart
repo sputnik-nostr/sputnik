@@ -169,6 +169,20 @@ Future<void> _confirmDeleteIdentity(
   );
   if (!confirmed) return;
 
+  // The key goes first: if it can't be deleted the identity stays listed,
+  // instead of leaving a key behind that nothing refers to any more.
+  try {
+    await SettingsStore.deletePrivateKey(identity.pubkeyHex);
+  } catch (error, stack) {
+    reportError('deleting an identity', error, stack);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not delete this key')),
+      );
+    }
+    return;
+  }
+
   final remaining = identitiesNotifier.value
       .where((i) => i.pubkeyHex != identity.pubkeyHex)
       .toList();
@@ -178,7 +192,6 @@ Future<void> _confirmDeleteIdentity(
         ? null
         : remaining.first.pubkeyHex;
   }
-  await SettingsStore.deletePrivateKey(identity.pubkeyHex);
 }
 
 Future<void> _showNsec(BuildContext context, Identity identity) async {
