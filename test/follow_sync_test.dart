@@ -10,6 +10,7 @@ import 'package:sputnik/services/settings_store.dart';
 
 import 'support/answering_relay_client.dart';
 import 'support/fake_secret_store.dart';
+import 'support/follow_questions.dart';
 
 enum _Relays {
   // Nobody answers.
@@ -344,19 +345,23 @@ void main() {
     ], unorderedEquals([alice, bob, carol]));
   });
 
-  test(
-    'a first follow goes through while one relay of three is down',
-    () async {
-      final relay = _ThreeRelays(me);
-      RelayClient.instance = relay;
+  test('a first follow while one relay of three is silent is published once '
+      'the user agrees', () async {
+    final relay = _ThreeRelays(me);
+    RelayClient.instance = relay;
+    FollowNeedsConfirmation? asked;
+    answerFollowQuestions((update) {
+      asked = update;
+      return true;
+    });
 
-      scheduleFollowingSync(carol, follow: true);
-      await _waitForSync();
+    scheduleFollowingSync(carol, follow: true);
+    await _waitForSync();
 
-      expect([for (final tag in relay.lastPublished!.tags) tag[1]], [carol]);
-      expect(myFollowingNotifier.value, {carol});
-    },
-  );
+    expect(asked!.risks, {FollowRisk.noListFound});
+    expect([for (final tag in relay.lastPublished!.tags) tag[1]], [carol]);
+    expect(myFollowingNotifier.value, {carol});
+  });
 
   test('changes made in a row are all applied', () async {
     final relay = _FlakyRelay(me, [alice, bob])..relays = _Relays.up;

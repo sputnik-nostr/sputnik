@@ -24,18 +24,28 @@ void main() {
     );
   }
 
+  Future<FollowUpdate> change(
+    RelayClient client,
+    String target, {
+    bool follow = true,
+    Set<FollowRisk> agreedTo = const {},
+  }) {
+    return RelayContactsRepository(client: client).applyFollowChanges(
+      secretKey: SecretKey.fromHex(me.privateKeyHex),
+      myPubkeyHex: me.publicKeyHex,
+      changes: {target: follow},
+      relayUrls: relays,
+      agreedTo: agreedTo,
+    );
+  }
+
+  /// What the relays took of a follow; nothing when it was not sent.
   Future<Map<String, RelayPublishResult>> follow(
     RelayClient client,
     String target,
   ) async {
-    final outcome = await RelayContactsRepository(client: client)
-        .applyFollowChanges(
-          secretKey: SecretKey.fromHex(me.privateKeyHex),
-          myPubkeyHex: me.publicKeyHex,
-          changes: {target: true},
-          relayUrls: relays,
-        );
-    return outcome.results;
+    final update = await change(client, target);
+    return update is FollowPublished ? update.results : const {};
   }
 
   test('one relay of four answering is not enough to publish', () async {
@@ -101,9 +111,13 @@ void main() {
     client.events
       ..clear()
       ..add(older);
-    final results = await follow(client, 'cc' * 32);
+    final update = await change(client, 'cc' * 32);
 
-    expect(results, isEmpty);
+    expect(update, isA<FollowNeedsConfirmation>());
+    update as FollowNeedsConfirmation;
+    expect(update.risks, {FollowRisk.olderThanSeen});
+    expect(update.found?.count, 1);
+    expect(update.lastSeen?.count, 2);
     expect(client.published, hasLength(1));
   });
 
@@ -116,9 +130,13 @@ void main() {
 
       await follow(client, bob);
       client.events.clear();
-      final results = await follow(client, 'cc' * 32);
+      final update = await change(client, 'cc' * 32);
 
-      expect(results, isEmpty);
+      expect(update, isA<FollowNeedsConfirmation>());
+      update as FollowNeedsConfirmation;
+      expect(update.risks, {FollowRisk.olderThanSeen});
+      expect(update.found, isNull);
+      expect(update.lastSeen?.count, 2);
       expect(client.published, hasLength(1));
     },
   );
@@ -137,6 +155,109 @@ void main() {
       bob,
       'cc' * 32,
     ]);
+  });
+
+  group('asks before building on a list that may not be the real one', () {
+    test(
+      'a majority answering with nothing is asked about, not trusted',
+      () async {
+        final client = PartlyAnsweringRelayClient([], answered: 3);
+
+        final update = await change(client, bob);
+
+        expect(update, isA<FollowNeedsConfirmation>());
+        update as FollowNeedsConfirmation;
+        expect(update.risks, {FollowRisk.noListFound});
+        expect(update.answeredRelays, 3);
+        expect(update.queriedRelays, 4);
+        expect(update.found, isNull);
+        expect(update.resultingCount, 1);
+        expect(client.published, isEmpty);
+      },
+    );
+
+    test('once the user agrees, the fresh list is published', () async {
+      final client = PartlyAnsweringRelayClient([], answered: 3);
+
+      final update = await change(
+        client,
+        bob,
+        agreedTo: {FollowRisk.noListFound},
+      );
+
+      expect(update, isA<FollowPublished>());
+      expect(client.published.single.tags, [
+        ['p', bob],
+      ]);
+    });
+
+    test('too few relays answering is refused, not asked about', () async {
+      final client = PartlyAnsweringRelayClient([], answered: 2);
+
+      final update = await change(client, bob);
+
+      expect(update, isA<FollowRefused>());
+      update as FollowRefused;
+      expect(update.reason, FollowRefusal.relaysSilent);
+      expect(update.answeredRelays, 2);
+      expect(update.queriedRelays, 4);
+      expect(client.published, isEmpty);
+    });
+
+    test('an unfollow never publishes an empty list on a doubtful base, even '
+        'if the user agreed', () async {
+      final client = PartlyAnsweringRelayClient([], answered: 3);
+
+      for (final agreedTo in [
+        const <FollowRisk>{},
+        {FollowRisk.noListFound},
+      ]) {
+        final update = await change(
+          client,
+          alice,
+          follow: false,
+          agreedTo: agreedTo,
+        );
+
+        expect(update, isA<FollowRefused>());
+        expect((update as FollowRefused).reason, FollowRefusal.wouldEmptyList);
+      }
+      expect(client.published, isEmpty);
+    });
+
+    test(
+      'a list from after the last one seen is built on without asking',
+      () async {
+        final client = PartlyAnsweringRelayClient([
+          contactList([alice], age: const Duration(days: 30)),
+        ], answered: 4);
+        noteOwnContactList(
+          me.publicKeyHex,
+          DateTime.now().subtract(const Duration(days: 90)),
+          10,
+        );
+
+        final update = await change(client, bob);
+
+        // Another client may have shortened the list since; that is its news.
+        expect(update, isA<FollowPublished>());
+      },
+    );
+
+    test(
+      'the change is dated after a newer list than the one built on',
+      () async {
+        final client = PartlyAnsweringRelayClient([
+          contactList([alice], age: const Duration(days: 30)),
+        ], answered: 4);
+        final future = DateTime.now().add(const Duration(hours: 2));
+        noteOwnContactList(me.publicKeyHex, future, 5);
+
+        await change(client, bob, agreedTo: {FollowRisk.olderThanSeen});
+
+        expect(client.published.single.createdAt.isAfter(future), isTrue);
+      },
+    );
   });
 
   group('the list shown for an identity', () {

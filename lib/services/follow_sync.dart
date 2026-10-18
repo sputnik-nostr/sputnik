@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../nostr/nostr.dart';
 import 'cache_store.dart';
+import 'follow_confirmation.dart';
 import 'follows.dart';
 import 'settings_store.dart';
 
@@ -20,8 +22,19 @@ List<Duration> followSyncRetryDelays = const [
   Duration(minutes: 10),
 ];
 
+/// Asks whether to publish despite what [update] warns of; null when there is
+/// nobody to ask. Tests replace it.
+@visibleForTesting
+Future<bool?> Function(FollowNeedsConfirmation update) confirmFollowUpdate =
+    confirmFollowPublish;
+
 /// Unpublished changes (pubkey -> follow?), sent on top of the relays' list.
 final _pending = <String, bool>{};
+
+/// What the user agreed to for exactly these [changes], so the publish after
+/// the dialog, or a retry of it, does not ask again.
+({String pubkeyHex, Map<String, bool> changes, Set<FollowRisk> risks})?
+_consent;
 
 /// The identity [_pending] belongs to; switching identity discards the queue.
 String? _pendingFor;
@@ -112,20 +125,57 @@ void resetFollowSync() {
   _timer?.cancel();
   _pending.clear();
   _pendingFor = null;
+  _consent = null;
+  confirmFollowUpdate = confirmFollowPublish;
   _failedAttempts = 0;
   _myFollowingLoadedFor = null;
   _myFollowingLoading = null;
 }
 
-void _retryLater() {
+void _retryLater([String? failure]) {
   // The user is told once per streak of failures, not on every retry.
-  if (_failedAttempts == 0) _reportSyncFailure();
+  if (_failedAttempts == 0) _reportSyncFailure(failure);
 
   final delays = followSyncRetryDelays;
   final delay = delays[min(_failedAttempts, delays.length - 1)];
   _failedAttempts++;
   _timer?.cancel();
   _timer = Timer(delay, _runSync);
+}
+
+Set<FollowRisk> _agreedRisks(String pubkeyHex, Map<String, bool> changes) {
+  final consent = _consent;
+  if (consent == null ||
+      consent.pubkeyHex != pubkeyHex ||
+      !mapEquals(consent.changes, changes)) {
+    return const {};
+  }
+  return consent.risks;
+}
+
+/// Drops the queued [changes] the user turned down, and undoes them on screen.
+void _discardChanges(String pubkeyHex, Map<String, bool> changes) {
+  _consent = null;
+  // A person tapped again meanwhile is a newer answer, which stays queued.
+  final declined = {
+    for (final change in changes.entries)
+      if (_pending[change.key] == change.value) change.key: change.value,
+  };
+  for (final pubkey in declined.keys) {
+    _pending.remove(pubkey);
+  }
+
+  final shown = myFollowingNotifier.value;
+  if (activeIdentityPubkeyNotifier.value != pubkeyHex || shown == null) return;
+  final reverted = {
+    for (final pubkey in shown)
+      if (declined[pubkey] != true) pubkey,
+    for (final change in declined.entries)
+      if (!change.value) change.key,
+  };
+  // A list that never loaded is unknown, not empty.
+  myFollowingNotifier.value =
+      reverted.isEmpty && _myFollowingLoadedFor != pubkeyHex ? null : reverted;
 }
 
 /// Publishes queued changes until none are left, backing off on failure.
@@ -143,37 +193,67 @@ Future<void> _runSync() async {
         return;
       }
 
-      final ({Map<String, RelayPublishResult> results, Set<String> following})
-      outcome;
+      final FollowUpdate update;
       try {
-        outcome = await RelayContactsRepository().applyFollowChanges(
+        update = await RelayContactsRepository().applyFollowChanges(
           secretKey: secretKey,
           myPubkeyHex: myPubkeyHex,
           changes: changes,
           relayUrls: selectedRelaysNotifier.value,
+          agreedTo: _agreedRisks(myPubkeyHex, changes),
         );
       } finally {
         secretKey.wipe();
       }
-      if (outcome.results.acceptedCount == 0) {
-        _retryLater();
-        return;
-      }
-      _failedAttempts = 0;
-      CacheStore.putFollowing(myPubkeyHex, outcome.following.toList());
 
-      // Anything toggled again mid-publish stays queued for the next pass.
-      for (final change in changes.entries) {
-        if (_pending[change.key] == change.value) _pending.remove(change.key);
-      }
+      switch (update) {
+        case FollowRefused():
+          // The changes stay queued until the list can be loaded.
+          _retryLater('Could not load your follow list');
+          return;
+        case FollowNeedsConfirmation():
+          final agreed = await confirmFollowUpdate(update);
+          if (agreed == null) {
+            _retryLater();
+            return;
+          }
+          // The relays answered and the user was asked, so whatever failed
+          // before is over.
+          _failedAttempts = 0;
+          if (!agreed) {
+            _discardChanges(myPubkeyHex, changes);
+            continue;
+          }
+          // Applied again with the answer in hand, on what the relays say now.
+          _consent = (
+            pubkeyHex: myPubkeyHex,
+            changes: changes,
+            risks: {..._agreedRisks(myPubkeyHex, changes), ...update.risks},
+          );
+        case FollowPublished():
+          if (update.results.acceptedCount == 0) {
+            _retryLater();
+            return;
+          }
+          _failedAttempts = 0;
+          _consent = null;
+          CacheStore.putFollowing(myPubkeyHex, update.following.toList());
 
-      if (activeIdentityPubkeyNotifier.value == myPubkeyHex) {
-        // Built on a conclusive fetch of the list, so it counts as loaded.
-        _myFollowingLoadedFor = myPubkeyHex;
-        myFollowingNotifier.value = _withPending(
-          myPubkeyHex,
-          outcome.following,
-        );
+          // Anything toggled again mid-publish stays queued for the next pass.
+          for (final change in changes.entries) {
+            if (_pending[change.key] == change.value) {
+              _pending.remove(change.key);
+            }
+          }
+
+          if (activeIdentityPubkeyNotifier.value == myPubkeyHex) {
+            // What was just sent is the list, so it counts as loaded.
+            _myFollowingLoadedFor = myPubkeyHex;
+            myFollowingNotifier.value = _withPending(
+              myPubkeyHex,
+              update.following,
+            );
+          }
       }
     }
   } finally {
@@ -181,11 +261,11 @@ Future<void> _runSync() async {
   }
 }
 
-void _reportSyncFailure() {
+void _reportSyncFailure([String? failure]) {
   final context = navigatorKey.currentContext;
   if (context != null && context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Could not update your follow list')),
+      SnackBar(content: Text(failure ?? 'Could not update your follow list')),
     );
   }
 }

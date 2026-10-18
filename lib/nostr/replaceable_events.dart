@@ -62,11 +62,15 @@ Future<OwnEvent> fetchOwnReplaceable(
 }
 
 /// Relays keep the older of two same-second events, so an edit must be newer.
-DateTime nextReplaceableTime(NostrEvent? previous) {
+DateTime nextReplaceableTime(NostrEvent? previous) =>
+    nextReplaceableTimeAfter(previous?.createdAt);
+
+/// [nextReplaceableTime] for a newest event known only by its time.
+DateTime nextReplaceableTimeAfter(DateTime? previous) {
   final now = DateTime.now();
   if (previous == null) return now;
   final nowSeconds = now.millisecondsSinceEpoch ~/ 1000;
-  final previousSeconds = previous.createdAt.millisecondsSinceEpoch ~/ 1000;
+  final previousSeconds = previous.millisecondsSinceEpoch ~/ 1000;
   return nowSeconds > previousSeconds
       ? now
       : DateTime.fromMillisecondsSinceEpoch((previousSeconds + 1) * 1000);

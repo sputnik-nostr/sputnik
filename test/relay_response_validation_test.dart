@@ -271,14 +271,18 @@ void main() {
 
     final me = generateNostrKeyPair();
 
-    Future<({Map<String, RelayPublishResult> results, Set<String> following})>
-    apply(RelayClient client, Map<String, bool> changes) {
-      return RelayContactsRepository(client: client).applyFollowChanges(
-        secretKey: SecretKey.fromHex(me.privateKeyHex),
-        myPubkeyHex: me.publicKeyHex,
-        changes: changes,
-        relayUrls: {'wss://r'},
-      );
+    Future<FollowPublished> apply(
+      RelayClient client,
+      Map<String, bool> changes,
+    ) async {
+      final update = await RelayContactsRepository(client: client)
+          .applyFollowChanges(
+            secretKey: SecretKey.fromHex(me.privateKeyHex),
+            myPubkeyHex: me.publicKeyHex,
+            changes: changes,
+            relayUrls: {'wss://r'},
+          );
+      return update as FollowPublished;
     }
 
     test('applies changes on top of the relay list, keeping its other tags and '
