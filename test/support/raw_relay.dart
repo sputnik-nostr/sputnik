@@ -70,11 +70,13 @@ class RawRelay {
 
   String get url => 'ws://127.0.0.1:${_server.port}';
 
-  /// Runs [onConnection] for each client, once the upgrade is done.
+  /// Runs [onConnection] for each client, once the upgrade is done. It listens
+  /// on [port], or on one the system picks if that is 0.
   static Future<RawRelay> start(
-    FutureOr<void> Function(RawConnection connection) onConnection,
-  ) async {
-    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    FutureOr<void> Function(RawConnection connection) onConnection, {
+    int port = 0,
+  }) async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
     final relay = RawRelay._(server);
     server.listen((request) async {
       final key = request.headers.value('sec-websocket-key')!;
@@ -90,7 +92,7 @@ class RawRelay {
           'Sec-WebSocket-Accept: $accept\r\n\r\n',
         ),
       );
-      final connection = RawConnection._(socket);
+      final connection = RawConnection._(socket, request.headers);
       relay.connections.add(connection);
       try {
         await onConnection(connection);
@@ -111,7 +113,7 @@ class RawRelay {
 
 /// The server side of one connection to a [RawRelay].
 class RawConnection {
-  RawConnection._(this.socket) {
+  RawConnection._(this.socket, this.requestHeaders) {
     socket.listen(
       _onData,
       onError: (_) => _end(),
@@ -121,6 +123,9 @@ class RawConnection {
   }
 
   final Socket socket;
+
+  /// The headers of the request that was upgraded to this connection.
+  final HttpHeaders requestHeaders;
 
   /// The JSON messages the client has sent, oldest first.
   final received = <List<dynamic>>[];

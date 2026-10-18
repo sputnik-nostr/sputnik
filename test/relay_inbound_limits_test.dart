@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/nostr/relay_connection_pool.dart';
+import 'package:sputnik/services/ssrf_guard.dart';
 
+import 'support/loopback_connection.dart';
 import 'support/raw_relay.dart';
 
 void main() {
@@ -34,13 +37,14 @@ void main() {
 
   /// A relay that answers the first REQ with [reply] and then stays open.
   Future<RawRelay> relayReplying(
-    FutureOr<void> Function(RawConnection connection, String sub) reply,
-  ) {
+    FutureOr<void> Function(RawConnection connection, String sub) reply, {
+    int port = 0,
+  }) {
     return RawRelay.start((connection) async {
       final req = await connection.next('REQ');
       await reply(connection, req[1] as String);
       await connection.closed;
-    });
+    }, port: port);
   }
 
   /// A relay that answers each of the first [rounds] REQs with [answer], and
@@ -372,5 +376,375 @@ void main() {
         expect(relay.connections, hasLength(1));
       },
     );
+  });
+
+  group('frames are checked before dart:io has buffered them', () {
+    test('a message in fragments is cut off while it is still being sent', () async {
+      // 64 MiB as one message, in pieces of 64 KiB, unless the client hangs up.
+      var sent = 0;
+      final relay = await relayReplying((connection, sub) async {
+        final piece = Uint8List(65536)..fillRange(0, 65536, 0x78);
+        for (var i = 0; i < 1024 && !connection.isClosed; i++) {
+          connection.send(webSocketFrame(i == 0 ? 1 : 0, piece, fin: false));
+          await connection.flush();
+          sent += piece.length;
+        }
+      });
+      addTearDown(relay.close);
+
+      final result = await client.queryWithStatus({relay.url}, kind3);
+
+      expect(result.answeredRelays, 0);
+      await relay.connections.single.closed.timeout(const Duration(seconds: 5));
+      // About 1 MiB and what the sockets could hold, not the whole message.
+      expect(sent, lessThan(24 << 20));
+    });
+
+    test(
+      'a message of exactly the cap is delivered, one byte more is not',
+      () async {
+        Future<RelayQueryResult> afterNotice(int length) async {
+          // ["NOTICE",""] is 13 bytes without what is in the string.
+          final notice = '["NOTICE","${'x' * (length - 13)}"]';
+          expect(utf8.encode(notice), hasLength(length));
+          final relay = await relayReplying((connection, sub) {
+            connection.sendText(notice, frames: 16);
+            connection.sendText(eventMessage(sub, sign()));
+            connection.sendText(eose(sub));
+          });
+          addTearDown(relay.close);
+          return client.queryWithStatus({relay.url}, oneNote);
+        }
+
+        final atCap = await afterNotice(1 << 20);
+        final overCap = await afterNotice((1 << 20) + 1);
+
+        expect(atCap.events, hasLength(1));
+        expect(atCap.answeredRelays, 1);
+        expect(overCap.events, isEmpty);
+        expect(overCap.answeredRelays, 0);
+      },
+    );
+
+    test('a flood of empty frames is cut off', () async {
+      // Far fewer than the pool would count as a backlog.
+      final relay = await relayReplying((connection, sub) {
+        connection.send(repeated(webSocketFrame(1, const []), 20000));
+        connection.sendText(eose(sub));
+      });
+      addTearDown(relay.close);
+
+      final result = await client.queryWithStatus({relay.url}, kind3);
+
+      expect(result.answeredRelays, 0);
+      await relay.connections.single.closed.timeout(const Duration(seconds: 5));
+    });
+
+    test('a flood of pings is cut off, and only a few are answered', () async {
+      final relay = await relayReplying((connection, sub) {
+        connection.send(repeated(webSocketFrame(9, const []), 100000));
+        connection.sendText(eose(sub));
+      });
+      addTearDown(relay.close);
+
+      final result = await client.queryWithStatus({relay.url}, kind3);
+
+      expect(result.answeredRelays, 0);
+      await relay.connections.single.closed.timeout(const Duration(seconds: 5));
+      expect(relay.connections.single.pongs, lessThanOrEqualTo(256));
+    });
+
+    test('a relay that breaks a frame limit after answering is not retried', () async {
+      final relay = await RawRelay.start((connection) async {
+        final first = await connection.next('REQ');
+        connection.sendText(eose(first[1] as String));
+        final second = await connection.next('REQ', index: 1);
+        connection.send(repeated(webSocketFrame(1, const []), 20000));
+        connection.sendText(eose(second[1] as String));
+        await connection.closed;
+      });
+      addTearDown(relay.close);
+
+      final alive = await client.queryWithStatus({relay.url}, kind3);
+      final flooding = await client.queryWithStatus({relay.url}, kind3);
+      final cooling = await client.queryWithStatus({relay.url}, kind3);
+
+      expect(alive.answeredRelays, 1);
+      expect(flooding.answeredRelays, 0);
+      expect(cooling.answeredRelays, 0);
+      // Not retried on a fresh socket, and not asked again while cooling down.
+      expect(relay.connections, hasLength(1));
+      expect(relay.connections.single.messagesOf('REQ'), hasLength(2));
+    });
+
+    test('a ping now and then is answered', () async {
+      final event = sign();
+      final relay = await relayReplying((connection, sub) {
+        connection.send(webSocketFrame(9, utf8.encode('hello')));
+        connection.sendText(eventMessage(sub, event));
+        connection.sendText(eose(sub));
+      });
+      addTearDown(relay.close);
+
+      final result = await client.queryWithStatus({relay.url}, oneNote);
+
+      expect(result.events.map((e) => e.id), [event.id]);
+      expect(result.answeredRelays, 1);
+      final connection = relay.connections.single;
+      for (var i = 0; i < 200 && connection.pongs < 1; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(connection.pongs, 1);
+    });
+
+    test('a relay that redirects is closed, not followed', () async {
+      // dart:io would send the next request over the same connection, and read
+      // the reply to that without anything watching it.
+      var requests = 0;
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      server.listen((socket) {
+        // The client may be gone when the next write is tried.
+        socket.done.ignore();
+        socket.listen((_) {
+          requests++;
+          socket.add(
+            ascii.encode(
+              'HTTP/1.1 302 Found\r\n'
+              'Location: /elsewhere\r\n'
+              'Content-Length: 0\r\n\r\n',
+            ),
+          );
+        }, onError: (_) {});
+      });
+
+      final result = await client.queryWithStatus({
+        'ws://127.0.0.1:${server.port}',
+      }, oneNote);
+
+      expect(result.answeredRelays, 0);
+      expect(requests, 1);
+    });
+  });
+
+  group('the connection to a relay', () {
+    test(
+      'is not blamed for what the relay sends after it was let go',
+      () async {
+        var connections = 0;
+        final flood = Completer<void>();
+        final relay = await RawRelay.start((connection) async {
+          final first = connections++ == 0;
+          final req = await connection.next('REQ');
+          connection.sendText(eose(req[1] as String));
+          if (first) {
+            await flood.future;
+            connection.send(repeated(webSocketFrame(9, const []), 1000));
+          }
+          await connection.closed;
+        });
+        addTearDown(relay.close);
+
+        final before = await client.queryWithStatus({relay.url}, kind3);
+        await RelayConnectionPool.instance.retainOnly({});
+        flood.complete();
+        await relay.connections.first.closed.timeout(
+          const Duration(seconds: 5),
+        );
+        final after = await client.queryWithStatus({relay.url}, kind3);
+
+        expect(before.answeredRelays, 1);
+        // Asked again at once: it is not on cooldown.
+        expect(after.answeredRelays, 1);
+        expect(relay.connections, hasLength(2));
+      },
+    );
+
+    test('does not offer compression', () async {
+      // A relay that is offered it could send a small frame that inflates
+      // into a huge one.
+      final relay = await relayReplying(
+        (connection, sub) => connection.sendText(eose(sub)),
+      );
+      addTearDown(relay.close);
+
+      await client.queryWithStatus({relay.url}, oneNote);
+
+      final headers = relay.connections.single.requestHeaders;
+      expect(headers.value('sec-websocket-extensions'), isNull);
+    });
+
+    test('goes through the SSRF guard unless a test replaces it', () async {
+      expect(productionRelayConnectionFactory, same(guardedConnectionFactory));
+
+      relayConnectionFactory = guardedConnectionFactory;
+      addTearDown(() => relayConnectionFactory = loopbackConnectionFactory);
+      final relay = await relayReplying(
+        (connection, sub) => connection.sendText(eose(sub)),
+      );
+      addTearDown(relay.close);
+
+      final result = await client.queryWithStatus({relay.url}, oneNote);
+
+      expect(result.answeredRelays, 0);
+      expect(relay.connections, isEmpty);
+    });
+
+    group('through a proxy', () {
+      // The "proxy" is a relay that answers whatever it is asked for.
+      Future<RelayQueryResult> asked(RawRelay proxy, Set<String> relays) {
+        final port = Uri.parse(proxy.url).port;
+        return HttpOverrides.runZoned(
+          () => client.queryWithStatus(relays, kind3),
+          findProxyFromEnvironment: (url, _) => 'PROXY 127.0.0.1:$port',
+        );
+      }
+
+      test('a relay is reached', () async {
+        final event = sign(kind: 3, follows: 10);
+        final proxy = await relayReplying((connection, sub) {
+          connection.sendText(eventMessage(sub, event));
+          connection.sendText(eose(sub));
+        });
+        addTearDown(proxy.close);
+
+        final result = await asked(proxy, {'ws://reached.example'});
+
+        expect(result.events.map((e) => e.id), [event.id]);
+        expect(result.answeredRelays, 1);
+      });
+
+      test('what the app can still tell is held to the limits', () async {
+        final tooBig = sign(kind: 3, follows: 15000);
+        final proxy = await relayReplying((connection, sub) {
+          connection.sendText(eventMessage(sub, tooBig), frames: 3);
+          connection.sendText(eose(sub));
+        });
+        addTearDown(proxy.close);
+
+        final result = await asked(proxy, {'ws://limited.example'});
+
+        expect(result.events, isEmpty);
+        expect(result.answeredRelays, 0);
+      });
+
+      test('a binary message is not an answer there either', () async {
+        final proxy = await relayReplying((connection, sub) {
+          connection.send(
+            webSocketFrame(2, utf8.encode(eventMessage(sub, sign()))),
+          );
+          connection.sendText(eose(sub));
+        });
+        addTearDown(proxy.close);
+
+        final result = await asked(proxy, {'ws://binary.example'});
+
+        expect(result.events, isEmpty);
+        expect(result.answeredRelays, 0);
+      });
+    });
+  });
+
+  group('the relay pool', () {
+    test('closes its connections when it is reset', () async {
+      final relay = await relayReplying(
+        (connection, sub) => connection.sendText(eose(sub)),
+      );
+      addTearDown(relay.close);
+      await client.queryWithStatus({relay.url}, kind3);
+
+      await RelayConnectionPool.instance.reset();
+
+      await relay.connections.single.closed.timeout(const Duration(seconds: 5));
+    });
+
+    // The next two tests are to be run in this order: the relay of the second
+    // is on the port of the first one's. The system hands a port out again
+    // soon after it was freed, and the pool remembers a relay that failed by
+    // its URL.
+    int? failedPort;
+
+    test('puts a relay that failed on cooldown', () async {
+      final relay = await relayReplying((connection, sub) {
+        connection.send(webSocketFrame(2, utf8.encode(eose(sub))));
+      });
+      addTearDown(relay.close);
+      failedPort = Uri.parse(relay.url).port;
+
+      final first = await client.queryWithStatus({relay.url}, kind3);
+      final second = await client.queryWithStatus({relay.url}, kind3);
+
+      expect(first.answeredRelays, 0);
+      expect(second.answeredRelays, 0);
+      expect(relay.connections.single.messagesOf('REQ'), hasLength(1));
+    });
+
+    test(
+      'is reset after each test, so a relay on that port is asked',
+      () async {
+        final relay = await relayReplying(
+          (connection, sub) => connection.sendText(eose(sub)),
+          port: failedPort ?? 0,
+        );
+        addTearDown(relay.close);
+
+        final result = await client.queryWithStatus({relay.url}, kind3);
+
+        expect(result.answeredRelays, 1);
+        expect(relay.connections, hasLength(1));
+      },
+    );
+  });
+
+  group('ordinary traffic is still delivered', () {
+    test('a page of nearly 2000 events', () async {
+      final events = [for (var i = 0; i < 1999; i++) sign(content: 'n$i')];
+      final relay = await relayReplying((connection, sub) {
+        final out = BytesBuilder(copy: false);
+        for (final event in events) {
+          out.add(webSocketText(eventMessage(sub, event)));
+        }
+        out.add(webSocketText(eose(sub)));
+        connection.send(out.takeBytes());
+      });
+      addTearDown(relay.close);
+
+      final result = await client.queryWithStatus({
+        relay.url,
+      }, const NostrFilter(kinds: [1], limit: 2000));
+
+      expect(result.events, hasLength(1999));
+      expect(result.answeredRelays, 1);
+    });
+
+    test('an 800 follow list', () async {
+      final list = sign(kind: 3, follows: 800);
+      final relay = await relayReplying((connection, sub) {
+        connection.sendText(eventMessage(sub, list));
+        connection.sendText(eose(sub));
+      });
+      addTearDown(relay.close);
+
+      final result = await client.queryWithStatus({relay.url}, kind3);
+
+      expect(result.events.single.tags, hasLength(800));
+      expect(result.answeredRelays, 1);
+    });
+
+    test('a 900 KB event, whole or in pieces', () async {
+      final big = sign(content: 'x' * 900000);
+      for (final frames in [1, 7]) {
+        final relay = await relayReplying((connection, sub) {
+          connection.sendText(eventMessage(sub, big), frames: frames);
+          connection.sendText(eose(sub));
+        });
+        addTearDown(relay.close);
+
+        final result = await client.queryWithStatus({relay.url}, oneNote);
+
+        expect(result.events.map((e) => e.id), [big.id], reason: '$frames');
+        expect(result.answeredRelays, 1, reason: '$frames');
+      }
+    });
   });
 }
