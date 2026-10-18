@@ -105,6 +105,10 @@ List<InternetAddress> _interleaveFamilies(List<InternetAddress> addresses) {
   ];
 }
 
+/// What one connection races: both families, and not more than a handful.
+List<InternetAddress> _raced(List<InternetAddress> addresses) =>
+    _interleaveFamilies(addresses).take(_maxRacedAddresses).toList();
+
 /// Races [addresses] in staggered order, as dart:io does for a hostname.
 ///
 /// Like any [ConnectionTask], cancelling it closes every attempt and fails
@@ -276,10 +280,22 @@ Future<List<InternetAddress>> _vettedAddresses(String host) async {
   if (addresses.isEmpty) {
     throw SocketException('No public address found for $host');
   }
-  return _interleaveFamilies(addresses).take(_maxRacedAddresses).toList();
+  return _raced(addresses);
 }
 
-/// Connects only to vetted addresses so DNS can't rebind; ignores proxies.
+/// Connects only to vetted addresses so DNS can't rebind.
+///
+/// Through a proxy (dart:io reads http_proxy, https_proxy and no_proxy) it
+/// dials the proxy, not the server, and hands HttpClient a plain socket.
+/// HttpClient asks the proxy for a tunnel and does the TLS handshake with the
+/// server itself, so the credentials of the proxy reach the proxy and nobody
+/// else. The user chose the proxy, so its address is not vetted, but the host
+/// asked for must still resolve here to a public address, and that is checked
+/// before the proxy is dialled. The proxy resolves the name again and makes
+/// the last hop, so rebinding goes unnoticed on this path. Plain http through
+/// a proxy is refused: HttpClient reuses the connection to the proxy for the
+/// next http host, a redirect target for one, without asking this factory, so
+/// that host would never be vetted.
 ///
 /// The task is handed back at once, with the lookup, the connect and the TLS
 /// handshake still ahead of it: dart:io applies connectionTimeout and
@@ -293,13 +309,28 @@ Future<ConnectionTask<Socket>> guardedConnectionFactory(
   ConnectionTask<Socket>? racing;
 
   Future<void> connect() async {
+    if (proxyHost != null && url.scheme != 'https') {
+      throw SocketException(
+        'Plain ${url.scheme} can\'t go through a proxy: ${url.host}',
+      );
+    }
     final addresses = await _vettedAddresses(url.host);
     if (result.isCompleted) return; // cancelled during the lookup
-    final task = racing = connectToAny(addresses, effectivePort(url));
+    final ConnectionTask<Socket> task;
+    if (proxyHost == null) {
+      task = connectToAny(addresses, effectivePort(url));
+    } else {
+      // Not vetted: the user chose the proxy, often one on this machine.
+      final proxyAddresses = await resolveHost(proxyHost);
+      if (result.isCompleted) return; // cancelled during the second lookup
+      task = connectToAny(_raced(proxyAddresses), proxyPort!);
+    }
+    racing = task;
     var socket = await task.socket;
-    // connectionFactory doesn't wrap HTTPS in TLS itself. A handshake under
-    // way can't be aborted, so after a cancel its socket is closed once it ends.
-    if (url.scheme == 'https' && !result.isCompleted) {
+    // connectionFactory doesn't wrap HTTPS in TLS itself, but through a proxy
+    // HttpClient does, once the tunnel is up. A handshake under way can't be
+    // aborted, so after a cancel its socket is closed once it ends.
+    if (proxyHost == null && url.scheme == 'https' && !result.isCompleted) {
       socket = await SecureSocket.secure(socket, host: url.host);
     }
     if (result.isCompleted) {

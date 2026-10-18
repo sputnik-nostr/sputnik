@@ -150,7 +150,9 @@ void main() {
         '[::ffff:7f00:1]',
       ]) {
         final client = HttpClient()
-          ..connectionFactory = guardedConnectionFactory;
+          ..connectionFactory = guardedConnectionFactory
+          // Whatever http_proxy says on the machine that runs the tests.
+          ..findProxy = (_) => 'DIRECT';
         addTearDown(() => client.close(force: true));
         await expectLater(
           client.getUrl(Uri.parse('http://$host:${server.port}/')),

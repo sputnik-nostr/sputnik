@@ -23,7 +23,9 @@ void main() {
   HttpClient guardedClient([Duration? connectionTimeout]) {
     final client = HttpClient()
       ..connectionFactory = guardedConnectionFactory
-      ..connectionTimeout = connectionTimeout;
+      ..connectionTimeout = connectionTimeout
+      // Whatever http_proxy says on the machine that runs the tests.
+      ..findProxy = (_) => 'DIRECT';
     addTearDown(() => client.close(force: true));
     return client;
   }
