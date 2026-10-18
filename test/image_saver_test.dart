@@ -45,6 +45,13 @@ void main() {
     );
   });
 
+  test('a URL that is not valid UTF-8 still gives a plain name', () {
+    final name = imageFileName('https://a.example/Caf%E9.jpg', _png());
+
+    expect(name, isNot(contains('%')));
+    expect(name, endsWith('.png'));
+  });
+
   test('reports each way saving can end', () async {
     final source = MediaSource(url: 'https://a.example/cat.png');
     Future<Uint8List> fetch(MediaSource _) async => _png();

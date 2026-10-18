@@ -5,16 +5,24 @@ const maxBlossomServers = 5;
 
 final _blobName = RegExp(r'^([0-9a-fA-F]{64})(\.[A-Za-z0-9]+)?$');
 
+/// The last path segment of [uri] as written, empty if there is none.
+///
+/// Not `Uri.pathSegments`, which decodes every segment and throws on escapes
+/// that are not valid UTF-8, such as `%FF`, which a note's URL can contain.
+/// Hashes and extensions are plain ASCII, so nothing here needs decoding.
+String lastPathSegment(Uri uri) {
+  final path = uri.path;
+  return path.substring(path.lastIndexOf('/') + 1);
+}
+
 /// The SHA-256 that [uri] names in its last path segment, per NIP-B7.
 String? blossomHash(Uri uri) {
-  if (uri.pathSegments.isEmpty) return null;
-  return _blobName.firstMatch(uri.pathSegments.last)?[1]?.toLowerCase();
+  return _blobName.firstMatch(lastPathSegment(uri))?[1]?.toLowerCase();
 }
 
 /// The `.ext` after the name in [uri]'s last path segment, if any.
 String extensionOf(Uri uri) {
-  if (uri.pathSegments.isEmpty) return '';
-  final name = uri.pathSegments.last;
+  final name = lastPathSegment(uri);
   final dot = name.lastIndexOf('.');
   return dot <= 0 ? '' : name.substring(dot);
 }

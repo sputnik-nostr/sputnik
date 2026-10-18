@@ -558,6 +558,35 @@ void main() {
       },
     );
 
+    test('still asks the servers when the URL is not valid UTF-8', () async {
+      const url = 'https://one.example/%FF';
+      final log = <String>[];
+      final source = MediaSource(
+        url: url,
+        sha256: hash,
+        serverLookup: () async => ['https://blossom.example'],
+      );
+
+      final got = await source.fetch(attempts(log, failing: {url}));
+
+      expect(got, 'https://blossom.example/$hash');
+      expect(log, [url, got]);
+    });
+
+    test('still asks the servers when the URL does not parse', () async {
+      final log = <String>[];
+      final source = MediaSource(
+        url: 'https://[bad',
+        sha256: hash,
+        serverLookup: () async => ['https://blossom.example'],
+      );
+
+      final got = await source.fetch(attempts(log));
+
+      expect(got, 'https://blossom.example/$hash');
+      expect(log, [got]);
+    });
+
     test('a cancelled download stops the search immediately', () async {
       final log = <String>[];
       final source = MediaSource(
@@ -635,6 +664,11 @@ void main() {
 
     test('names no hash for an ordinary URL', () {
       expect(profileImageSource('https://cdn.example/me.png').sha256, isNull);
+    });
+
+    test('names no hash for a URL it cannot read', () {
+      expect(profileImageSource('https://cdn.example/%FF').sha256, isNull);
+      expect(profileImageSource('https://[bad').sha256, isNull);
     });
   });
 

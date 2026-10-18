@@ -72,12 +72,22 @@ String? _sniffedExtension(List<int> b) {
   return null;
 }
 
+/// [segment] with its percent-escapes decoded, or as written if they are not
+/// valid UTF-8, since a URL's author chose them.
+String _decoded(String segment) {
+  try {
+    return Uri.decodeComponent(segment);
+  } on FormatException {
+    return segment;
+  } on ArgumentError {
+    return segment;
+  }
+}
+
 /// A safe file name for [bytes] fetched from [url], whatever the URL claims.
 String imageFileName(String url, List<int> bytes) {
   final uri = Uri.tryParse(url);
-  final last = uri == null || uri.pathSegments.isEmpty
-      ? ''
-      : uri.pathSegments.last;
+  final last = uri == null ? '' : _decoded(lastPathSegment(uri));
   final dot = last.lastIndexOf('.');
   var stem = (dot > 0 ? last.substring(0, dot) : last)
       .replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_')

@@ -36,6 +36,24 @@ void main() {
         expect(blossomHash(Uri.parse(url)), isNull, reason: url);
       }
     });
+
+    test('reads the hash whatever the segments before it hold', () {
+      expect(
+        blossomHash(Uri.parse('https://a.example/%FF/x%80/$_hash.png')),
+        _hash,
+      );
+    });
+
+    test('is null, not an error, when the last segment is not UTF-8', () {
+      for (final url in [
+        'https://a.example/%FF',
+        'https://a.example/$_hash%FF',
+        'https://a.example/Caf%E9',
+        'https://a.example/%E2%82',
+      ]) {
+        expect(blossomHash(Uri.parse(url)), isNull, reason: url);
+      }
+    });
   });
 
   test('extensionOf returns the extension with its dot, or nothing', () {
@@ -43,6 +61,15 @@ void main() {
     expect(extensionOf(Uri.parse('https://a.example/$_hash')), '');
     expect(extensionOf(Uri.parse('https://a.example/.hidden')), '');
     expect(extensionOf(Uri.parse('https://a.example/')), '');
+  });
+
+  test('extensionOf reads the last segment whatever precedes it', () {
+    expect(extensionOf(Uri.parse('https://a.example/x/%80/y.jpg')), '.jpg');
+    expect(extensionOf(Uri.parse('https://a.example/Caf%E9.jpg')), '.jpg');
+    expect(
+      () => extensionOf(Uri.parse('https://a.example/%FF')),
+      returnsNormally,
+    );
   });
 
   group('blossomServersFromEvent', () {

@@ -30,8 +30,10 @@ String? fetchableUrlOrNull(String? url) =>
     url != null && isFetchableUrl(Uri.tryParse(url)) ? url : null;
 
 /// A profile picture or banner, held to the hash a Blossom URL names.
-MediaSource profileImageSource(String url) =>
-    MediaSource(url: url, sha256: blossomHash(Uri.parse(url)));
+MediaSource profileImageSource(String url) {
+  final uri = Uri.tryParse(url);
+  return MediaSource(url: url, sha256: uri == null ? null : blossomHash(uri));
+}
 
 /// Bounds the connections one host can hold open on the shared client.
 const _maxConnectionsPerHost = 6;
@@ -315,7 +317,8 @@ class MediaSource {
       } catch (_) {
         // A failed lookup just leaves the earlier error to report.
       }
-      final extension = extensionOf(Uri.parse(url));
+      final original = Uri.tryParse(url);
+      final extension = original == null ? '' : extensionOf(original);
       for (final uri in blossomUrls(servers, hash, extension)) {
         final result = await tryUri(uri);
         if (result != null) return result.value;
