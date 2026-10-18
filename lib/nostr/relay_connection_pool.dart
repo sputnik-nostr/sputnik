@@ -42,7 +42,14 @@ const _maxMessageLength = 1 << 20;
 
 /// Maximum length of text waiting to be parsed on one connection before its
 /// relay is counted as flooding.
-const _maxPendingParseLength = 32 << 20;
+@visibleForTesting
+int maxPendingParseLength = 32 << 20;
+
+/// Maximum number of messages waiting to be parsed on one connection. Each
+/// costs about a kilobyte of heap whatever its length, so the cap on text above
+/// doesn't bound a flood of tiny messages.
+@visibleForTesting
+int maxPendingMessages = 50000;
 
 class _RelayCoolingDown implements Exception {
   const _RelayCoolingDown();
@@ -372,6 +379,7 @@ class _RelayConnection {
   int _messagesReceived = 0;
   int _activeSubscriptions = 0;
   int _pendingParseLength = 0;
+  int _pendingMessages = 0;
 
   /// Set once the relay broke a limit, and the connection is being dropped.
   bool flooded = false;
@@ -405,10 +413,12 @@ class _RelayConnection {
       _breakLimit();
       return;
     }
-    if (_pendingParseLength + raw.length > _maxPendingParseLength) {
+    if (_pendingMessages >= maxPendingMessages ||
+        _pendingParseLength + raw.length > maxPendingParseLength) {
       _breakLimit();
       return;
     }
+    _pendingMessages++;
     _pendingParseLength += raw.length;
 
     final parsing = RelayMessageParser.instance
@@ -431,9 +441,10 @@ class _RelayConnection {
       }
       _handlers[parsed.subscriptionId]?.call(parsed);
     });
-    _dispatchQueue = dispatched
-        .catchError((Object _) {})
-        .whenComplete(() => _pendingParseLength -= raw.length);
+    _dispatchQueue = dispatched.catchError((Object _) {}).whenComplete(() {
+      _pendingParseLength -= raw.length;
+      _pendingMessages--;
+    });
   }
 
   void _fail() {
