@@ -41,29 +41,26 @@ bool isFetchableUrl(Uri? uri) {
       uri.userInfo.isEmpty;
 }
 
-/// The HTTPS origins in a kind:10063 server list, in the author's order.
-List<String> blossomServersFromEvent(NostrEvent event) {
-  final servers = <String>[];
-  for (final tag in event.tags) {
-    if (tag.length < 2 || tag[0] != 'server') continue;
-
-    final uri = Uri.tryParse(tag[1].trim());
-    if (!isFetchableUrl(uri)) continue;
-    final origin = uri!.hasPort
-        ? '${uri.scheme}://${uri.host}:${uri.port}'
-        : '${uri.scheme}://${uri.host}';
-    if (!servers.contains(origin)) servers.add(origin);
-    if (servers.length >= maxBlossomServers) break;
-  }
-  return servers;
-}
-
 /// [server]'s scheme, host and port alone, or null if it is not an HTTPS one.
 Uri? _originOf(String server) {
   final uri = Uri.tryParse(server);
   if (uri == null || !isFetchableUrl(uri)) return null;
   // The authority keeps the brackets of an IPv6 host, which `host` drops.
   return Uri.tryParse('${uri.scheme}://${uri.authority}');
+}
+
+/// The HTTPS origins in a kind:10063 server list, in the author's order.
+List<String> blossomServersFromEvent(NostrEvent event) {
+  final servers = <String>[];
+  for (final tag in event.tags) {
+    if (tag.length < 2 || tag[0] != 'server') continue;
+
+    final origin = _originOf(tag[1].trim())?.toString();
+    if (origin == null) continue;
+    if (!servers.contains(origin)) servers.add(origin);
+    if (servers.length >= maxBlossomServers) break;
+  }
+  return servers;
 }
 
 /// Where each of [servers] would serve the blob, as NIP-B7 describes.

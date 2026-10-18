@@ -104,6 +104,30 @@ void main() {
       ]);
     });
 
+    test('keeps the brackets of an IPv6 server, so its URLs can be built', () {
+      final event = fakeEvent(
+        kind: 10063,
+        tags: [
+          ['server', 'https://[2001:db8::1]:8443/blobs'],
+          ['server', 'https://[2001:db8::2]'],
+          ['server', 'HTTPS://One.Example:443'],
+        ],
+      );
+
+      final servers = blossomServersFromEvent(event);
+
+      expect(servers, [
+        'https://[2001:db8::1]:8443',
+        'https://[2001:db8::2]',
+        'https://one.example',
+      ]);
+      expect(blossomUrls(servers, _hash, '.png'), [
+        Uri.parse('https://[2001:db8::1]:8443/$_hash.png'),
+        Uri.parse('https://[2001:db8::2]/$_hash.png'),
+        Uri.parse('https://one.example/$_hash.png'),
+      ]);
+    });
+
     test('drops plain http, credentials, junk, and other tags', () {
       final event = fakeEvent(
         kind: 10063,
