@@ -11,6 +11,7 @@ import 'package:sputnik/services/follow_sync.dart';
 import 'package:sputnik/services/settings_store.dart';
 
 import 'support/fake_secret_store.dart';
+import 'support/identity_storage.dart';
 import 'support/in_memory_relay_client.dart';
 
 // The whole way there, as a user reaches it: A's note is on screen in a tab,
@@ -25,17 +26,32 @@ void main() {
 
   final delete = find.byIcon(Icons.delete_outline);
 
-  setUp(() async {
+  setUp(() {
     resetFollowSync();
     a = generateNostrKeyPair();
     b = generateNostrKeyPair();
-    SettingsStore.secretStore = FakeSecretStore();
-    await SettingsStore.savePrivateKey(a.publicKeyHex, a.privateKeyHex);
-    await SettingsStore.savePrivateKey(b.publicKeyHex, b.privateKeyHex);
-    identitiesNotifier.value = [
-      Identity(pubkeyHex: a.publicKeyHex, createdAt: DateTime(2026, 1, 1)),
-      Identity(pubkeyHex: b.publicKeyHex, createdAt: DateTime(2026, 1, 2)),
+    final held = [
+      (
+        identity: Identity(
+          pubkeyHex: a.publicKeyHex,
+          createdAt: DateTime(2026, 1, 1),
+        ),
+        privkeyHex: a.privateKeyHex,
+      ),
+      (
+        identity: Identity(
+          pubkeyHex: b.publicKeyHex,
+          createdAt: DateTime(2026, 1, 2),
+        ),
+        privkeyHex: b.privateKeyHex,
+      ),
     ];
+    // Generating, importing and deleting an identity change the index in
+    // secure storage and the list follows it, so the index must list the same.
+    SettingsStore.secretStore = FakeSecretStore(
+      currentStorage(held, active: a.publicKeyHex),
+    );
+    identitiesNotifier.value = [for (final h in held) h.identity];
     activeIdentityPubkeyNotifier.value = a.publicKeyHex;
     selectedRelaysNotifier.value = {'wss://relay.example'};
     profileCacheNotifier.value = const {};
