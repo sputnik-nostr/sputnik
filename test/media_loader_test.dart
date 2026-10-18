@@ -8,7 +8,16 @@ import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/services/media_loader.dart';
 
+import 'support/eventually.dart';
+
 class _RealHttp extends HttpOverrides {}
+
+/// What dart:io does when the environment holds no proxy.
+class _NoProxy extends HttpOverrides {
+  @override
+  String findProxyFromEnvironment(Uri url, Map<String, String>? environment) =>
+      super.findProxyFromEnvironment(url, const {});
+}
 
 // The test binding replaces every HttpClient with one that answers 400.
 HttpClient _realClient() =>
@@ -380,6 +389,35 @@ void main() {
         ).timeout(const Duration(seconds: 5)),
         [1],
       );
+    });
+
+    test('keeps at most six connections to one host', () async {
+      var holding = true;
+      final held = <HttpRequest>[];
+      void answer(HttpRequest request) {
+        request.response
+          ..add([1])
+          ..close();
+      }
+
+      serve((request) => holding ? held.add(request) : answer(request));
+
+      await HttpOverrides.runWithHttpOverrides(() async {
+        final fetches = [
+          for (var i = 0; i < 9; i++)
+            fetchImageBytes(
+              base.resolve('/$i'),
+              clientFactory: sharedImageClient,
+            ),
+        ];
+        await eventually(() => held.length >= 6);
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(held, hasLength(6)); // the rest wait for one of the six
+
+        holding = false;
+        held.forEach(answer);
+        expect(await Future.wait(fetches), everyElement([1]));
+      }, _NoProxy());
     });
 
     test('a redirect body that never ends is cut off', () async {

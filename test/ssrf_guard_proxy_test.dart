@@ -5,6 +5,7 @@ import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/nostr/nip05.dart';
+import 'package:sputnik/services/media_loader.dart';
 import 'package:sputnik/services/nip05_verification.dart';
 import 'package:sputnik/services/ssrf_guard.dart';
 
@@ -793,6 +794,40 @@ void main() {
 
         expect(connector.attempts.single.cancelled, isTrue);
       });
+    });
+  });
+
+  group('the shared image client through a proxy', () {
+    setUp(() => replaceSharedImageClient(null));
+    tearDown(() => replaceSharedImageClient(null));
+
+    /// More requests at once than the client's limit per host.
+    Future<void> expectBurstToFinish({String? noProxy}) async {
+      final rig = await startRig();
+
+      final bodies = await rig.run(
+        () => Future.wait([
+          for (var i = 0; i < 20; i++)
+            fetchImageBytes(Uri.parse('https://tls.test/hello')),
+        ]).timeout(const Duration(seconds: 10)),
+        environment: {'https_proxy': rig.proxy.url, 'no_proxy': ?noProxy},
+      );
+
+      expect(bodies, everyElement(utf8.encode('hello')));
+      _expectOnlyTheProxy(
+        rig,
+        tunnels: List.filled(20, 'tls.test:443'),
+        served: List.filled(20, 'GET /hello'),
+      );
+    }
+
+    test(
+      'finishes more requests at once than its limit per host',
+      expectBurstToFinish,
+    );
+
+    test('is not limited again by no_proxy entries for other hosts', () {
+      return expectBurstToFinish(noProxy: 'org,example.com');
     });
   });
 }

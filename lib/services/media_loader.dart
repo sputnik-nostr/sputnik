@@ -38,14 +38,26 @@ MediaSource profileImageSource(String url) {
 /// Bounds the connections one host can hold open on the shared client.
 const _maxConnectionsPerHost = 6;
 
+/// Whether the proxy of the environment may carry an https request.
+///
+/// no_proxy exempts hosts one by one, so a URL without a host stands for all.
+bool _httpsMayUseProxy() =>
+    HttpClient.findProxyFromEnvironment(Uri(scheme: 'https')) != 'DIRECT';
+
 HttpClient Function() _sharedClientBuilder = guardedHttpClient;
 HttpClient? _sharedClient;
 
 /// Shared so a feed reuses connections; a download aborts only itself.
+///
+/// Behind a proxy it has no limit per host: HttpClient keeps the requests
+/// beyond the limit waiting for the proxy, and once the tunnels are made
+/// nothing starts them.
 HttpClient sharedImageClient() {
   return _sharedClient ??= _sharedClientBuilder()
     ..connectionTimeout = _connectTimeout
-    ..maxConnectionsPerHost = _maxConnectionsPerHost;
+    ..maxConnectionsPerHost = _httpsMayUseProxy()
+        ? null
+        : _maxConnectionsPerHost;
 }
 
 @visibleForTesting
