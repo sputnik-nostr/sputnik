@@ -187,14 +187,17 @@ class _PostScreenState extends State<PostScreen> {
         slivers: [
           SliverList.builder(
             itemCount: ancestors.length,
-            itemBuilder: (context, index) => Column(
-              key: index == 0 ? _parentKey : null,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                NoteTile(note: ancestors[ancestors.length - 1 - index]),
-                const Divider(height: 1),
-              ],
-            ),
+            itemBuilder: (context, index) {
+              final ancestor = ancestors[ancestors.length - 1 - index];
+              return Column(
+                key: index == 0 ? _parentKey : null,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  NoteTile(key: ValueKey(ancestor.id), note: ancestor),
+                  const Divider(height: 1),
+                ],
+              );
+            },
           ),
           SliverToBoxAdapter(
             key: _focusKey,
@@ -276,7 +279,7 @@ class _NestedReply extends StatelessWidget {
                       ),
                     ),
                   ),
-            child: NoteTile(note: note),
+            child: NoteTile(key: ValueKey(note.id), note: note),
           ),
         ),
         const Divider(height: 1),

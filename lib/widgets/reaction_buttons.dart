@@ -21,6 +21,7 @@ class LikeButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _ReactionToggle(
+      scope: note.id,
       active: note.likedByMe,
       count: note.likeCount,
       showCount: showCount,
@@ -49,6 +50,7 @@ class RepostButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _ReactionToggle(
+      scope: note.id,
       active: note.repostedByMe,
       count: note.repostCount,
       showCount: showCount,
@@ -65,6 +67,7 @@ class RepostButton extends StatelessWidget {
 
 class _ReactionToggle extends StatefulWidget {
   const _ReactionToggle({
+    required this.scope,
     required this.active,
     required this.count,
     required this.showCount,
@@ -74,6 +77,10 @@ class _ReactionToggle extends StatefulWidget {
     required this.toggle,
     this.onLongPress,
   });
+
+  /// What [active] and a tap are about. When it changes this button is showing
+  /// something else, and what it did for the previous scope no longer applies.
+  final Object scope;
 
   /// Whether the relays say the active identity already reacted.
   final bool active;
@@ -99,11 +106,24 @@ class _ReactionToggleState extends State<_ReactionToggle> {
   /// Set once this button has toggled itself; null defers to [widget.active].
   bool? _localOverride;
 
+  /// How often the scope changed, so a tap can tell that it was overtaken.
+  int _scopeChanges = 0;
+
+  @override
+  void didUpdateWidget(_ReactionToggle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.scope == oldWidget.scope) return;
+    _localOverride = null;
+    _pending = false;
+    _scopeChanges++;
+  }
+
   Future<void> _tap() async {
     final active = _localOverride ?? widget.active;
+    final scopeChanges = _scopeChanges;
     setState(() => _pending = true);
     final succeeded = await widget.toggle(active);
-    if (!mounted) return;
+    if (!mounted || scopeChanges != _scopeChanges) return;
     setState(() {
       _pending = false;
       if (succeeded) _localOverride = !active;

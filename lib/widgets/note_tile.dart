@@ -122,6 +122,19 @@ class NoteTile extends StatelessWidget {
   }
 }
 
+/// Where in [notes] the row keyed [key] is now, for a list's
+/// `findItemIndexCallback`.
+///
+/// Rows are keyed `ValueKey(note.id)`. With this, what a row remembers, such
+/// as a like it just made, moves with its note when the list shifts instead of
+/// being dropped. Two rows with one key would break that, so [notes] must hold
+/// each note once, as a feed's cursor and the map of bookmarks make sure.
+int? indexOfNoteRow(List<Note> notes, Key key) {
+  if (key is! ValueKey<String>) return null;
+  final index = notes.indexWhere((note) => note.id == key.value);
+  return index < 0 ? null : index;
+}
+
 /// Reply, repost, like, bookmark and, on the active identity's own notes,
 /// delete.
 class _NoteActions extends StatelessWidget {
