@@ -138,7 +138,15 @@ bool _isAuthentic(
   );
 }
 
-/// [NostrEvent.fromJson] throws unless the ID and signature check out.
+/// The latest `created_at`, in seconds, that a [DateTime] can hold. A later
+/// one makes it throw, or wraps around once it is converted to milliseconds.
+const _maxCreatedAtSeconds = 8640000000000;
+
+/// NIP-01: "an integer between 0 and 65535".
+const _maxKind = 65535;
+
+/// [NostrEvent.fromJson] throws unless the ID and signature check out and the
+/// `created_at` and `kind` are in range.
 class NostrEvent {
   const NostrEvent({
     required this.id,
@@ -157,6 +165,17 @@ class NostrEvent {
     if (!isHex(id, 32) || !isHex(pubkey, 32) || !isHex(sig, 64)) {
       throw const FormatException('Malformed event ID, pubkey, or sig');
     }
+    // Before the signature check, so such an event costs no crypto.
+    final createdAt = json['created_at'];
+    final kind = json['kind'];
+    if (createdAt is! int ||
+        createdAt < 0 ||
+        createdAt > _maxCreatedAtSeconds) {
+      throw const FormatException('Malformed created_at');
+    }
+    if (kind is! int || kind < 0 || kind > _maxKind) {
+      throw const FormatException('Malformed kind');
+    }
     final tags = _tagsFromJson(json['tags']);
     if (!_isAuthentic(json, id, pubkey, sig)) {
       throw const FormatException("Event id/sig doesn't match its content");
@@ -165,10 +184,8 @@ class NostrEvent {
     return NostrEvent(
       id: id,
       pubkey: pubkey,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(
-        (json['created_at'] as int) * 1000,
-      ),
-      kind: json['kind'] as int,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(createdAt * 1000),
+      kind: kind,
       tags: tags,
       content: sanitizeUtf16(json['content'] as String),
       sig: sig,
