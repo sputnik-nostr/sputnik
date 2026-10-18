@@ -164,6 +164,53 @@ void main() {
     expect(await SettingsStore.loadPrivateKey(pubkeyHex), isNull);
   });
 
+  testWidgets('deleting an identity forgets when its follow list was seen', (
+    tester,
+  ) async {
+    resetKnownContactLists();
+    addTearDown(resetKnownContactLists);
+    await openIdentitiesScreen(tester);
+    await tester.tap(find.byKey(const Key('generateIdentityButton')));
+    await tester.pumpAndSettle();
+    final pubkeyHex = identitiesNotifier.value.single.pubkeyHex;
+    noteOwnContactList(pubkeyHex, DateTime.now(), 3);
+    noteOwnContactList('ab' * 32, DateTime.now(), 7);
+
+    await deleteFirstIdentity(tester);
+
+    expect(identitiesNotifier.value, isEmpty);
+    // Another identity's record stays.
+    expect(seenOwnContactLists.value.keys, ['ab' * 32]);
+  });
+
+  testWidgets('a key that cannot be deleted keeps when its list was seen', (
+    tester,
+  ) async {
+    final store = _UndeletableSecretStore();
+    SettingsStore.secretStore = store;
+    resetKnownContactLists();
+    addTearDown(resetKnownContactLists);
+    await openIdentitiesScreen(tester);
+    await tester.tap(find.byKey(const Key('generateIdentityButton')));
+    await tester.pumpAndSettle();
+    final pubkeyHex = identitiesNotifier.value.single.pubkeyHex;
+    noteOwnContactList(pubkeyHex, DateTime.now(), 3);
+
+    store.failDeletes = true;
+    await deleteFirstIdentity(tester);
+
+    expect(tester.takeException(), isA<PlatformException>());
+    expect(identitiesNotifier.value.single.pubkeyHex, pubkeyHex);
+    expect(seenOwnContactLists.value.keys, [pubkeyHex]);
+
+    // Once storage cooperates again, the identity and its record go together.
+    store.failDeletes = false;
+    await deleteFirstIdentity(tester);
+
+    expect(identitiesNotifier.value, isEmpty);
+    expect(seenOwnContactLists.value, isEmpty);
+  });
+
   group('when the identities cannot be read', () {
     final held = generateNostrKeyPair();
     late _LockedIndexSecretStore store;

@@ -6,11 +6,13 @@ import 'package:flutter/services.dart';
 import 'app_state.dart';
 import 'models/relay.dart';
 import 'nostr/relay_connection_pool.dart';
+import 'nostr/relay_contacts_repository.dart';
 import 'screens/root_screen.dart';
 import 'services/bookmark_store.dart';
 import 'services/cache_store.dart';
 import 'services/feed_loader.dart';
 import 'services/identity_store.dart';
+import 'services/own_follow_list_store.dart';
 import 'services/settings_store.dart';
 import 'services/ssrf_guard.dart';
 import 'services/video_store.dart';
@@ -71,6 +73,11 @@ Future<void> main() async {
       confirmBeforeReactingNotifier,
       SettingsStore.loadConfirmBeforeReacting,
       SettingsStore.saveConfirmBeforeReacting,
+    ),
+    bindPersisted(
+      seenOwnContactLists,
+      OwnFollowListStore.load,
+      OwnFollowListStore.save,
     ),
   ]);
 

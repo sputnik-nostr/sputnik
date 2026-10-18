@@ -6,6 +6,7 @@ import 'package:sputnik/models/identity.dart';
 import 'package:sputnik/nostr/nostr.dart';
 import 'package:sputnik/services/cache_store.dart';
 import 'package:sputnik/services/follow_sync.dart';
+import 'package:sputnik/services/follows.dart';
 import 'package:sputnik/services/settings_store.dart';
 
 import 'support/answering_relay_client.dart';
@@ -21,6 +22,9 @@ enum _Relays {
 
   // Two of three relays say "nothing here"; the third is silent.
   mostlyEmpty,
+
+  // Every relay answers, with a copy older than the one the relays held.
+  behind,
   up,
 }
 
@@ -61,6 +65,24 @@ class _FlakyRelay extends RelayClient {
           events: [],
           answeredRelays: 2,
           queriedRelays: 3,
+        );
+      case _Relays.behind:
+        return RelayQueryResult(
+          events: [
+            NostrEvent(
+              id: 'old',
+              pubkey: me,
+              createdAt: DateTime.now().subtract(const Duration(days: 30)),
+              kind: 3,
+              tags: [
+                ['p', followed.first],
+              ],
+              content: '',
+              sig: 'sig',
+            ),
+          ],
+          answeredRelays: 2,
+          queriedRelays: 2,
         );
       case _Relays.up:
         return RelayQueryResult(
@@ -177,6 +199,7 @@ void main() {
 
   setUp(() async {
     resetFollowSync();
+    resetKnownContactLists();
     await CacheStore.clearAll();
     followSyncRetryDelays = const [Duration(milliseconds: 100)];
 
@@ -255,6 +278,41 @@ void main() {
     relay.relays = _Relays.up;
     await load();
     expect(myFollowingNotifier.value, {alice, bob});
+  });
+
+  test('the list shown to the user is what a follow is checked against, so '
+      'an older copy returned later is asked about', () async {
+    final relay = _FlakyRelay(me, [alice, bob])..relays = _Relays.up;
+    RelayClient.instance = relay;
+    await ensureMyFollowingLoaded({'wss://relay.example'});
+    expect(myFollowingNotifier.value, {alice, bob});
+    expect(seenOwnContactLists.value[me]?.count, 2);
+
+    // The relays holding the list lag when the user taps Follow.
+    relay.relays = _Relays.behind;
+    FollowNeedsConfirmation? asked;
+    confirmFollowUpdate = (update) async {
+      asked = update;
+      return false;
+    };
+    scheduleFollowingSync(carol, follow: true);
+    await _waitForSync();
+
+    expect(asked!.risks, {FollowRisk.olderThanSeen});
+    expect(asked!.lastSeen?.count, 2);
+    expect(relay.lastPublished, isNull);
+    // Turned down, so the tap is undone.
+    expect(myFollowingNotifier.value, {alice, bob});
+  });
+
+  test('only the user\'s own list is kept as seen', () async {
+    final other = 'dd' * 32;
+    final relay = _FlakyRelay(other, [alice])..relays = _Relays.up;
+    RelayClient.instance = relay;
+
+    await loadFollowing(other, {'wss://relay.example'});
+
+    expect(seenOwnContactLists.value, isEmpty);
   });
 
   test(

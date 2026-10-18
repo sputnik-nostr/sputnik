@@ -164,6 +164,9 @@ Future<void> _confirmDeleteIdentity(
 
   try {
     await IdentityStore.remove(identity);
+    // After the removal, so an identity whose key could not be deleted keeps
+    // what was seen of its follow list.
+    forgetOwnContactList(identity.pubkeyHex);
   } catch (error, stack) {
     reportError('deleting an identity', error, stack);
     if (context.mounted) {

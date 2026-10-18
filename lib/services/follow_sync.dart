@@ -73,7 +73,7 @@ Future<void> ensureMyFollowingLoaded(Set<String> relayUrls) {
   }
 
   late final Future<void> future;
-  future = loadFollowingOrNull(myPubkeyHex, relayUrls)
+  future = loadFollowingOrNull(myPubkeyHex, relayUrls, own: true)
       .then((following) {
         // Left unloaded on failure so the next call retries.
         if (following == null) return;

@@ -8,21 +8,32 @@ import 'relay_client.dart';
 import 'replaceable_events.dart';
 
 /// When an identity's own follow list was made, and how many people it held.
+/// Never whom: follow lists are kept off the disk.
 typedef OwnListSize = ({DateTime createdAt, int count});
 
-/// So a lagging relay's older copy is never built on without asking.
-final _newestOwnContactList = <String, OwnListSize>{};
+/// The newest own follow list seen for each identity, so that an older copy a
+/// lagging relay returns is never built on without asking. The app keeps it
+/// on disk, so it also holds after a restart.
+final seenOwnContactLists = ValueNotifier<Map<String, OwnListSize>>(const {});
 
 @visibleForTesting
-void resetKnownContactLists() => _newestOwnContactList.clear();
+void resetKnownContactLists() => seenOwnContactLists.value = const {};
 
 /// Remembers [pubkeyHex]'s list unless a newer one is already known.
 void noteOwnContactList(String pubkeyHex, DateTime createdAt, int count) {
   final key = pubkeyHex.toLowerCase();
-  final known = _newestOwnContactList[key];
-  if (known == null || createdAt.isAfter(known.createdAt)) {
-    _newestOwnContactList[key] = (createdAt: createdAt, count: count);
-  }
+  final known = seenOwnContactLists.value[key];
+  if (known != null && !createdAt.isAfter(known.createdAt)) return;
+  seenOwnContactLists.value = {
+    ...seenOwnContactLists.value,
+    key: (createdAt: createdAt, count: count),
+  };
+}
+
+/// Forgets what was seen of [pubkeyHex]'s list, for an identity that is gone.
+void forgetOwnContactList(String pubkeyHex) {
+  seenOwnContactLists.value = {...seenOwnContactLists.value}
+    ..remove(pubkeyHex.toLowerCase());
 }
 
 bool _isPTag(List<String> tag) => tag.length > 1 && tag[0] == 'p';
@@ -146,10 +157,14 @@ class RelayContactsRepository {
   RelayClient get client => _client ?? RelayClient.instance;
 
   /// Null when nothing was found and some relay may still hold a list.
+  ///
+  /// With [remember], a list found counts as the newest seen for [pubkeyHex],
+  /// which later changes to it are checked against.
   Future<List<String>?> fetchFollowingOrNull(
     String pubkeyHex,
-    Set<String> relayUrls,
-  ) async {
+    Set<String> relayUrls, {
+    bool remember = false,
+  }) async {
     final result = await client.queryWithStatus(
       relayUrls,
       NostrFilter(kinds: const [3], authors: [pubkeyHex], limit: 1),
@@ -166,7 +181,15 @@ class RelayContactsRepository {
       return result.allRelaysAnswered ? const <String>[] : null;
     }
 
-    return _followedPubkeys(own.first.tags);
+    final following = _followedPubkeys(own.first.tags);
+    if (remember) {
+      noteOwnContactList(
+        pubkeyHex,
+        own.first.createdAt,
+        following.toSet().length,
+      );
+    }
+    return following;
   }
 
   /// People whose current contact list includes [pubkeyHex].
@@ -249,7 +272,7 @@ class RelayContactsRepository {
             createdAt: base.createdAt,
             count: _followedPubkeys(base.tags).toSet().length,
           );
-    final seen = _newestOwnContactList[myPubkeyHex.toLowerCase()];
+    final seen = seenOwnContactLists.value[myPubkeyHex.toLowerCase()];
     if (baseSize != null) {
       noteOwnContactList(myPubkeyHex, baseSize.createdAt, baseSize.count);
     }

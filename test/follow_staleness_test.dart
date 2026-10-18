@@ -225,6 +225,40 @@ void main() {
       expect(client.published, isEmpty);
     });
 
+    test('an older copy that was asked about is not taken as the newest list '
+        'seen', () async {
+      final older = contactList([alice], age: const Duration(days: 30));
+      final client = PartlyAnsweringRelayClient([older], answered: 4);
+      await follow(client, bob);
+      client.events
+        ..clear()
+        ..add(older);
+
+      // Turning the first question down must not make the next change look
+      // safe: the laggard is still the only list the relays return.
+      expect(await change(client, 'cc' * 32), isA<FollowNeedsConfirmation>());
+      expect(await change(client, 'dd' * 32), isA<FollowNeedsConfirmation>());
+      expect(client.published, hasLength(1));
+    });
+
+    test('the newest list seen is only replaced by a newer one', () {
+      final at = DateTime.utc(2026, 10, 1);
+      Object? seen() => seenOwnContactLists.value[me.publicKeyHex];
+
+      noteOwnContactList(me.publicKeyHex, at, 5);
+      noteOwnContactList(
+        me.publicKeyHex,
+        at.subtract(const Duration(days: 1)),
+        9,
+      );
+      noteOwnContactList(me.publicKeyHex, at, 7);
+      expect(seen(), (createdAt: at, count: 5));
+
+      final later = at.add(const Duration(seconds: 1));
+      noteOwnContactList(me.publicKeyHex, later, 3);
+      expect(seen(), (createdAt: later, count: 3));
+    });
+
     test(
       'a list from after the last one seen is built on without asking',
       () async {
@@ -294,5 +328,49 @@ void main() {
 
       expect(await shown(client), [alice]);
     });
+
+    test(
+      'is kept as the newest seen only when it is the user\'s own',
+      () async {
+        final client = PartlyAnsweringRelayClient([
+          contactList([alice, bob], age: const Duration(days: 30)),
+        ], answered: 4);
+        final repository = RelayContactsRepository(client: client);
+
+        await repository.fetchFollowingOrNull(me.publicKeyHex, relays);
+        expect(seenOwnContactLists.value, isEmpty);
+
+        await repository.fetchFollowingOrNull(
+          me.publicKeyHex,
+          relays,
+          remember: true,
+        );
+        expect(seenOwnContactLists.value.keys, [me.publicKeyHex]);
+        expect(seenOwnContactLists.value[me.publicKeyHex]?.count, 2);
+      },
+    );
+
+    test(
+      'shown to the user, it is what a later change is checked against',
+      () async {
+        final client = PartlyAnsweringRelayClient([
+          contactList([alice, bob], age: const Duration(days: 1)),
+        ], answered: 4);
+        await RelayContactsRepository(client: client)
+            .fetchFollowingOrNull(me.publicKeyHex, relays, remember: true);
+
+        // The relays that held it are slow when the user taps; a lagging one
+        // returns a copy from before.
+        client.events
+          ..clear()
+          ..add(contactList([alice], age: const Duration(days: 30)));
+        final update = await change(client, 'cc' * 32);
+
+        expect(update, isA<FollowNeedsConfirmation>());
+        update as FollowNeedsConfirmation;
+        expect(update.risks, {FollowRisk.olderThanSeen});
+        expect(update.lastSeen?.count, 2);
+      },
+    );
   });
 }

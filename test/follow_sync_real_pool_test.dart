@@ -108,6 +108,8 @@ void main() {
     expect(published.tags, [
       ['p', newcomer],
     ]);
+    // What was published is what this device knows of the list from now on.
+    expect(seenOwnContactLists.value[me]?.count, 1);
     expect(myFollowingNotifier.value, {newcomer});
   });
 
