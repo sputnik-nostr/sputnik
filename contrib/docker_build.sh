@@ -22,6 +22,7 @@ flutter pub get --enforce-lockfile
 if [[ $mode == check ]]; then
     dart format --output=none --set-exit-if-changed .
     flutter analyze
+    contrib/tests/run.sh
     make test
     exit 0
 fi

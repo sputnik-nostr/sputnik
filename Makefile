@@ -38,7 +38,7 @@ check: image
 fmt:
 	dart format .
 	clang-format -i src/nostr_secp256k1.c src/nostr_secp256k1.h
-	shfmt -w -i 4 contrib/*.sh
+	shfmt -w -i 4 contrib/*.sh contrib/tests/*.sh
 	yamlfmt .github/dependabot.yml .github/workflows/*.yml
 	mbake format Makefile
 	npx prettier --write docs/*.md README.md
