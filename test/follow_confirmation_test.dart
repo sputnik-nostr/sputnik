@@ -57,6 +57,47 @@ void main() {
   final carol = 'cc' * 32;
   final dave = 'dd' * 32;
 
+  group('what confirming a tap says', () {
+    test('a follow publishes the list and says how long it becomes', () {
+      expect(
+        followListChangeMessage(follow: true, listSize: 2),
+        'This adds them to your follow list, which then has 3 people, and '
+        'publishes it to your relays.',
+      );
+    });
+
+    test('an unfollow says the same, one person fewer', () {
+      expect(
+        followListChangeMessage(follow: false, listSize: 3),
+        'This removes them from your follow list, which then has 2 people, '
+        'and publishes it to your relays.',
+      );
+      expect(
+        followListChangeMessage(follow: false, listSize: 2),
+        'This removes them from your follow list, which then has 1 person, '
+        'and publishes it to your relays.',
+      );
+      expect(
+        followListChangeMessage(follow: false, listSize: 1),
+        'This removes them from your follow list, which then has 0 people, '
+        'and publishes it to your relays.',
+      );
+    });
+
+    test('does not make up a size while the list has not loaded', () {
+      expect(
+        followListChangeMessage(follow: true),
+        'This adds them to your follow list and publishes it to your relays. '
+        'The list has not loaded yet, so it is fetched first.',
+      );
+      expect(
+        followListChangeMessage(follow: false),
+        'This removes them from your follow list and publishes it to your '
+        'relays. The list has not loaded yet, so it is fetched first.',
+      );
+    });
+  });
+
   group('the question', () {
     FollowNeedsConfirmation update({
       Set<FollowRisk> risks = const {FollowRisk.noListFound},

@@ -93,6 +93,14 @@ Future<void> ensureMyFollowingLoaded(Set<String> relayUrls) {
   return future;
 }
 
+/// How many people the active identity follows; null while its list has not
+/// loaded, when [myFollowingNotifier] holds only the taps made so far.
+int? loadedFollowingCount() {
+  final myPubkeyHex = activeIdentityPubkeyNotifier.value;
+  if (myPubkeyHex == null || _myFollowingLoadedFor != myPubkeyHex) return null;
+  return myFollowingNotifier.value?.length;
+}
+
 bool _hasPendingFor(String pubkeyHex) =>
     _pendingFor == pubkeyHex && _pending.isNotEmpty;
 
