@@ -87,7 +87,7 @@ Future<bool> _publishAgainst(
     final confirmed = await confirmAction(
       context,
       title: dialogTitle,
-      message: dialogBody,
+      message: '$dialogBody\n\nSigning as ${_describe(identity)}.',
       action: 'Continue',
     );
     if (!confirmed || !context.mounted) return false;
@@ -121,6 +121,23 @@ const _notYours = 'Only the identity that published this can remove it';
 
 bool _isAuthor(Identity identity, NostrEvent event) =>
     event.pubkey.toLowerCase() == identity.pubkeyHex.toLowerCase();
+
+/// Profile names can be long, and are only there to recognize an identity by.
+const _maxNameLength = 40;
+
+/// Its profile name, when one is known, and its short npub.
+String _describe(Identity identity) {
+  final npub = truncateNpub(npubFromHex(identity.pubkeyHex));
+  final name = profileCacheNotifier.value[identity.pubkeyHex]?.resolvedName
+      ?.replaceAll(RegExp(r'\s+'), ' ');
+  if (name == null) return npub;
+
+  final letters = name.runes.toList();
+  final shown = letters.length > _maxNameLength
+      ? '${String.fromCharCodes(letters.take(_maxNameLength))}...'
+      : name;
+  return '$shown ($npub)';
+}
 
 /// Publishes a NIP-25 like for [note].
 Future<bool> likeNote(BuildContext context, Note note) {

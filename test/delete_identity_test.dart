@@ -86,6 +86,9 @@ void main() {
     return tester.pumpWidget(MaterialApp(home: Scaffold(body: button)));
   }
 
+  String shortNpub(NostrKeyPair keys) =>
+      truncateNpub(npubFromHex(keys.publicKeyHex));
+
   group('deleting a note', () {
     testWidgets("refuses another identity's note, signing nothing", (
       tester,
@@ -198,6 +201,82 @@ void main() {
         icon: Icons.repeat,
         content: '',
       );
+    });
+  });
+
+  group('confirmations name the signing identity', () {
+    testWidgets('delete, by its short npub when it has no profile', (
+      tester,
+    ) async {
+      await pumpButton(tester, DeleteButton(note: noteOfA));
+
+      await tester.tap(find.byIcon(Icons.delete_outline));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining(shortNpub(a)), findsOneWidget);
+      expect(find.textContaining(shortNpub(b)), findsNothing);
+    });
+
+    testWidgets('delete, by its profile name and short npub', (tester) async {
+      profileCacheNotifier.value = {
+        a.publicKeyHex: const NostrMetadata(name: 'Alice'),
+        b.publicKeyHex: const NostrMetadata(name: 'Bob'),
+      };
+      await pumpButton(tester, DeleteButton(note: noteOfA));
+
+      await tester.tap(find.byIcon(Icons.delete_outline));
+      await tester.pumpAndSettle();
+
+      final message = find.textContaining('Alice');
+      expect(message, findsOneWidget);
+      expect(find.textContaining(shortNpub(a)), findsOneWidget);
+      expect(find.textContaining('Bob'), findsNothing);
+    });
+
+    testWidgets('like', (tester) async {
+      activeIdentityPubkeyNotifier.value = b.publicKeyHex;
+      await pumpButton(tester, LikeButton(note: noteOfA));
+
+      await tester.tap(find.byIcon(Icons.favorite_border));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Like this note?'), findsOneWidget);
+      expect(find.textContaining(shortNpub(b)), findsOneWidget);
+      expect(find.textContaining(shortNpub(a)), findsNothing);
+    });
+
+    testWidgets('repost', (tester) async {
+      activeIdentityPubkeyNotifier.value = b.publicKeyHex;
+      await pumpButton(tester, RepostButton(note: noteOfA));
+
+      await tester.tap(find.byIcon(Icons.repeat));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Repost this note?'), findsOneWidget);
+      expect(find.textContaining(shortNpub(b)), findsOneWidget);
+    });
+
+    testWidgets('a long or multi-line profile name is cut down', (
+      tester,
+    ) async {
+      profileCacheNotifier.value = {
+        a.publicKeyHex: NostrMetadata(name: 'Al\n${'ice' * 400}'),
+      };
+      await pumpButton(tester, DeleteButton(note: noteOfA));
+
+      await tester.tap(find.byIcon(Icons.delete_outline));
+      await tester.pumpAndSettle();
+
+      final message = tester.widget<Text>(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.textContaining(shortNpub(a)),
+        ),
+      );
+      final text = message.data!;
+      expect(text.length, lessThan(400));
+      expect(text, contains('Al ice'));
+      expect(text, isNot(contains('Al\nice')));
     });
   });
 }
