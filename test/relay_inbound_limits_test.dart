@@ -291,4 +291,86 @@ void main() {
       expect(relay.connections.single.messagesOf('REQ'), isEmpty);
     });
   });
+
+  group('a message too wide to decode safely', () {
+    late int pendingCap;
+    setUp(() => pendingCap = maxPendingOpeners);
+    tearDown(() => maxPendingOpeners = pendingCap);
+
+    /// Holds [openers] empty maps (and the two lists around them), so that
+    /// decoding it takes far more heap than its text does.
+    String wide(String sub, int openers) =>
+        '["EVENT","$sub",[${'{},' * (openers - 2)}0]]';
+
+    test('fails the relay, and its EOSE is no answer', () async {
+      // 70,000 empty maps are 210 KB of text.
+      final relay = await relayReplying((connection, sub) {
+        connection.sendText(wide(sub, 70000));
+        connection.sendText(eose(sub));
+      });
+      addTearDown(relay.close);
+
+      final first = await client.queryWithStatus({relay.url}, oneNote);
+
+      expect(first.answeredRelays, 0);
+      await relay.connections.single.closed.timeout(const Duration(seconds: 5));
+
+      final second = await client.queryWithStatus({relay.url}, oneNote);
+      expect(second.answeredRelays, 0);
+      expect(relay.connections.single.messagesOf('REQ'), hasLength(1));
+    });
+
+    test('is not what a note full of brackets looks like', () async {
+      final note = sign(content: '[{' * 50000);
+      final relay = await relayReplying((connection, sub) {
+        connection.sendText(eventMessage(sub, note));
+        connection.sendText(eose(sub));
+      });
+      addTearDown(relay.close);
+
+      final result = await client.queryWithStatus({relay.url}, oneNote);
+
+      expect(result.events.map((e) => e.id), [note.id]);
+      expect(result.answeredRelays, 1);
+    });
+
+    test('many of them waiting at once fail the relay too', () async {
+      // None is over the limit for one message, but together they hold more
+      // than a connection may have waiting.
+      maxPendingOpeners = 1000;
+      final relay = await relayReplying((connection, sub) {
+        connection.send(repeated(webSocketText(wide(sub, 600)), 10));
+        connection.sendText(eose(sub));
+      });
+      addTearDown(relay.close);
+
+      final result = await client.queryWithStatus({relay.url}, oneNote);
+
+      expect(result.answeredRelays, 0);
+      await relay.connections.single.closed.timeout(const Duration(seconds: 5));
+    });
+
+    test(
+      'are counted as they drain, not over the connection\'s life',
+      () async {
+        maxPendingOpeners = 1000;
+        final event = sign();
+        // About 1,250 openers in all, but only about a hundred waiting at once.
+        final relay = await relayAnswering(12, (connection, sub) {
+          connection.sendText(wide(sub, 100));
+          connection.sendText(eventMessage(sub, event));
+          connection.sendText(eose(sub));
+        });
+        addTearDown(relay.close);
+
+        final results = await askedInTurn(relay, 12);
+
+        for (final (round, result) in results.indexed) {
+          expect(result.events.map((e) => e.id), [event.id], reason: '$round');
+          expect(result.answeredRelays, 1, reason: '$round');
+        }
+        expect(relay.connections, hasLength(1));
+      },
+    );
+  });
 }

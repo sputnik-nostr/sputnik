@@ -146,4 +146,54 @@ void main() {
       expect(await parser.parse(eventMessage('s', at: near)), isNotNull);
     });
   });
+
+  group('counting the openers of a message', () {
+    test('counts every [ and { outside strings', () {
+      const raw = r'["EVENT","s",{"tags":[["p","x"],["e","y"]],"a":{}}]';
+
+      expect(countOpeners(raw), 6);
+    });
+
+    test('leaves out brackets inside strings, which are text', () {
+      expect(countOpeners(r'["[[{{","}]"]'), 1);
+      expect(countOpeners('["EVENT","s",{"content":"${'[{' * 1000}"}]'), 2);
+    });
+
+    test('knows an escaped quote from the end of a string', () {
+      // The quote after the backslash is part of the string.
+      expect(countOpeners(r'["a\"[{","b"]'), 1);
+      // The backslash escapes the other backslash, so this quote ends it.
+      expect(countOpeners(r'["a\\",[{]]'), 3);
+    });
+
+    test('stops past the limit, one over', () {
+      expect(countOpeners('[' * 1000, limit: 10), 11);
+      expect(countOpeners('[' * 10, limit: 10), 10);
+      expect(
+        countOpeners('{},' * maxMessageOpeners * 2),
+        maxMessageOpeners + 1,
+      );
+    });
+
+    test('has room for the fullest follow list that fits the length cap', () {
+      final key = generateNostrKeyPair();
+      final event = signEvent(
+        secretKey: SecretKey.fromHex(key.privateKeyHex),
+        pubkeyHex: key.publicKeyHex,
+        kind: 3,
+        content: '',
+        tags: [
+          for (var i = 0; i < 14358; i++)
+            ['p', (i + 0x1000).toRadixString(16).padLeft(16, '0') * 4],
+        ],
+      );
+      final raw = jsonEncode(['EVENT', 's', event.toJson()]);
+      expect(raw.length, lessThanOrEqualTo(1 << 20));
+      expect(raw.length, greaterThan(1000000));
+
+      // One for each tag, and for the message, the event and its tags.
+      expect(countOpeners(raw), 14358 + 3);
+      expect(maxMessageOpeners, greaterThan(4 * (14358 + 3)));
+    });
+  });
 }

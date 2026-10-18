@@ -51,6 +51,13 @@ int maxPendingParseLength = 32 << 20;
 @visibleForTesting
 int maxPendingMessages = 50000;
 
+/// Maximum number of `[` and `{` in the messages waiting to be parsed on one
+/// connection. Decoding takes up to about 250 bytes of heap for each, however
+/// short the text, so this bounds that heap to 128 MiB where the caps above
+/// would allow a hundred times the text they hold.
+@visibleForTesting
+int maxPendingOpeners = 1 << 19;
+
 class _RelayCoolingDown implements Exception {
   const _RelayCoolingDown();
 }
@@ -380,6 +387,7 @@ class _RelayConnection {
   int _activeSubscriptions = 0;
   int _pendingParseLength = 0;
   int _pendingMessages = 0;
+  int _pendingOpeners = 0;
 
   /// Set once the relay broke a limit, and the connection is being dropped.
   bool flooded = false;
@@ -418,8 +426,15 @@ class _RelayConnection {
       _breakLimit();
       return;
     }
+    final openers = countOpeners(raw);
+    if (openers > maxMessageOpeners ||
+        _pendingOpeners + openers > maxPendingOpeners) {
+      _breakLimit();
+      return;
+    }
     _pendingMessages++;
     _pendingParseLength += raw.length;
+    _pendingOpeners += openers;
 
     final parsing = RelayMessageParser.instance
         .parse(raw, subscriptionIds: _handlers.keys.toSet())
@@ -444,6 +459,7 @@ class _RelayConnection {
     _dispatchQueue = dispatched.catchError((Object _) {}).whenComplete(() {
       _pendingParseLength -= raw.length;
       _pendingMessages--;
+      _pendingOpeners -= openers;
     });
   }
 
