@@ -573,6 +573,41 @@ void main() {
       expect(log, [url, got]);
     });
 
+    test(
+      'builds the Blossom URL from the hash, not from the URL text',
+      () async {
+        for (final url in [
+          'https://one.example/a.png%3Fx%3D1',
+          'https://one.example/a.png%2F..%2F..%2Fadmin',
+          'https://one.example/a.torrent',
+        ]) {
+          final log = <String>[];
+          final source = MediaSource(
+            url: url,
+            sha256: hash,
+            serverLookup: () async => ['https://blossom.example'],
+          );
+
+          await source.fetch(attempts(log, failing: {url}));
+
+          expect(log, [url, 'https://blossom.example/$hash'], reason: url);
+        }
+      },
+    );
+
+    test('skips a server it cannot make a URL from', () async {
+      final log = <String>[];
+      final source = MediaSource(
+        url: primary,
+        sha256: hash,
+        serverLookup: () async => ['https://[bad', 'https://blossom.example'],
+      );
+
+      final got = await source.fetch(attempts(log, failing: {primary}));
+
+      expect(got, 'https://blossom.example/$hash.png');
+    });
+
     test('still asks the servers when the URL does not parse', () async {
       final log = <String>[];
       final source = MediaSource(

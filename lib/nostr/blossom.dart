@@ -4,6 +4,10 @@ import 'models/nostr_event.dart';
 const maxBlossomServers = 5;
 
 final _blobName = RegExp(r'^([0-9a-fA-F]{64})(\.[A-Za-z0-9]+)?$');
+final _sha256Hex = RegExp(r'^[0-9a-f]{64}$');
+
+/// The extensions we pass on: short and plain, as for video temp files.
+final _plainExtension = RegExp(r'^\.[A-Za-z0-9]{1,5}$');
 
 /// The last path segment of [uri] as written, empty if there is none.
 ///
@@ -20,11 +24,13 @@ String? blossomHash(Uri uri) {
   return _blobName.firstMatch(lastPathSegment(uri))?[1]?.toLowerCase();
 }
 
-/// The `.ext` after the name in [uri]'s last path segment, if any.
+/// The `.ext` after the name in [uri]'s last path segment: one to five ASCII
+/// letters or digits, else empty, since the rest is the URL author's text.
 String extensionOf(Uri uri) {
   final name = lastPathSegment(uri);
   final dot = name.lastIndexOf('.');
-  return dot <= 0 ? '' : name.substring(dot);
+  final extension = dot <= 0 ? '' : name.substring(dot);
+  return _plainExtension.hasMatch(extension) ? extension : '';
 }
 
 /// Whether [uri] is one we would fetch: HTTPS, with a host and no credentials.
@@ -52,7 +58,27 @@ List<String> blossomServersFromEvent(NostrEvent event) {
   return servers;
 }
 
+/// [server]'s scheme, host and port alone, or null if it is not an HTTPS one.
+Uri? _originOf(String server) {
+  final uri = Uri.tryParse(server);
+  if (uri == null || !isFetchableUrl(uri)) return null;
+  // The authority keeps the brackets of an IPv6 host, which `host` drops.
+  return Uri.tryParse('${uri.scheme}://${uri.authority}');
+}
+
 /// Where each of [servers] would serve the blob, as NIP-B7 describes.
+///
+/// The URL is a single path segment: [sha256] and, if it is short and plain,
+/// [extension]. So nothing a note's URL held can reshape the request, and a
+/// server that is not an HTTPS origin is skipped rather than guessed at.
 List<Uri> blossomUrls(List<String> servers, String sha256, String extension) {
-  return [for (final server in servers) Uri.parse('$server/$sha256$extension')];
+  final hash = sha256.toLowerCase();
+  if (!_sha256Hex.hasMatch(hash)) return const [];
+
+  final name = _plainExtension.hasMatch(extension) ? '$hash$extension' : hash;
+  return [
+    for (final server in servers)
+      if (_originOf(server) case final origin?)
+        origin.replace(pathSegments: [name]),
+  ];
 }
