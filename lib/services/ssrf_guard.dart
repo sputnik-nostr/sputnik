@@ -182,30 +182,60 @@ ConnectionTask<Socket> connectToAny(List<InternetAddress> addresses, int port) {
 Future<List<InternetAddress>> Function(String host) resolveHost =
     InternetAddress.lookup;
 
+/// The public addresses of [host], in the order they are tried.
+Future<List<InternetAddress>> _vettedAddresses(String host) async {
+  final addresses = [
+    for (final candidate in await resolveHost(host))
+      if (!isBlockedAddress(candidate)) candidate,
+  ];
+  if (addresses.isEmpty) {
+    throw SocketException('No public address found for $host');
+  }
+  return _interleaveFamilies(addresses).take(_maxRacedAddresses).toList();
+}
+
 /// Connects only to vetted addresses so DNS can't rebind; ignores proxies.
+///
+/// The task is handed back at once, with the lookup, the connect and the TLS
+/// handshake still ahead of it: dart:io applies connectionTimeout and
+/// close(force: true) only to a task it holds. Cancelling fails it at once.
 Future<ConnectionTask<Socket>> guardedConnectionFactory(
   Uri url,
   String? proxyHost,
   int? proxyPort,
-) async {
-  final addresses = [
-    for (final candidate in await resolveHost(url.host))
-      if (!isBlockedAddress(candidate)) candidate,
-  ];
-  if (addresses.isEmpty) {
-    throw SocketException('No public address found for ${url.host}');
+) {
+  final result = Completer<Socket>();
+  ConnectionTask<Socket>? racing;
+
+  Future<void> connect() async {
+    final addresses = await _vettedAddresses(url.host);
+    if (result.isCompleted) return; // cancelled during the lookup
+    final task = racing = connectToAny(addresses, effectivePort(url));
+    var socket = await task.socket;
+    // connectionFactory doesn't wrap HTTPS in TLS itself. A handshake under
+    // way can't be aborted, so after a cancel its socket is closed once it ends.
+    if (url.scheme == 'https' && !result.isCompleted) {
+      socket = await SecureSocket.secure(socket, host: url.host);
+    }
+    if (result.isCompleted) {
+      socket.destroy(); // cancelled while connecting
+    } else {
+      result.complete(socket);
+    }
   }
 
-  final rawTask = connectToAny(
-    _interleaveFamilies(addresses).take(_maxRacedAddresses).toList(),
-    effectivePort(url),
+  connect().catchError((Object error, StackTrace stack) {
+    if (!result.isCompleted) result.completeError(error, stack);
+  }).ignore();
+  return Future.value(
+    ConnectionTask.fromSocket(result.future, () {
+      if (result.isCompleted) return;
+      racing?.cancel();
+      result.completeError(
+        const SocketException('Connection attempt cancelled'),
+      );
+    }),
   );
-  if (url.scheme != 'https') return rawTask;
-
-  // connectionFactory doesn't wrap HTTPS in TLS itself.
-  final rawSocket = await rawTask.socket;
-  final secureSocket = SecureSocket.secure(rawSocket, host: url.host);
-  return ConnectionTask.fromSocket(secureSocket, rawTask.cancel);
 }
 
 /// An HttpClient that refuses non-public addresses.
