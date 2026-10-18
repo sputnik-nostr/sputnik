@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/nostr/keys.dart';
 import 'package:sputnik/nostr/models/nostr_event.dart';
+import 'package:sputnik/nostr/models/text_sanitizer.dart';
 import 'package:sputnik/nostr/relay_message_parser.dart';
 
 void main() {
@@ -57,6 +58,53 @@ void main() {
     expect(parsed, isNotNull);
     // The lone surrogate becomes U+FFFD, so the string is safe to render.
     expect(parsed!.message, 'broken�message');
+  });
+
+  test('cuts an OK message before sanitizing it', () async {
+    // The cut falls between the halves of the emoji, which leaves a lone one.
+    final raw = jsonEncode([
+      'OK',
+      'a' * 64,
+      false,
+      '${'x' * 299}\u{1F600}tail',
+    ]);
+
+    final parsed = await parser.parse(raw);
+
+    expect(parsed!.message, '${'x' * 299}\u{FFFD}');
+  });
+
+  test('keeps a surrogate pair that ends exactly at the cut', () async {
+    final raw = jsonEncode([
+      'OK',
+      'a' * 64,
+      false,
+      '${'x' * 298}\u{1F600}tail',
+    ]);
+
+    final parsed = await parser.parse(raw);
+
+    expect(parsed!.message, '${'x' * 298}\u{1F600}');
+  });
+
+  test('an OK message is well-formed wherever it is cut', () async {
+    for (var plain = 290; plain <= 300; plain++) {
+      final raw = jsonEncode([
+        'OK',
+        'a' * 64,
+        false,
+        '${'x' * plain}${'\u{1F600}' * 8}',
+      ]);
+
+      final message = (await parser.parse(raw))!.message!;
+
+      expect(message, hasLength(300), reason: '$plain units before the emoji');
+      expect(
+        sanitizeUtf16(message),
+        message,
+        reason: '$plain units before the emoji',
+      );
+    }
   });
 
   group('signed events', () {
