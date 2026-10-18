@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../models/identity.dart';
 import '../models/note.dart';
 import '../nostr/nostr.dart';
 import 'publishing.dart';
@@ -50,6 +51,9 @@ _Publish _retraction(RelayReactionsRepository repository) =>
     );
 
 /// Confirms first if [alwaysConfirm] or the confirmation setting is on.
+///
+/// [ownTargetOnly] is for a [publish] that deletes the target (NIP-09). That
+/// only works on the signer's own events, so any other is refused up front.
 Future<bool> _publishAgainst(
   BuildContext context, {
   required _FetchTarget fetchTarget,
@@ -58,6 +62,7 @@ Future<bool> _publishAgainst(
   required String dialogBody,
   required bool alwaysConfirm,
   required _Publish publish,
+  bool ownTargetOnly = false,
 }) async {
   final identity = activeIdentity();
   if (identity == null) return false;
@@ -69,6 +74,12 @@ Future<bool> _publishAgainst(
   if (!context.mounted) return false;
   if (target == null) {
     messenger.showSnackBar(SnackBar(content: Text(notFoundMessage)));
+    return false;
+  }
+  if (ownTargetOnly && !_isAuthor(identity, target.event)) {
+    // Signing it would not delete anything, only tie the two identities
+    // together in public.
+    messenger.showSnackBar(const SnackBar(content: Text(_notYours)));
     return false;
   }
 
@@ -106,6 +117,10 @@ Future<bool> _publishAgainst(
 
 const _noteNotFound = 'Could not load this note from relays';
 const _reactionNotFound = 'Could not find that on any of your relays';
+const _notYours = 'Only the identity that published this can remove it';
+
+bool _isAuthor(Identity identity, NostrEvent event) =>
+    event.pubkey.toLowerCase() == identity.pubkeyHex.toLowerCase();
 
 /// Publishes a NIP-25 like for [note].
 Future<bool> likeNote(BuildContext context, Note note) {
@@ -168,6 +183,7 @@ Future<bool> unlikeNote(BuildContext context, Note note) {
         'This asks your relays to delete your reaction. Removal is not '
         'guaranteed; other relays or clients may still show it.',
     publish: _retraction(repository),
+    ownTargetOnly: true,
   );
 }
 
@@ -184,6 +200,7 @@ Future<bool> unrepostNote(BuildContext context, Note note) {
         'This asks your relays to delete your repost. Removal is not '
         'guaranteed; other relays or clients may still show it.',
     publish: _retraction(repository),
+    ownTargetOnly: true,
   );
 }
 
@@ -209,6 +226,7 @@ Future<bool> deleteNote(BuildContext context, Note note) async {
         'This asks your relays to delete the note. Removal is not '
         'guaranteed; other relays or clients may still show it.',
     publish: _retraction(RelayReactionsRepository()),
+    ownTargetOnly: true,
   );
   if (succeeded) _removeNoteFromFeeds(note.id);
   return succeeded;
