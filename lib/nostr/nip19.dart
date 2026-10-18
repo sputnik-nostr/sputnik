@@ -93,23 +93,33 @@ const nostrEntityPattern =
 
 typedef NostrUriTarget = ({String? pubkeyHex, String? eventIdHex});
 
-/// An npub, nprofile, note or nevent, with or without `nostr:`; else null.
-NostrUriTarget? decodeNostrUri(String text) {
-  final value = text.startsWith('nostr:') ? text.substring(6) : text;
+bool _startsWithIgnoringCase(String text, String lowerCasePrefix) =>
+    text.length >= lowerCasePrefix.length &&
+    text.substring(0, lowerCasePrefix.length).toLowerCase() == lowerCasePrefix;
 
-  if (value.startsWith('npub1')) {
+/// An npub, nprofile, note or nevent, with or without `nostr:`; else null.
+///
+/// A QR code may carry the URI in uppercase, which BIP-173 allows for a whole
+/// entity but never mixed with lowercase; the bech32 decoders enforce that.
+/// The scheme is case-insensitive.
+NostrUriTarget? decodeNostrUri(String text) {
+  final value = _startsWithIgnoringCase(text, 'nostr:')
+      ? text.substring(6)
+      : text;
+
+  if (_startsWithIgnoringCase(value, 'npub1')) {
     final hex = hexFromNpub(value);
     return hex == null ? null : (pubkeyHex: hex, eventIdHex: null);
   }
-  if (value.startsWith('nprofile1')) {
+  if (_startsWithIgnoringCase(value, 'nprofile1')) {
     final hex = hexFromNprofile(value);
     return hex == null ? null : (pubkeyHex: hex, eventIdHex: null);
   }
-  if (value.startsWith('note1')) {
+  if (_startsWithIgnoringCase(value, 'note1')) {
     final hex = hexFromNote(value);
     return hex == null ? null : (pubkeyHex: null, eventIdHex: hex);
   }
-  if (value.startsWith('nevent1')) {
+  if (_startsWithIgnoringCase(value, 'nevent1')) {
     final hex = hexFromNevent(value);
     return hex == null ? null : (pubkeyHex: null, eventIdHex: hex);
   }
