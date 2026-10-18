@@ -102,18 +102,20 @@ List<InternetAddress> _interleaveFamilies(List<InternetAddress> addresses) {
 }
 
 /// Races [addresses] in staggered order, as dart:io does for a hostname.
+///
+/// Like any [ConnectionTask], cancelling it closes every attempt and fails
+/// its socket with a [SocketException].
 @visibleForTesting
 ConnectionTask<Socket> connectToAny(List<InternetAddress> addresses, int port) {
   final result = Completer<Socket>();
   final tasks = <ConnectionTask<Socket>>[];
   var next = 0;
   var failed = 0;
-  var cancelled = false;
   Timer? stagger;
 
   void startNext() {
     stagger?.cancel();
-    if (cancelled || result.isCompleted || next >= addresses.length) return;
+    if (result.isCompleted || next >= addresses.length) return;
     final address = addresses[next++];
     stagger = Timer(_connectAttemptDelay, startNext);
 
@@ -127,8 +129,17 @@ ConnectionTask<Socket> connectToAny(List<InternetAddress> addresses, int port) {
       }
     }
 
-    Socket.startConnect(address, port).then((task) {
-      if (cancelled || result.isCompleted) {
+    // An error thrown straight away fails this attempt like any other.
+    Future<ConnectionTask<Socket>> started;
+    try {
+      started = Socket.startConnect(address, port);
+    } catch (error, stack) {
+      started = Future.error(error, stack);
+    }
+    started.then((task) {
+      if (result.isCompleted) {
+        // Nobody wants it any more: close whatever it still manages to open.
+        task.socket.then((socket) => socket.destroy(), onError: (_) {});
         task.cancel();
         return;
       }
@@ -153,11 +164,12 @@ ConnectionTask<Socket> connectToAny(List<InternetAddress> addresses, int port) {
     startNext();
   }
   return ConnectionTask.fromSocket(result.future, () {
-    cancelled = true;
+    if (result.isCompleted) return;
     stagger?.cancel();
     for (final task in tasks) {
       task.cancel();
     }
+    result.completeError(const SocketException('Connection attempt cancelled'));
   });
 }
 
