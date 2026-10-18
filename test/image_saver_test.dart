@@ -1,3 +1,5 @@
+import 'dart:collection';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +7,23 @@ import 'package:sputnik/services/image_saver.dart';
 import 'package:sputnik/services/media_loader.dart';
 
 Uint8List _png() => Uint8List.fromList([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+
+/// Bytes whose length cannot be read, so that writing them fails half way.
+class _Unwritable extends ListBase<int> {
+  @override
+  int get length => throw StateError('disk full');
+
+  @override
+  set length(int _) {}
+
+  @override
+  int operator [](int index) => 0;
+
+  @override
+  void operator []=(int index, int value) {}
+}
+
+const _executable = 0x49; // The owner, group and other execute bits.
 
 void main() {
   test(
@@ -106,6 +125,103 @@ void main() {
 
     expect(result.outcome, SaveOutcome.failed);
     expect(asked, 0);
+  });
+
+  group('saving to a file the user picked', () {
+    late Directory dir;
+
+    setUp(() async {
+      dir = await Directory.systemTemp.createTemp('image_saver_test_');
+    });
+
+    tearDown(() => dir.delete(recursive: true));
+
+    Future<String?> save(String name, {String? pick}) {
+      return saveToDevice(
+        _png(),
+        name,
+        pickLocation: (_) async => pick == null ? null : '${dir.path}/$pick',
+      );
+    }
+
+    test('writes the bytes to a new file that is not executable', () async {
+      final suggested = <String>[];
+
+      final path = await saveToDevice(
+        _png(),
+        'cat.png',
+        pickLocation: (name) async {
+          suggested.add(name);
+          return '${dir.path}/$name';
+        },
+      );
+
+      expect(suggested, ['cat.png']);
+      expect(path, '${dir.path}/cat.png');
+      expect(File(path!).readAsBytesSync(), _png());
+      expect(File(path).statSync().mode & _executable, 0);
+    });
+
+    test('writes nothing when the user cancels', () async {
+      expect(await save('cat.png'), isNull);
+      expect(dir.listSync(), isEmpty);
+    });
+
+    test('never replaces a file that exists, nor changes its mode', () async {
+      final target = File('${dir.path}/run.sh')
+        ..writeAsStringSync('#!/bin/sh\necho precious\n');
+      await Process.run('chmod', ['755', target.path]);
+
+      await expectLater(
+        save('cat.png', pick: 'run.sh'),
+        throwsA(isA<PathExistsException>()),
+      );
+
+      expect(target.readAsStringSync(), '#!/bin/sh\necho precious\n');
+      expect(target.statSync().mode & _executable, _executable);
+    });
+
+    test('does not write through a link', () async {
+      final victim = File('${dir.path}/victim.txt')..writeAsStringSync('keep');
+      Link('${dir.path}/live.png').createSync(victim.path);
+      Link('${dir.path}/dangling.png').createSync('${dir.path}/nowhere');
+
+      for (final name in ['live.png', 'dangling.png']) {
+        await expectLater(
+          save('cat.png', pick: name),
+          throwsA(isA<PathExistsException>()),
+          reason: name,
+        );
+      }
+
+      expect(victim.readAsStringSync(), 'keep');
+      expect(File('${dir.path}/nowhere').existsSync(), isFalse);
+    });
+
+    test('takes back the file it made if the write fails', () async {
+      final path = '${dir.path}/half.png';
+
+      await expectLater(
+        writeNewFile(path, _Unwritable()),
+        throwsA(isA<StateError>()),
+      );
+
+      expect(File(path).existsSync(), isFalse);
+    });
+
+    test('tells the user a file with that name exists', () async {
+      File('${dir.path}/cat.png').writeAsStringSync('mine');
+
+      final result = await saveImage(
+        MediaSource(url: 'https://a.example/cat.png'),
+        backend: (bytes, name) => save(name, pick: name),
+        fetchBytes: (_) async => _png(),
+      );
+
+      expect(result.outcome, SaveOutcome.exists);
+      expect(saveMessage(result), 'A file with that name already exists');
+      expect(File('${dir.path}/cat.png').readAsStringSync(), 'mine');
+    });
   });
 
   test('reports each way saving can end', () async {

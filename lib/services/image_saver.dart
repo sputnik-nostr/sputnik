@@ -1,14 +1,14 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart';
 import 'package:gal/gal.dart';
 
 import '../nostr/blossom.dart';
 import '../nostr/nip92.dart';
 import 'media_loader.dart';
 
-enum SaveOutcome { saved, cancelled, denied, failed }
+enum SaveOutcome { saved, cancelled, denied, exists, failed }
 
 class SaveResult {
   const SaveResult(this.outcome, [this.location]);
@@ -27,8 +27,46 @@ class SaveDenied implements Exception {
 /// Stores [bytes] where the user can find them; null if they cancel.
 typedef SaveBackend = Future<String?> Function(Uint8List bytes, String name);
 
-/// The gallery on phones, and a file the user picks on desktop.
-Future<String?> saveToDevice(Uint8List bytes, String name) async {
+/// Where the user wants a file suggested as [name]; null if they cancel.
+typedef SaveLocationPicker = Future<String?> Function(String name);
+
+Future<String?> _pickSaveLocation(String name) async {
+  final location = await getSaveLocation(
+    suggestedName: name,
+    acceptedTypeGroups: [
+      XTypeGroup(label: 'Images', extensions: imageExtensions.toList()),
+    ],
+  );
+  return location?.path;
+}
+
+/// Writes [bytes] to a file created at [path], which must not exist yet.
+///
+/// Throws a [PathExistsException] instead of replacing a file or writing
+/// through a link. The desktop dialog does not ask before it hands back a
+/// name in use, and a file written over would keep its mode, executable or not.
+@visibleForTesting
+Future<void> writeNewFile(String path, List<int> bytes) async {
+  final file = File(path);
+  await file.create(exclusive: true);
+  try {
+    await file.writeAsBytes(bytes, flush: true);
+  } catch (_) {
+    try {
+      await file.delete();
+    } on FileSystemException {
+      // Already gone; nothing is left to take back.
+    }
+    rethrow;
+  }
+}
+
+/// The gallery on phones, and a new file the user picks on desktop.
+Future<String?> saveToDevice(
+  Uint8List bytes,
+  String name, {
+  SaveLocationPicker pickLocation = _pickSaveLocation,
+}) async {
   if (Platform.isAndroid || Platform.isIOS) {
     if (!await Gal.requestAccess()) throw const SaveDenied();
     final dot = name.lastIndexOf('.');
@@ -44,15 +82,10 @@ Future<String?> saveToDevice(Uint8List bytes, String name) async {
     return 'gallery';
   }
 
-  final location = await getSaveLocation(
-    suggestedName: name,
-    acceptedTypeGroups: [
-      XTypeGroup(label: 'Images', extensions: imageExtensions.toList()),
-    ],
-  );
-  if (location == null) return null;
-  await File(location.path).writeAsBytes(bytes);
-  return location.path;
+  final path = await pickLocation(name);
+  if (path == null) return null;
+  await writeNewFile(path, bytes);
+  return path;
 }
 
 String? _sniffedExtension(List<int> b) {
@@ -136,6 +169,8 @@ Future<SaveResult> saveImage(
     return SaveResult(SaveOutcome.saved, location);
   } on SaveDenied {
     return const SaveResult(SaveOutcome.denied);
+  } on PathExistsException {
+    return const SaveResult(SaveOutcome.exists);
   } catch (_) {
     return const SaveResult(SaveOutcome.failed);
   }
@@ -147,6 +182,7 @@ String? saveMessage(SaveResult result) {
     SaveOutcome.saved => 'Saved to ${result.location}',
     SaveOutcome.cancelled => null,
     SaveOutcome.denied => 'Permission to save images was denied',
+    SaveOutcome.exists => 'A file with that name already exists',
     SaveOutcome.failed => 'Could not save this image',
   };
 }
