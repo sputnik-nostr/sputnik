@@ -1,4 +1,4 @@
-.PHONY: all run fmt test image dist check clean
+.PHONY: all run fmt test warn-uncommitted image dist check clean
 
 NOSTR_SECP256K1_LIB := build/linux/x64/release/libnostr_secp256k1.so
 NOSTR_SECP256K1_SRCS := src/nostr_secp256k1.c src/nostr_secp256k1.h \
@@ -8,8 +8,11 @@ NOSTR_SECP256K1_SRCS := src/nostr_secp256k1.c src/nostr_secp256k1.h \
 DOCKER_IMAGE := sputnik-build
 DOCKER_RUN := docker run --rm -v "$(CURDIR):/src:ro" \
 	-e HOST_UID="$${SUDO_UID:-$$(id -u)}" -e HOST_GID="$${SUDO_GID:-$$(id -g)}"
-WARN_DIRTY := test -z "$$(git status --porcelain)" || \
-	echo "warning: only committed changes are used" >&2
+# The image and the build script are cut out of the commit, like the sources
+# that the container clones from it, so what is built is what the commit says.
+# For the rest of the command, $$tmp holds contrib/ as committed.
+HEAD_CONTRIB := tmp="$$(mktemp -d)" && trap 'rm -rf "$$tmp"' EXIT && \
+	chmod 755 "$$tmp" && git archive HEAD contrib | tar -x -C "$$tmp" &&
 
 all: fmt
 
@@ -23,17 +26,21 @@ $(NOSTR_SECP256K1_LIB): $(NOSTR_SECP256K1_SRCS)
 	flutter build linux --release
 	touch $@
 
-image:
-	docker build -t $(DOCKER_IMAGE) -f contrib/Dockerfile contrib
+warn-uncommitted:
+	@test -z "$$(git status --porcelain)" || \
+		echo "warning: uncommitted changes are not built, only commit $$(git rev-parse --short HEAD)" >&2
 
-dist: image
-	@$(WARN_DIRTY)
+image: warn-uncommitted
+	$(HEAD_CONTRIB) docker build -t $(DOCKER_IMAGE) -f "$$tmp/contrib/Dockerfile" "$$tmp/contrib"
+
+dist: warn-uncommitted image
 	mkdir -p dist
-	$(DOCKER_RUN) -v "$(CURDIR)/dist:/out" $(DOCKER_IMAGE) /src/contrib/docker_build.sh dist
+	$(HEAD_CONTRIB) $(DOCKER_RUN) -v "$(CURDIR)/dist:/out" -v "$$tmp/contrib:/contrib:ro" \
+		$(DOCKER_IMAGE) /contrib/docker_build.sh dist
 
-check: image
-	@$(WARN_DIRTY)
-	$(DOCKER_RUN) $(DOCKER_IMAGE) /src/contrib/docker_build.sh check
+check: warn-uncommitted image
+	$(HEAD_CONTRIB) $(DOCKER_RUN) -v "$$tmp/contrib:/contrib:ro" \
+		$(DOCKER_IMAGE) /contrib/docker_build.sh check
 
 fmt:
 	dart format .
