@@ -17,6 +17,11 @@ abstract class SecretStore {
   Future<void> delete(String key);
 }
 
+/// flutter_secure_storage, which stores entries differently per platform. On
+/// Android each one is encrypted on its own, but entry names stay plaintext.
+/// On Linux they all share one libsecret item, a JSON object that is decrypted
+/// whole on every call and found by the application ID, so changing that ID
+/// hides every key until they are migrated.
 class _SecureSecretStore implements SecretStore {
   const _SecureSecretStore();
 
@@ -237,7 +242,7 @@ class SettingsStore {
     }
   }
 
-  /// One secure-storage entry per identity, read only when needed.
+  /// Read from secure storage each time it is needed, never cached.
   static Future<String?> loadPrivateKey(String pubkeyHex) {
     return secretStore.read('$_identitySecretPrefix$pubkeyHex');
   }
