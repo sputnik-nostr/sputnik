@@ -210,4 +210,44 @@ void main() {
       expect(find.text('${'n' * 99}...'), findsOneWidget);
     });
   });
+
+  group('a bio', () {
+    Future<void> pumpProfile(WidgetTester tester, String about) async {
+      profileCacheNotifier.value = {
+        _pubkey: NostrMetadata(name: 'Bob', about: about),
+      };
+      await tester.pumpWidget(
+        MaterialApp(home: ProfileScreen(pubkeyHex: _pubkey)),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('of up to 2,000 code units is shown whole', (tester) async {
+      final bio = 'word ' * 400;
+      await pumpProfile(tester, bio);
+
+      expect(bio.length, 2000);
+      expect(find.text(bio), findsOneWidget);
+    });
+
+    testWidgets('past that is cut, and ends with an ellipsis', (tester) async {
+      final bio = 'word ' * 4000;
+      await pumpProfile(tester, bio);
+
+      expect(find.text('${bio.substring(0, 2000)}...'), findsOneWidget);
+      expect(_longestParagraph(tester), lessThan(2100));
+    });
+
+    testWidgets('is cut as the engine would be slowest to lay it out', (
+      tester,
+    ) async {
+      // A letter and tens of thousands of its accents is a single cluster, and
+      // text that keeps changing direction takes a layout the longest.
+      for (final bio in ['a${'\u{301}' * 60000}', 'a\u{628}' * 30000]) {
+        await pumpProfile(tester, bio);
+
+        expect(_longestParagraph(tester), lessThan(2100));
+      }
+    });
+  });
 }

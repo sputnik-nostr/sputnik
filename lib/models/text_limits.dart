@@ -19,6 +19,9 @@ const maxPostLength = 10000;
 /// A name beside a note, on a profile or in a list of people.
 const maxNameLength = 100;
 
+/// A profile's bio.
+const maxBioLength = 2000;
+
 /// [text] cut to at most [maxLength] code units, after a whole grapheme
 /// cluster: never inside a surrogate pair, nor between a letter and its
 /// accent. A cluster longer than [maxLength] is dropped whole.

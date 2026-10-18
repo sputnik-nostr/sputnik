@@ -639,7 +639,11 @@ class _ProfileDetails extends StatelessWidget {
           ],
           if (bio != null && bio.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
-            LinkifiedText(bio, style: theme.textTheme.bodyMedium),
+            LinkifiedText(
+              bio,
+              style: theme.textTheme.bodyMedium,
+              maxLength: maxBioLength,
+            ),
           ],
           const SizedBox(height: 8),
           Row(
