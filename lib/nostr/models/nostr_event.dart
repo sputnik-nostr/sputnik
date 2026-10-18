@@ -48,6 +48,14 @@ const _nip01Escapes = {
   0x5c: r'\\',
 };
 
+/// The C0 controls without a short escape: U+0000-U+0007, U+000B and
+/// U+000E-U+001F.
+///
+/// NIP-01 says to hash them as they are, but nostr-tools, serde_json and
+/// strfry hash them as \u00xx, so software that hashes the other way than
+/// the signer rejects the event.
+final _unescapedControls = RegExp(r'[\x00-\x07\x0b\x0e-\x1f]');
+
 String _encodeString(String value) {
   if (!_needsEscape.hasMatch(value)) return '"$value"';
   final buffer = StringBuffer('"');
@@ -167,7 +175,16 @@ int compareNewestFirst(NostrEvent a, NostrEvent b) {
   return byTime != 0 ? byTime : a.id.compareTo(b.id);
 }
 
+/// Lone surrogates go first, so that removing a control between two halves
+/// can't join them into a character the author never wrote.
+String _signable(String text) =>
+    sanitizeUtf16(text).replaceAll(_unescapedControls, '');
+
 /// Builds and signs a NostrEvent with [secretKey], per NIP-01.
+///
+/// The controls that clients hash differently are removed from [tags] and
+/// [content] and lone surrogates replaced, so the ID can be computed only one
+/// way and the event holds exactly the text it commits to.
 NostrEvent signEvent({
   required SecretKey secretKey,
   required String pubkeyHex,
@@ -178,13 +195,17 @@ NostrEvent signEvent({
 }) {
   final createdAtSeconds =
       (createdAt ?? DateTime.now()).millisecondsSinceEpoch ~/ 1000;
+  final signedTags = [
+    for (final tag in tags) [for (final value in tag) _signable(value)],
+  ];
+  final signedContent = _signable(content);
 
   final serialized = _canonicalSerialization(
     pubkey: pubkeyHex,
     createdAt: createdAtSeconds,
     kind: kind,
-    tags: tags,
-    content: content,
+    tags: signedTags,
+    content: signedContent,
   );
   final idBytes = Uint8List.fromList(sha256.convert(serialized).bytes);
   final sigBytes = signSchnorrSignature(secretKey: secretKey, msg32: idBytes);
@@ -194,8 +215,8 @@ NostrEvent signEvent({
     pubkey: pubkeyHex,
     createdAt: DateTime.fromMillisecondsSinceEpoch(createdAtSeconds * 1000),
     kind: kind,
-    tags: tags,
-    content: content,
+    tags: signedTags,
+    content: signedContent,
     sig: hexEncode(sigBytes),
   );
 
