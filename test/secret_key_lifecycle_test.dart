@@ -88,31 +88,142 @@ void main() {
     });
   });
 
-  testWidgets('withSecretKey never lends a key that is not the identity\'s', (
-    tester,
-  ) async {
-    await SettingsStore.savePrivateKey(me.publicKeyHex, other.privateKeyHex);
-    final messenger = await pumpMessenger(tester);
-    var lent = false;
+  group('withSecretKey', () {
+    setUp(() async {
+      await SettingsStore.savePrivateKey(me.publicKeyHex, me.privateKeyHex);
+    });
 
-    final result = await tester.runAsync(
-      () => withSecretKey<String>(
+    testWidgets('lends a usable key and wipes it once use returns', (
+      tester,
+    ) async {
+      final messenger = await pumpMessenger(tester);
+      SecretKey? lent;
+
+      final result = await withSecretKey<String>(
         identity,
         messenger,
         signFailure: 'Could not sign',
         use: (secretKey) async {
-          lent = true;
+          lent = secretKey;
+          expect(isWiped(secretKey), isFalse);
+          return xonlyPubkeyHex(secretKey);
+        },
+      );
+
+      expect(result, me.publicKeyHex);
+      expect(isWiped(lent!), isTrue);
+    });
+
+    testWidgets('wipes the key when use rejects it as invalid', (tester) async {
+      final messenger = await pumpMessenger(tester);
+      SecretKey? lent;
+
+      final result = await withSecretKey<String>(
+        identity,
+        messenger,
+        signFailure: 'Could not sign',
+        use: (secretKey) async {
+          lent = secretKey;
+          throw ArgumentError('invalid secp256k1 secret key');
+        },
+      );
+      await tester.pump();
+
+      expect(result, isNull);
+      expect(find.text('Could not sign'), findsOneWidget);
+      expect(isWiped(lent!), isTrue);
+    });
+
+    testWidgets('wipes the key and passes on any other error', (tester) async {
+      final messenger = await pumpMessenger(tester);
+      SecretKey? lent;
+
+      await expectLater(
+        withSecretKey<String>(
+          identity,
+          messenger,
+          signFailure: 'Could not sign',
+          use: (secretKey) async {
+            lent = secretKey;
+            throw StateError('relay went away');
+          },
+        ),
+        throwsStateError,
+      );
+
+      expect(isWiped(lent!), isTrue);
+    });
+
+    testWidgets('wipes the key when use throws before returning a future', (
+      tester,
+    ) async {
+      final messenger = await pumpMessenger(tester);
+      SecretKey? lent;
+
+      await expectLater(
+        withSecretKey<String>(
+          identity,
+          messenger,
+          signFailure: 'Could not sign',
+          use: (secretKey) {
+            lent = secretKey;
+            throw StateError('failed synchronously');
+          },
+        ),
+        throwsStateError,
+      );
+
+      expect(isWiped(lent!), isTrue);
+    });
+
+    testWidgets('says so when the identity has no key', (tester) async {
+      SettingsStore.secretStore = FakeSecretStore();
+      final messenger = await pumpMessenger(tester);
+      var called = false;
+
+      final result = await withSecretKey<String>(
+        identity,
+        messenger,
+        signFailure: 'Could not sign',
+        use: (secretKey) async {
+          called = true;
           return 'signed';
         },
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    expect(result, isNull);
-    expect(lent, isFalse);
-    expect(
-      find.text("Could not find this identity's private key"),
-      findsOneWidget,
-    );
+      expect(result, isNull);
+      expect(called, isFalse);
+      expect(
+        find.text("Could not find this identity's private key"),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('never lends a key that is not the identity\'s', (
+      tester,
+    ) async {
+      await SettingsStore.savePrivateKey(me.publicKeyHex, other.privateKeyHex);
+      final messenger = await pumpMessenger(tester);
+      var called = false;
+
+      final result = await withSecretKey<String>(
+        identity,
+        messenger,
+        signFailure: 'Could not sign',
+        use: (secretKey) async {
+          called = true;
+          return 'signed';
+        },
+      );
+      await tester.pump();
+
+      expect(result, isNull);
+      expect(called, isFalse);
+      expect(
+        find.text("Could not find this identity's private key"),
+        findsOneWidget,
+      );
+    });
   });
 }
