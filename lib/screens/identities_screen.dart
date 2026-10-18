@@ -8,6 +8,7 @@ import '../models/identity.dart';
 import '../models/time_format.dart';
 import '../nostr/nostr.dart';
 import '../services/error_reporting.dart';
+import '../services/identity_store.dart';
 import '../services/publishing.dart';
 import '../services/settings_store.dart';
 import '../widgets/placeholder_tab.dart';
@@ -39,18 +40,10 @@ String _pubkeyHexOf(String seckeyHex) {
   }
 }
 
-Future<void> _addIdentity(String pubkeyHex, String privkeyHex) async {
-  // Save the secret first so an identity is never listed without one.
-  await SettingsStore.savePrivateKey(pubkeyHex, privkeyHex);
-  final identity = Identity(pubkeyHex: pubkeyHex, createdAt: DateTime.now());
-  identitiesNotifier.value = [...identitiesNotifier.value, identity];
-  activeIdentityPubkeyNotifier.value = identity.pubkeyHex;
-}
-
 Future<void> _generateIdentity(BuildContext context) async {
   try {
     final keyPair = generateNostrKeyPair();
-    await _addIdentity(keyPair.publicKeyHex, keyPair.privateKeyHex);
+    await IdentityStore.add(keyPair.publicKeyHex, keyPair.privateKeyHex);
   } catch (error, stack) {
     reportError('generating an identity', error, stack);
     if (context.mounted) {
@@ -142,7 +135,7 @@ Future<void> _importIdentity(BuildContext context) async {
   if (seckeyHex == null) return;
 
   try {
-    await _addIdentity(_pubkeyHexOf(seckeyHex), seckeyHex);
+    await IdentityStore.add(_pubkeyHexOf(seckeyHex), seckeyHex);
   } catch (error, stack) {
     reportError('importing an identity', error, stack);
     if (context.mounted) {
@@ -169,10 +162,8 @@ Future<void> _confirmDeleteIdentity(
   );
   if (!confirmed) return;
 
-  // The key goes first: if it can't be deleted the identity stays listed,
-  // instead of leaving a key behind that nothing refers to any more.
   try {
-    await SettingsStore.deletePrivateKey(identity.pubkeyHex);
+    await IdentityStore.remove(identity);
   } catch (error, stack) {
     reportError('deleting an identity', error, stack);
     if (context.mounted) {
@@ -180,17 +171,6 @@ Future<void> _confirmDeleteIdentity(
         const SnackBar(content: Text('Could not delete this key')),
       );
     }
-    return;
-  }
-
-  final remaining = identitiesNotifier.value
-      .where((i) => i.pubkeyHex != identity.pubkeyHex)
-      .toList();
-  identitiesNotifier.value = remaining;
-  if (activeIdentityPubkeyNotifier.value == identity.pubkeyHex) {
-    activeIdentityPubkeyNotifier.value = remaining.isEmpty
-        ? null
-        : remaining.first.pubkeyHex;
   }
 }
 

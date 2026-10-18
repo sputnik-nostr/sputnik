@@ -19,6 +19,16 @@ class _UndeletableSecretStore extends FakeSecretStore {
   }
 }
 
+// Fails every write of the identity index, like a keyring that locked after
+// the identities were read.
+class _UnwritableIndexSecretStore extends FakeSecretStore {
+  @override
+  Future<void> write(String key, String value) {
+    if (key == 'identities') throw PlatformException(code: 'KeyringLocked');
+    return super.write(key, value);
+  }
+}
+
 void main() {
   setUp(() {
     // Without posts, HomeScreen's spinner keeps pumpAndSettle going forever.
@@ -127,6 +137,22 @@ void main() {
   const nsec =
       'nsec1vl029mgpspedva04g90vltkh6fvh240zqtv9k0t9af8935ke9laqsnlfe5';
 
+  testWidgets('a key pair that cannot be listed is not shown, and says so', (
+    tester,
+  ) async {
+    SettingsStore.secretStore = _UnwritableIndexSecretStore();
+    await openIdentitiesScreen(tester);
+
+    await tester.tap(find.byKey(const Key('generateIdentityButton')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isA<PlatformException>());
+    expect(find.text('Could not generate a key pair'), findsOneWidget);
+    expect(find.text('No identities yet'), findsOneWidget);
+    expect(identitiesNotifier.value, isEmpty);
+    expect(activeIdentityPubkeyNotifier.value, isNull);
+  });
+
   testWidgets('imports an nsec and makes it the active identity', (
     tester,
   ) async {
@@ -150,6 +176,25 @@ void main() {
       identitiesNotifier.value.single.pubkeyHex,
     );
   });
+
+  testWidgets(
+    'an imported key that cannot be listed is not shown, and says so',
+    (tester) async {
+      SettingsStore.secretStore = _UnwritableIndexSecretStore();
+      await openIdentitiesScreen(tester);
+
+      await tester.tap(find.byKey(const Key('importIdentityButton')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField), nsec);
+      await tester.tap(find.text('Import'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isA<PlatformException>());
+      expect(find.text('Could not import this key'), findsOneWidget);
+      expect(identitiesNotifier.value, isEmpty);
+      expect(activeIdentityPubkeyNotifier.value, isNull);
+    },
+  );
 
   testWidgets('rejects a malformed nsec without adding an identity', (
     tester,

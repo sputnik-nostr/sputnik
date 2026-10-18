@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_seed_color.dart';
 import '../models/identity.dart';
+import '../models/identity_index.dart';
 import '../models/relay.dart';
 import '../nostr/keys.dart';
 import 'error_reporting.dart';
@@ -180,53 +181,105 @@ class SettingsStore {
     await prefs.setStringList(_customRelaysKey, relays.toList());
   }
 
-  static Future<List<Identity>> loadIdentities() async {
+  /// The index change in progress, if any.
+  static Future<void>? _running;
+
+  /// Runs index changes one at a time. Each starts from the index in storage,
+  /// so none may begin before the one ahead of it has written.
+  static Future<T> _serialized<T>(Future<T> Function() change) async {
+    for (var running = _running; running != null; running = _running) {
+      await running;
+    }
+    final done = Completer<void>();
+    _running = done.future;
+    try {
+      return await change();
+    } finally {
+      _running = null;
+      done.complete();
+    }
+  }
+
+  static Future<IdentityIndex> _readIndex() async {
     final raw = await secretStore.read(_identitiesKey);
-    if (raw == null) return [];
+    return raw == null ? IdentityIndex.empty : IdentityIndex.parse(raw);
+  }
 
-    final decoded = jsonDecode(raw) as List<dynamic>;
-    final identities = <Identity>[];
-    var migratedAny = false;
-    var migrationFailed = false;
+  /// Stores [value] and reads it back, so it only counts as stored once it
+  /// can be read again.
+  static Future<void> _writeVerified(String key, String value) async {
+    await secretStore.write(key, value);
+    if (await secretStore.read(key) != value) {
+      throw StateError('secure storage did not keep $key');
+    }
+  }
 
-    for (final item in decoded) {
-      final Identity identity;
-      final String? legacyPrivkeyHex;
+  /// The identity index, after moving any private key that an older version
+  /// stored inside it into an entry of its own.
+  ///
+  /// Throws if the index can't be read. Until it can, nothing may be added or
+  /// removed: every change starts from the index in storage.
+  static Future<IdentityIndex> loadIdentityIndex() => _serialized(() async {
+    final index = await _readIndex();
+
+    var migrated = index;
+    for (final inline in index.inlineKeys) {
       try {
-        final map = item as Map<String, dynamic>;
-        identity = Identity.fromJson(map);
-        final legacy = map['privkeyHex'];
-        legacyPrivkeyHex = legacy is String ? legacy : null;
-      } catch (_) {
-        // Skip malformed identity entries.
-        continue;
-      }
-      identities.add(identity);
-      if (legacyPrivkeyHex == null) continue;
-
-      // Migrate a private key that used to live inline here.
-      try {
-        if (await loadPrivateKey(identity.pubkeyHex) == null) {
-          await savePrivateKey(identity.pubkeyHex, legacyPrivkeyHex);
+        if (await loadPrivateKey(inline.pubkeyHex) == null) {
+          await _writeVerified(
+            '$_identitySecretPrefix${inline.pubkeyHex}',
+            inline.privkeyHex,
+          );
         }
-        migratedAny = true;
-      } catch (_) {
-        migrationFailed = true;
+        migrated = migrated.withoutInlineKey(inline.pubkeyHex);
+      } catch (error, stack) {
+        // The key stays inline, and in every later write, until it is stored.
+        reportError('moving a private key out of the index', error, stack);
       }
     }
+    if (migrated.encode() == index.encode()) return index;
 
-    // Rewriting the index would drop an inline key that failed to migrate.
-    if (migratedAny && !migrationFailed) await saveIdentities(identities);
+    try {
+      await _writeVerified(_identitiesKey, migrated.encode());
+    } catch (error, stack) {
+      reportError('saving the identity index', error, stack);
+      return index;
+    }
+    return migrated;
+  });
 
-    return identities;
-  }
+  /// Stores [privkeyHex] for [identity] and lists the identity.
+  ///
+  /// The key goes first, so an identity is never listed without one. Throws if
+  /// either can't be saved, and then the identity is not listed.
+  static Future<IdentityIndex> addIdentity(
+    Identity identity,
+    String privkeyHex,
+  ) => _serialized(() async {
+    final index = await _readIndex();
+    if (index.contains(identity.pubkeyHex)) return index;
 
-  static Future<void> saveIdentities(List<Identity> identities) async {
-    await secretStore.write(
-      _identitiesKey,
-      jsonEncode([for (final identity in identities) identity.toJson()]),
+    await _writeVerified(
+      '$_identitySecretPrefix${identity.pubkeyHex}',
+      privkeyHex,
     );
-  }
+    final next = index.withIdentity(identity);
+    await _writeVerified(_identitiesKey, next.encode());
+    return next;
+  });
+
+  /// Deletes the key of [pubkeyHex], then unlists the identity.
+  ///
+  /// Throws if the key can't be deleted, and then the identity stays listed:
+  /// unlisting it first would leave a key that nothing refers to any more.
+  static Future<IdentityIndex> removeIdentity(String pubkeyHex) =>
+      _serialized(() async {
+        final index = await _readIndex();
+        await secretStore.delete('$_identitySecretPrefix$pubkeyHex');
+        final next = index.without(pubkeyHex);
+        await _writeVerified(_identitiesKey, next.encode());
+        return next;
+      });
 
   static Future<String?> loadActiveIdentityPubkey() async {
     final prefs = await SharedPreferences.getInstance();
@@ -273,10 +326,6 @@ class SettingsStore {
 
   static Future<void> savePrivateKey(String pubkeyHex, String privkeyHex) {
     return secretStore.write('$_identitySecretPrefix$pubkeyHex', privkeyHex);
-  }
-
-  static Future<void> deletePrivateKey(String pubkeyHex) {
-    return secretStore.delete('$_identitySecretPrefix$pubkeyHex');
   }
 
   static Future<bool?> loadLoadProfileImages() =>

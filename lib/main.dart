@@ -10,6 +10,7 @@ import 'screens/root_screen.dart';
 import 'services/bookmark_store.dart';
 import 'services/cache_store.dart';
 import 'services/feed_loader.dart';
+import 'services/identity_store.dart';
 import 'services/settings_store.dart';
 import 'services/ssrf_guard.dart';
 import 'services/video_store.dart';
@@ -45,11 +46,7 @@ Future<void> main() async {
       SettingsStore.loadCustomRelays,
       SettingsStore.saveCustomRelays,
     ),
-    bindPersisted(
-      identitiesNotifier,
-      SettingsStore.loadIdentities,
-      SettingsStore.saveIdentities,
-    ),
+    IdentityStore.load(),
     bindPersisted(
       activeIdentityPubkeyNotifier,
       SettingsStore.loadActiveIdentityPubkey,
