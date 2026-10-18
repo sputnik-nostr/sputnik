@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../models/avatar_initial.dart';
 import '../models/note.dart';
+import '../models/text_limits.dart';
 import '../models/time_format.dart';
 import '../nostr/nostr.dart';
 import '../screens/compose_screen.dart';
@@ -56,9 +57,14 @@ class NoteTile extends StatelessWidget {
                         color: theme.colorScheme.outline,
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        '${note.repostedByDisplayName} reposted',
-                        style: theme.metadata,
+                      Flexible(
+                        child: Text(
+                          '${boundedName(note.repostedByDisplayName ?? '')} '
+                          'reposted',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.metadata,
+                        ),
                       ),
                     ],
                   ),
@@ -89,7 +95,7 @@ class NoteTile extends StatelessWidget {
                             child: GestureDetector(
                               onTap: () => openProfile(context, note.pubkey),
                               child: Text(
-                                note.displayName,
+                                boundedName(note.displayName),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.avatarName,

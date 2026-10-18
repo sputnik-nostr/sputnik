@@ -188,7 +188,11 @@ class _LinkifiedTextState extends State<LinkifiedText> {
   }
 
   String _mentionLabel(String pubkeyHex, NostrMetadata? metadata) {
-    final name = metadata?.resolvedName?.replaceAll(RegExp(r'\s+'), ' ');
+    // A name can be as long as a relay lets it, and is read on every build.
+    final resolved = metadata?.resolvedName;
+    final name = resolved == null
+        ? null
+        : truncateText(resolved, maxNameLength).replaceAll(RegExp(r'\s+'), ' ');
     if (name == null || name.isEmpty) {
       return '@${truncateNpub(npubFromHex(pubkeyHex))}';
     }

@@ -166,4 +166,22 @@ void main() {
       }
     });
   });
+
+  group('boundedName', () {
+    test('leaves a name that fits as it is', () {
+      final name = 'n' * 100;
+
+      expect(identical(boundedName(name), name), isTrue);
+      expect(boundedName(''), '');
+    });
+
+    test('cuts a longer name and says so', () {
+      expect(boundedName('n' * 101), '${'n' * 100}...');
+      expect(boundedName('n' * 100000), '${'n' * 100}...');
+    });
+
+    test('does not leave half an emoji at the cut', () {
+      expect(boundedName('${'n' * 99}\u{1F600}${'m' * 10}'), '${'n' * 99}...');
+    });
+  });
 }

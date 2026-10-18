@@ -267,6 +267,39 @@ void main() {
       expect(_shown(tester), '@${'a' * 36}...');
     });
 
+    testWidgets('a mention reads only the start of a long name', (
+      tester,
+    ) async {
+      // Every one of the 200 mentions takes its label from the name, and does
+      // so again on every build: reading all of this one takes seconds.
+      final pubkey = hexFromNpub(_npub.substring('nostr:'.length))!;
+      final mentions = List.filled(200, _npub).join(' ');
+      Future<Duration> pumpMentions(String name) async {
+        profileCacheNotifier.value = {pubkey: NostrMetadata(name: name)};
+        final watch = Stopwatch()..start();
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: LinkifiedText(mentions, maxLength: mentions.length),
+              ),
+            ),
+          ),
+        );
+        return watch.elapsed;
+      }
+
+      // The first build of anything is slow, so it is not the one timed.
+      await pumpMentions('Bob');
+      final elapsed = await pumpMentions('ab ' * 100000);
+
+      final links = _links(tester);
+      expect(links, hasLength(200));
+      expect(links.first.text, '@${('ab ' * 13).substring(0, 37)}...');
+      // Well over what laying out the mentions takes, well under reading it.
+      expect(elapsed, lessThan(const Duration(seconds: 2)));
+    });
+
     testWidgets('costs about the same as a short note, whatever it holds', (
       tester,
     ) async {

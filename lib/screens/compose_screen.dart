@@ -296,7 +296,10 @@ class _ReplyContext extends StatelessWidget {
             TextSpan(
               text: 'Replying to ',
               children: [
-                TextSpan(text: note.displayName, style: theme.avatarName),
+                TextSpan(
+                  text: boundedName(note.displayName),
+                  style: theme.avatarName,
+                ),
               ],
             ),
             maxLines: 1,

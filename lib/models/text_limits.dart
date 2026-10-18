@@ -16,6 +16,9 @@ const maxNoteLength = 8000;
 /// twice what a row does.
 const maxPostLength = 10000;
 
+/// A name beside a note, on a profile or in a list of people.
+const maxNameLength = 100;
+
 /// [text] cut to at most [maxLength] code units, after a whole grapheme
 /// cluster: never inside a surrogate pair, nor between a letter and its
 /// accent. A cluster longer than [maxLength] is dropped whole.
@@ -34,4 +37,10 @@ String truncateText(String text, int maxLength) {
     end = next;
   }
   return text.substring(0, end);
+}
+
+/// [name] as it is shown: cut to [maxNameLength], with "..." where it was.
+String boundedName(String name) {
+  final cut = truncateText(name, maxNameLength);
+  return cut.length == name.length ? name : '$cut...';
 }

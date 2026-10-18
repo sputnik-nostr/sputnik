@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../models/avatar_initial.dart';
 import '../models/note.dart';
+import '../models/text_limits.dart';
 import '../models/time_format.dart';
 import '../nostr/nostr.dart';
 import '../services/error_reporting.dart';
@@ -363,7 +364,7 @@ class _PostHeader extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            note.displayName,
+                            boundedName(note.displayName),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.avatarName,
