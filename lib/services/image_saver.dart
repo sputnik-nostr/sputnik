@@ -84,24 +84,30 @@ String _decoded(String segment) {
   }
 }
 
-/// A safe file name for [bytes] fetched from [url], whatever the URL claims.
-String imageFileName(String url, List<int> bytes) {
-  final uri = Uri.tryParse(url);
-  final last = uri == null ? '' : _decoded(lastPathSegment(uri));
-  final dot = last.lastIndexOf('.');
-  var stem = (dot > 0 ? last.substring(0, dot) : last)
-      .replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_')
-      .replaceFirst(RegExp(r'^\.+'), '');
-  if (stem.length > 60) stem = stem.substring(0, 60);
-  if (stem.isEmpty) stem = 'image';
+final _unsafeNameChars = RegExp(r'[^A-Za-z0-9_-]');
+final _nameEdges = RegExp(r'^[_-]+|[_-]+$');
 
-  final urlExtension = uri == null ? '' : extensionOf(uri).toLowerCase();
-  final extension =
-      _sniffedExtension(bytes) ??
-      (imageExtensions.contains(urlExtension.replaceFirst('.', ''))
-          ? urlExtension
-          : '');
-  return '$stem$extension';
+/// The name in [url] reduced to letters, digits, `_` and `-`, with no dots
+/// to pass for an extension and nothing that reads as hidden or an option.
+String _nameStem(String url) {
+  final uri = Uri.tryParse(url);
+  var name = uri == null ? '' : _decoded(lastPathSegment(uri));
+  // What follows the last dot says nothing about the bytes, so it goes.
+  final dot = name.lastIndexOf('.');
+  if (dot > 0) name = name.substring(0, dot);
+
+  var stem = name.replaceAll(_unsafeNameChars, '_');
+  if (stem.length > 60) stem = stem.substring(0, 60);
+  stem = stem.replaceAll(_nameEdges, '');
+  return stem.isEmpty ? 'image' : stem;
+}
+
+/// A safe file name for [bytes] fetched from [url]: a plain stem from the URL
+/// and the extension of the format the bytes really are. Null if they are not
+/// an image we save, since nothing the URL says makes them one.
+String? imageFileName(String url, List<int> bytes) {
+  final extension = _sniffedExtension(bytes);
+  return extension == null ? null : '${_nameStem(url)}$extension';
 }
 
 Future<Uint8List> _fetchOriginal(MediaSource source) {
@@ -121,8 +127,11 @@ Future<SaveResult> saveImage(
     return const SaveResult(SaveOutcome.failed);
   }
 
+  final name = imageFileName(source.url, bytes);
+  if (name == null) return const SaveResult(SaveOutcome.failed);
+
   try {
-    final location = await backend(bytes, imageFileName(source.url, bytes));
+    final location = await backend(bytes, name);
     if (location == null) return const SaveResult(SaveOutcome.cancelled);
     return SaveResult(SaveOutcome.saved, location);
   } on SaveDenied {
