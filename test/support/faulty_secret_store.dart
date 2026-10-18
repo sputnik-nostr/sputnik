@@ -61,6 +61,9 @@ class FaultySecretStore implements SecretStore {
   Future<String?> read(String key) => _call('read $key', () => inner.read(key));
 
   @override
+  Future<Map<String, String>> readAll() => _call('readAll', inner.readAll);
+
+  @override
   Future<void> write(String key, String value) =>
       _call('write $key', () => inner.write(key, value));
 

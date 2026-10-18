@@ -29,6 +29,10 @@ class IdentityStore {
 
   static final status = ValueNotifier(IdentityStatus.ready);
 
+  /// Keys in secure storage that no identity refers to, which the user can
+  /// list again: left over from an identity that never made it into the index.
+  static final unlisted = ValueNotifier<List<UnlistedKey>>(const []);
+
   /// Reads the identities and the active one from secure storage, and again to
   /// retry. Never throws: if they can't be read, [status] says so.
   static Future<void> load() async {
@@ -47,6 +51,12 @@ class IdentityStore {
     activeIdentityPubkeyNotifier
       ..removeListener(_saveActive)
       ..addListener(_saveActive);
+
+    try {
+      unlisted.value = await SettingsStore.reconcileStoredKeys();
+    } catch (error, stack) {
+      reportError('looking for keys that are not listed', error, stack);
+    }
   }
 
   static var _activeSaved = Future<void>.value();
@@ -72,6 +82,7 @@ class IdentityStore {
   static void reset() {
     activeIdentityPubkeyNotifier.removeListener(_saveActive);
     status.value = IdentityStatus.ready;
+    unlisted.value = const [];
   }
 
   static void _requireReady() {
@@ -89,6 +100,7 @@ class IdentityStore {
       privkeyHex,
     );
     identitiesNotifier.value = index.identities;
+    _noLongerUnlisted(pubkeyHex);
     activeIdentityPubkeyNotifier.value = pubkeyHex;
   }
 
@@ -104,5 +116,23 @@ class IdentityStore {
           ? null
           : remaining.first.pubkeyHex;
     }
+  }
+
+  /// Lists the identity of [key] again, as the active one if there is none.
+  /// Throws, with nothing changed, if that can't be saved.
+  static Future<void> restore(UnlistedKey key) async {
+    _requireReady();
+    final index = await SettingsStore.restoreIdentity(key);
+    identitiesNotifier.value = index.identities;
+    _noLongerUnlisted(key.pubkeyHex);
+    activeIdentityPubkeyNotifier.value ??= key.pubkeyHex;
+  }
+
+  /// A key whose identity is listed now, however it got there, is not on offer.
+  static void _noLongerUnlisted(String pubkeyHex) {
+    unlisted.value = [
+      for (final key in unlisted.value)
+        if (key.pubkeyHex != pubkeyHex) key,
+    ];
   }
 }

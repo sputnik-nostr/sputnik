@@ -14,6 +14,8 @@ import 'package:sputnik/services/identity_store.dart';
 import 'package:sputnik/services/settings_store.dart';
 
 import 'support/fake_secret_store.dart';
+import 'support/faulty_secret_store.dart';
+import 'support/identity_storage.dart';
 
 // Refuses to delete anything, like a locked keyring whose prompt was dismissed.
 class _UndeletableSecretStore extends FakeSecretStore {
@@ -302,6 +304,97 @@ void main() {
       expect(find.text('Could not read your identities'), findsOneWidget);
       expect(disabled(tester, 'generateIdentityButton'), isTrue);
       expect(identitiesNotifier.value, isEmpty);
+    });
+  });
+
+  group('keys that no identity refers to', () {
+    final lost = generateNostrKeyPair();
+    late FakeSecretStore store;
+
+    setUp(() {
+      store = FakeSecretStore({
+        'identity_secret_${lost.publicKeyHex}': lost.privateKeyHex,
+      });
+      SettingsStore.secretStore = store;
+    });
+
+    testWidgets(
+      'are offered instead of "No identities yet", and listed on Add',
+      (tester) async {
+        await IdentityStore.load();
+        await openIdentitiesScreen(tester);
+
+        expect(find.text('No identities yet'), findsNothing);
+        expect(
+          find.text('Found on this device, but not in your list'),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.text('Add'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Found on this device, but not in your list'),
+          findsNothing,
+        );
+        expect(identitiesNotifier.value.single.pubkeyHex, lost.publicKeyHex);
+        expect(activeIdentityPubkeyNotifier.value, lost.publicKeyHex);
+        expect(find.byType(ListTile), findsOneWidget);
+        expect(
+          (await SettingsStore.loadIdentityIndex()).identities.single.pubkeyHex,
+          lost.publicKeyHex,
+        );
+      },
+    );
+
+    testWidgets('are offered after the identities that are listed', (
+      tester,
+    ) async {
+      final held = generateNostrKeyPair();
+      store = FakeSecretStore({
+        ...store.values,
+        ...currentStorage([
+          (
+            identity: Identity(
+              pubkeyHex: held.publicKeyHex,
+              createdAt: DateTime(2026),
+            ),
+            privkeyHex: held.privateKeyHex,
+          ),
+        ]),
+      });
+      SettingsStore.secretStore = store;
+      await IdentityStore.load();
+      await openIdentitiesScreen(tester);
+
+      final tiles = tester.widgetList<ListTile>(find.byType(ListTile)).toList();
+      expect(tiles, hasLength(2));
+      expect(
+        (tiles.first.title as Text).data,
+        truncateNpub(npubFromHex(held.publicKeyHex)),
+      );
+      expect(tiles.last.trailing, isA<TextButton>());
+    });
+
+    testWidgets('stay offered, with a message, when they cannot be added', (
+      tester,
+    ) async {
+      await IdentityStore.load();
+      await openIdentitiesScreen(tester);
+      // Reading the index, reading the key, then writing the index fails.
+      SettingsStore.secretStore = FaultySecretStore(store, failCall: 3);
+
+      await tester.tap(find.text('Add'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isA<StateError>());
+      expect(find.text('Could not add this key'), findsOneWidget);
+      expect(
+        find.text('Found on this device, but not in your list'),
+        findsOneWidget,
+      );
+      expect(identitiesNotifier.value, isEmpty);
+      expect(store.values.keys, ['identity_secret_${lost.publicKeyHex}']);
     });
   });
 

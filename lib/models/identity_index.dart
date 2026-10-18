@@ -77,6 +77,19 @@ class IdentityIndex {
     return null;
   }
 
+  /// Whether the index accounts for the key entry [name]: it is the slot of an
+  /// identity, or it is named after the pubkey of one that has no slot yet.
+  bool refersTo(String name) {
+    for (final entry in _entries) {
+      if (entry is! Map<String, dynamic>) continue;
+      final slot = entry['slot'];
+      if (slot is String ? slot == name : entry['pubkeyHex'] == name) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /// Identities whose private key is not in a slot yet, or is still inline.
   Iterable<KeyToMove> get keysToMove sync* {
     for (final entry in _entries) {

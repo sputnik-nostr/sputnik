@@ -174,6 +174,19 @@ Future<void> _confirmDeleteIdentity(
   }
 }
 
+Future<void> _restoreKey(BuildContext context, UnlistedKey key) async {
+  try {
+    await IdentityStore.restore(key);
+  } catch (error, stack) {
+    reportError('listing a stored key again', error, stack);
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not add this key')));
+    }
+  }
+}
+
 Future<void> _showNsec(BuildContext context, Identity identity) async {
   final reveal = await confirmAction(
     context,
@@ -278,35 +291,42 @@ class IdentitiesScreen extends StatelessWidget {
               ? _IdentitiesUnavailable(
                   retrying: status == IdentityStatus.loading,
                 )
-              : ValueListenableBuilder<List<Identity>>(
-                  valueListenable: identitiesNotifier,
-                  builder: (context, identities, _) {
-                    if (identities.isEmpty) {
+              : AnimatedBuilder(
+                  animation: Listenable.merge([
+                    identitiesNotifier,
+                    activeIdentityPubkeyNotifier,
+                    IdentityStore.unlisted,
+                  ]),
+                  builder: (context, _) {
+                    final identities = identitiesNotifier.value;
+                    final unlisted = IdentityStore.unlisted.value;
+                    if (identities.isEmpty && unlisted.isEmpty) {
                       return const PlaceholderTab(
                         icon: Icons.key_outlined,
                         label: 'No identities yet',
                       );
                     }
 
-                    return ValueListenableBuilder<String?>(
-                      valueListenable: activeIdentityPubkeyNotifier,
-                      builder: (context, activePubkey, _) {
-                        return ListView(
-                          children: [
-                            for (final identity in identities)
-                              _IdentityTile(
-                                identity: identity,
-                                active: identity.pubkeyHex == activePubkey,
-                                onSelect: () =>
-                                    activeIdentityPubkeyNotifier.value =
-                                        identity.pubkeyHex,
-                                onShowNsec: () => _showNsec(context, identity),
-                                onDelete: () =>
-                                    _confirmDeleteIdentity(context, identity),
-                              ),
-                          ],
-                        );
-                      },
+                    return ListView(
+                      children: [
+                        for (final identity in identities)
+                          _IdentityTile(
+                            identity: identity,
+                            active:
+                                identity.pubkeyHex ==
+                                activeIdentityPubkeyNotifier.value,
+                            onSelect: () => activeIdentityPubkeyNotifier.value =
+                                identity.pubkeyHex,
+                            onShowNsec: () => _showNsec(context, identity),
+                            onDelete: () =>
+                                _confirmDeleteIdentity(context, identity),
+                          ),
+                        for (final key in unlisted)
+                          _UnlistedKeyTile(
+                            pubkeyHex: key.pubkeyHex,
+                            onAdd: () => _restoreKey(context, key),
+                          ),
+                      ],
                     );
                   },
                 ),
@@ -350,6 +370,25 @@ class _IdentitiesUnavailable extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A key found in secure storage that the list of identities does not have.
+class _UnlistedKeyTile extends StatelessWidget {
+  const _UnlistedKeyTile({required this.pubkeyHex, required this.onAdd});
+
+  final String pubkeyHex;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      key: ValueKey('unlisted-$pubkeyHex'),
+      leading: const Icon(Icons.help_outline),
+      title: Text(truncateNpub(npubFromHex(pubkeyHex))),
+      subtitle: const Text('Found on this device, but not in your list'),
+      trailing: TextButton(onPressed: onAdd, child: const Text('Add')),
     );
   }
 }

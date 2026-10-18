@@ -16,6 +16,7 @@ import 'error_reporting.dart';
 /// Storage seam so tests can fake [SettingsStore.secretStore].
 abstract class SecretStore {
   Future<String?> read(String key);
+  Future<Map<String, String>> readAll();
   Future<void> write(String key, String value);
   Future<void> delete(String key);
 }
@@ -36,6 +37,9 @@ class _SecureSecretStore implements SecretStore {
 
   @override
   Future<String?> read(String key) => _storage.read(key: key);
+
+  @override
+  Future<Map<String, String>> readAll() => _storage.readAll();
 
   @override
   Future<void> write(String key, String value) =>
@@ -70,6 +74,10 @@ Future<void> bindPersisted<T>(
     });
   });
 }
+
+/// A private key in secure storage that no identity in the index refers to,
+/// stored under [name]: the identity it belongs to is [pubkeyHex].
+typedef UnlistedKey = ({String name, String pubkeyHex});
 
 class SettingsStore {
   SettingsStore._();
@@ -381,6 +389,76 @@ class SettingsStore {
         // The copy older versions named after the pubkey, if never moved.
         await secretStore.delete(_secretName(pubkeyHex));
         final next = index.without(pubkeyHex);
+        await _writeVerified(_identitiesKey, next.encode());
+        return next;
+      });
+
+  /// Looks through the private keys in secure storage for ones the index does
+  /// not account for, such as a key whose identity never made it into the
+  /// index, and returns those of identities that are not listed so that they
+  /// can be listed again.
+  ///
+  /// Any other copy of the key of a listed identity, which a failure part way
+  /// through a move can leave behind, is deleted when the identity's own entry
+  /// holds the same key.
+  ///
+  /// This hands every stored key to the app for as long as it takes to look at
+  /// it, so it is not meant to run more often than a start.
+  static Future<List<UnlistedKey>> reconcileStoredKeys() =>
+      _serialized(() async {
+        final index = await _readIndex();
+        final stored = await secretStore.readAll();
+        final unlisted = <UnlistedKey>[];
+        final strayCopies = <String>[];
+        for (final entry in stored.entries) {
+          if (!entry.key.startsWith(_identitySecretPrefix)) continue;
+          final name = entry.key.substring(_identitySecretPrefix.length);
+          if (index.refersTo(name)) continue;
+          final pubkeyHex = _pubkeyHexOf(entry.value);
+          if (pubkeyHex == null) continue;
+
+          if (!index.contains(pubkeyHex)) {
+            if (unlisted.every((key) => key.pubkeyHex != pubkeyHex)) {
+              unlisted.add((name: name, pubkeyHex: pubkeyHex));
+            }
+            continue;
+          }
+          final own = stored[_secretName(index.slotOf(pubkeyHex) ?? pubkeyHex)];
+          if (own == entry.value) strayCopies.add(name);
+        }
+
+        for (final name in strayCopies) {
+          try {
+            await secretStore.delete(_secretName(name));
+          } catch (error, stack) {
+            reportError('deleting a stray copy of a private key', error, stack);
+          }
+        }
+        return unlisted..sort((a, b) => a.pubkeyHex.compareTo(b.pubkeyHex));
+      });
+
+  /// Lists the identity of [key] again, with the key where it is.
+  ///
+  /// Throws if the key is gone or no longer the identity's, and then nothing
+  /// is changed.
+  static Future<IdentityIndex> restoreIdentity(UnlistedKey key) =>
+      _serialized(() async {
+        final index = await _readIndex();
+        if (index.contains(key.pubkeyHex)) return index;
+
+        final stored = await secretStore.read(_secretName(key.name));
+        if (stored == null || _pubkeyHexOf(stored) != key.pubkeyHex) {
+          throw StateError('the key is no longer stored');
+        }
+        final identity = Identity(
+          pubkeyHex: key.pubkeyHex,
+          createdAt: DateTime.now(),
+        );
+        // A key named after its pubkey has no slot: the next start moves it.
+        final next = index.withIdentity(
+          identity,
+          slot: key.name == key.pubkeyHex ? null : key.name,
+        );
         await _writeVerified(_identitiesKey, next.encode());
         return next;
       });

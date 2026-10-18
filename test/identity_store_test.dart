@@ -194,6 +194,135 @@ void main() {
     });
   });
 
+  group('keys that no identity refers to', () {
+    late HeldIdentity listed;
+    late HeldIdentity lost;
+    late UnlistedKey lostKey;
+
+    setUp(() {
+      listed = newHeldIdentity();
+      lost = newHeldIdentity();
+      lostKey = (name: lost.pubkeyHex, pubkeyHex: lost.pubkeyHex);
+      store = FakeSecretStore({
+        ...currentStorage([listed]),
+        'identity_secret_${lost.pubkeyHex}': lost.privkeyHex,
+      });
+      SettingsStore.secretStore = store;
+    });
+
+    test('are offered once the identities are read', () async {
+      await IdentityStore.load();
+
+      expect(_shown(), [listed.pubkeyHex]);
+      expect(IdentityStore.unlisted.value, [lostKey]);
+    });
+
+    test('are not offered when the identities cannot be read', () async {
+      captureReportedErrors();
+      SettingsStore.secretStore = FaultySecretStore(store, failCall: 1);
+
+      await IdentityStore.load();
+
+      expect(IdentityStore.unlisted.value, isEmpty);
+    });
+
+    test('are not offered any more once they have been listed', () async {
+      await IdentityStore.load();
+      await IdentityStore.restore(lostKey);
+
+      await IdentityStore.load();
+
+      expect(IdentityStore.unlisted.value, isEmpty);
+    });
+
+    test('a search that fails does not fail the load', () async {
+      final reported = captureReportedErrors();
+      // Loading reads the index twice; the search reads it once more, then
+      // every stored key.
+      SettingsStore.secretStore = FaultySecretStore(store, failCall: 4);
+
+      await IdentityStore.load();
+
+      expect(IdentityStore.status.value, IdentityStatus.ready);
+      expect(_shown(), [listed.pubkeyHex]);
+      expect(IdentityStore.unlisted.value, isEmpty);
+      expect(reported, hasLength(1));
+    });
+
+    test(
+      'are listed again on request, as the active one if there is none',
+      () async {
+        store = FakeSecretStore({
+          'identity_secret_${lost.pubkeyHex}': lost.privkeyHex,
+        });
+        SettingsStore.secretStore = store;
+        await IdentityStore.load();
+
+        await IdentityStore.restore(lostKey);
+        await IdentityStore.activeSaved;
+
+        expect(_shown(), [lost.pubkeyHex]);
+        expect(activeIdentityPubkeyNotifier.value, lost.pubkeyHex);
+        expect(storedIndex(store.values).active, lost.pubkeyHex);
+        expect(IdentityStore.unlisted.value, isEmpty);
+        expect(
+          await SettingsStore.loadPrivateKey(lost.pubkeyHex),
+          lost.privkeyHex,
+        );
+      },
+    );
+
+    test('leave the active identity alone when listed again', () async {
+      await IdentityStore.load();
+      expect(activeIdentityPubkeyNotifier.value, listed.pubkeyHex);
+
+      await IdentityStore.restore(lostKey);
+
+      expect(_shown(), [listed.pubkeyHex, lost.pubkeyHex]);
+      expect(activeIdentityPubkeyNotifier.value, listed.pubkeyHex);
+    });
+
+    test('are not offered any more once the identity has been added', () async {
+      await IdentityStore.load();
+      expect(IdentityStore.unlisted.value, [lostKey]);
+
+      await IdentityStore.add(lost.pubkeyHex, lost.privkeyHex);
+
+      expect(IdentityStore.unlisted.value, isEmpty);
+      expect(_shown(), [listed.pubkeyHex, lost.pubkeyHex]);
+
+      // The next start drops the copy that was on offer: the key is kept in
+      // the slot of the identity that was added.
+      await IdentityStore.load();
+      expect(IdentityStore.unlisted.value, isEmpty);
+      expect(
+        store.values.containsKey('identity_secret_${lost.pubkeyHex}'),
+        isFalse,
+      );
+      expect(
+        await SettingsStore.loadPrivateKey(lost.pubkeyHex),
+        lost.privkeyHex,
+      );
+    });
+
+    test('stay on offer when listing them again fails', () async {
+      await IdentityStore.load();
+      // The index is read, then the key, then the index is written.
+      SettingsStore.secretStore = FaultySecretStore(store, failCall: 3);
+
+      await expectLater(IdentityStore.restore(lostKey), throwsStateError);
+
+      expect(_shown(), [listed.pubkeyHex]);
+      expect(IdentityStore.unlisted.value, [lostKey]);
+    });
+
+    test('cannot be listed while the identities are unknown', () async {
+      IdentityStore.status.value = IdentityStatus.unavailable;
+
+      await expectLater(IdentityStore.restore(lostKey), throwsStateError);
+    });
+  });
+
   group('the active identity', () {
     late HeldIdentity a;
     late HeldIdentity b;

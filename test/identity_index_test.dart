@@ -247,6 +247,37 @@ void main() {
     });
   });
 
+  group('the entries it refers to', () {
+    final index = IdentityIndex.parse(
+      jsonEncode([
+        entry(a, {'slot': 'slot-a'}),
+        entry(b),
+        // Not an identity this version can read, but it names a slot.
+        {'pubkeyHex': c, 'slot': 'slot-c'},
+        'not an entry',
+      ]),
+    );
+
+    test('are the slots, also those of entries that cannot be parsed', () {
+      expect(index.refersTo('slot-a'), isTrue);
+      expect(index.refersTo('slot-c'), isTrue);
+    });
+
+    test('include the pubkey of an identity that has no slot yet', () {
+      expect(index.refersTo(b), isTrue);
+    });
+
+    test('do not include the pubkey of an identity that has a slot', () {
+      expect(index.refersTo(a), isFalse);
+      expect(index.refersTo(c), isFalse);
+    });
+
+    test('are nothing else', () {
+      expect(index.refersTo('slot-d'), isFalse);
+      expect(index.refersTo('not an entry'), isFalse);
+    });
+  });
+
   group('without', () {
     test('removes every entry that names the pubkey', () {
       final index = IdentityIndex.parse(

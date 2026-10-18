@@ -15,6 +15,9 @@ class FakeSecretStore implements SecretStore {
   Future<String?> read(String key) async => _values[key];
 
   @override
+  Future<Map<String, String>> readAll() async => values;
+
+  @override
   Future<void> write(String key, String value) async => _values[key] = value;
 
   @override
