@@ -1,24 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sputnik/nostr/nostr.dart';
 
-import 'support/in_memory_relay_client.dart';
-
-// A relay pool where only some of the queried relays answer.
-class _PartlyAnswering extends InMemoryRelayClient {
-  _PartlyAnswering(super.events, {required this.answered});
-
-  int answered;
-
-  @override
-  Future<RelayQueryResult> queryWithStatus(
-    Set<String> relayUrls,
-    NostrFilter filter,
-  ) async => RelayQueryResult(
-    events: await query(relayUrls, filter),
-    answeredRelays: answered,
-    queriedRelays: relayUrls.length,
-  );
-}
+import 'support/partly_answering_relay_client.dart';
 
 void main() {
   final me = generateNostrKeyPair();
@@ -56,7 +39,7 @@ void main() {
   }
 
   test('one relay of four answering is not enough to publish', () async {
-    final client = _PartlyAnswering([
+    final client = PartlyAnsweringRelayClient([
       contactList([alice], age: const Duration(days: 30)),
     ], answered: 1);
 
@@ -67,7 +50,7 @@ void main() {
   });
 
   test('exactly half of the relays answering is not enough', () async {
-    final client = _PartlyAnswering([
+    final client = PartlyAnsweringRelayClient([
       contactList([alice], age: const Duration(days: 30)),
     ], answered: 2);
 
@@ -77,7 +60,7 @@ void main() {
   });
 
   test('a majority answering with a list is enough', () async {
-    final client = _PartlyAnswering([
+    final client = PartlyAnsweringRelayClient([
       contactList([alice], age: const Duration(days: 30)),
     ], answered: 3);
 
@@ -90,7 +73,7 @@ void main() {
   });
 
   test('no relay answering never publishes a fresh list', () async {
-    final client = _PartlyAnswering([], answered: 0);
+    final client = PartlyAnsweringRelayClient([], answered: 0);
 
     await follow(client, bob);
 
@@ -98,7 +81,7 @@ void main() {
   });
 
   test('every relay answering with nothing starts a fresh list', () async {
-    final client = _PartlyAnswering([], answered: 4);
+    final client = PartlyAnsweringRelayClient([], answered: 4);
 
     await follow(client, bob);
 
@@ -109,7 +92,7 @@ void main() {
 
   test('a lagging relay cannot roll back a list published earlier', () async {
     final older = contactList([alice], age: const Duration(days: 30));
-    final client = _PartlyAnswering([older], answered: 4);
+    final client = PartlyAnsweringRelayClient([older], answered: 4);
 
     await follow(client, bob);
     expect(client.published, hasLength(1));
@@ -127,7 +110,7 @@ void main() {
   test(
     'a list published earlier that no relay returns is not dropped',
     () async {
-      final client = _PartlyAnswering([
+      final client = PartlyAnsweringRelayClient([
         contactList([alice], age: const Duration(days: 30)),
       ], answered: 4);
 
@@ -141,7 +124,7 @@ void main() {
   );
 
   test('once the relays catch up the next change goes through', () async {
-    final client = _PartlyAnswering([
+    final client = PartlyAnsweringRelayClient([
       contactList([alice], age: const Duration(days: 30)),
     ], answered: 4);
 
@@ -165,7 +148,7 @@ void main() {
       'is unknown while a relay that may hold it has not answered',
       () async {
         for (final answered in [0, 1, 2, 3]) {
-          final client = _PartlyAnswering([], answered: answered);
+          final client = PartlyAnsweringRelayClient([], answered: answered);
 
           expect(
             await shown(client),
@@ -177,11 +160,14 @@ void main() {
     );
 
     test('is empty only when every relay said there is none', () async {
-      expect(await shown(_PartlyAnswering([], answered: 4)), <String>[]);
+      expect(
+        await shown(PartlyAnsweringRelayClient([], answered: 4)),
+        <String>[],
+      );
     });
 
     test('is the list that was found, however few relays answered', () async {
-      final client = _PartlyAnswering([
+      final client = PartlyAnsweringRelayClient([
         contactList([alice], age: const Duration(days: 30)),
       ], answered: 1);
 

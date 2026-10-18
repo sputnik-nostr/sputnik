@@ -152,7 +152,7 @@ class RelayContactsRepository {
       pubkeyHex: pubkeyHex,
       relayUrls: relayUrls,
     );
-    if (!own.conclusive) return null;
+    if (!own.mostRelaysAnswered) return null;
 
     final known = _newestOwnContactList[pubkeyHex.toLowerCase()];
     final event = own.event;

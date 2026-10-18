@@ -148,7 +148,8 @@ class RelayQueryResult {
   bool get allRelaysAnswered =>
       queriedRelays > 0 && answeredRelays == queriedRelays;
 
-  /// Enough to trust an absence, since one dead relay must not block writes.
+  /// Enough to trust a copy that was found, since one dead relay must not block
+  /// writes. Not enough to trust an absence: that needs [allRelaysAnswered].
   bool get mostRelaysAnswered => answeredRelays * 2 > queriedRelays;
 }
 
