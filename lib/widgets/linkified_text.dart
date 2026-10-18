@@ -19,6 +19,10 @@ bool _hasHost(String url) => Uri.tryParse(url)?.host.isNotEmpty ?? false;
 const _maxMentionLookups = 20;
 const _maxMentionNameLength = 40;
 
+/// Each link is a gesture recognizer, and a screen reader's pass over a
+/// paragraph takes time in proportion to the square of how many it holds.
+const _maxLinks = 200;
+
 /// So a missing profile is not requested again on every scroll.
 final _lookedUp = BoundedSet<String>(2000);
 
@@ -67,9 +71,21 @@ class _LinkifiedTextState extends State<LinkifiedText> {
   List<_Link> _linksFor(String text) {
     if (_parsedText == text) return _links!;
     _parsedText = text;
-    return _links = [
-      for (final match in linkPattern.allMatches(text)) _linkFor(match),
-    ];
+    return _links = _linksIn(text);
+  }
+
+  /// The first [_maxLinks] links of [text]; the rest of it stays plain.
+  List<_Link> _linksIn(String text) {
+    final links = <_Link>[];
+    var tappable = 0;
+    for (final match in linkPattern.allMatches(text)) {
+      final link = _linkFor(match);
+      if (link.httpUrl != null || link.target != null) {
+        if (++tappable > _maxLinks) break;
+      }
+      links.add(link);
+    }
+    return links;
   }
 
   _Link _linkFor(RegExpMatch match) {
