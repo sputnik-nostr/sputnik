@@ -415,8 +415,13 @@ class _PostHeader extends StatelessWidget {
               RepostButton(note: reactionNote, showCount: false, size: 20),
               LikeButton(note: reactionNote, showCount: false, size: 20),
               BookmarkButton(note: note, size: 20),
-              if (note.pubkey.toLowerCase() == myPubkeyHex)
-                DeleteButton(note: note, size: 20, onDeleted: onDeleted),
+              ValueListenableBuilder<String?>(
+                valueListenable: activeIdentityPubkeyNotifier,
+                builder: (context, activePubkey, _) =>
+                    note.pubkey.toLowerCase() == activePubkey?.toLowerCase()
+                    ? DeleteButton(note: note, size: 20, onDeleted: onDeleted)
+                    : const SizedBox.shrink(),
+              ),
             ],
           ),
         ),

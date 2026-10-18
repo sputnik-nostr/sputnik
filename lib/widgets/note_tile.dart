@@ -34,9 +34,6 @@ class NoteTile extends StatelessWidget {
     final theme = Theme.of(context);
 
     final repostedByPubkey = note.repostedByPubkey;
-    final isOwnNote =
-        note.pubkey.toLowerCase() ==
-        activeIdentityPubkeyNotifier.value?.toLowerCase();
 
     return InkWell(
       onTap: () => _openPost(context),
@@ -112,30 +109,7 @@ class NoteTile extends StatelessWidget {
                         selectable: false,
                       ),
                       const SizedBox(height: 8),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            NoteActionButton(
-                              key: const Key('replyButton'),
-                              icon: Icons.chat_bubble_outline,
-                              count: note.replyCount,
-                              tooltip: 'Reply',
-                              onTap: () => openReplyComposer(context, note),
-                            ),
-                            const SizedBox(width: 20),
-                            RepostButton(note: note),
-                            const SizedBox(width: 20),
-                            LikeButton(note: note),
-                            const SizedBox(width: 20),
-                            BookmarkButton(note: note),
-                            if (isOwnNote) ...[
-                              const SizedBox(width: 20),
-                              DeleteButton(note: note),
-                            ],
-                          ],
-                        ),
-                      ),
+                      _NoteActions(note: note),
                     ],
                   ),
                 ),
@@ -144,6 +118,50 @@ class NoteTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Reply, repost, like, bookmark and, on the active identity's own notes,
+/// delete.
+class _NoteActions extends StatelessWidget {
+  const _NoteActions({required this.note});
+
+  final Note note;
+
+  @override
+  Widget build(BuildContext context) {
+    // Tiles outlive an identity switch, so what they offer has to follow it.
+    return ValueListenableBuilder<String?>(
+      valueListenable: activeIdentityPubkeyNotifier,
+      builder: (context, activePubkey, _) {
+        final isOwnNote =
+            note.pubkey.toLowerCase() == activePubkey?.toLowerCase();
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              NoteActionButton(
+                key: const Key('replyButton'),
+                icon: Icons.chat_bubble_outline,
+                count: note.replyCount,
+                tooltip: 'Reply',
+                onTap: () => openReplyComposer(context, note),
+              ),
+              const SizedBox(width: 20),
+              RepostButton(note: note),
+              const SizedBox(width: 20),
+              LikeButton(note: note),
+              const SizedBox(width: 20),
+              BookmarkButton(note: note),
+              if (isOwnNote) ...[
+                const SizedBox(width: 20),
+                DeleteButton(note: note),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }
