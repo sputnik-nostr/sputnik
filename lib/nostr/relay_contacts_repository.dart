@@ -21,12 +21,40 @@ void _noteContactList(String pubkeyHex, DateTime createdAt) {
   }
 }
 
-List<String> _followedPubkeys(NostrEvent event) {
+bool _isPTag(List<String> tag) => tag.length > 1 && tag[0] == 'p';
+
+List<String> _followedPubkeys(List<List<String>> tags) {
   return [
-    for (final tag in event.tags)
-      if (tag.length > 1 && tag[0] == 'p' && isHex(tag[1], 32))
-        tag[1].toLowerCase(),
+    for (final tag in tags)
+      if (_isPTag(tag) && isHex(tag[1], 32)) tag[1].toLowerCase(),
   ];
+}
+
+/// [tags] without the p tags of those unfollowed and with a bare p tag added
+/// for each new follow. Every other tag stays as it was, where it was.
+List<List<String>> _withFollowChanges(
+  List<List<String>> tags,
+  Map<String, bool> changes,
+) {
+  final unfollowed = {
+    for (final change in changes.entries)
+      if (!change.value) change.key.toLowerCase(),
+  };
+  final result = <List<String>>[];
+  final followed = <String>{};
+  for (final tag in tags) {
+    if (_isPTag(tag)) {
+      final pubkey = tag[1].toLowerCase();
+      if (unfollowed.contains(pubkey)) continue;
+      followed.add(pubkey);
+    }
+    result.add(tag);
+  }
+  for (final change in changes.entries) {
+    final pubkey = change.key.toLowerCase();
+    if (change.value && followed.add(pubkey)) result.add(['p', pubkey]);
+  }
+  return result;
 }
 
 class RelayContactsRepository {
@@ -57,7 +85,7 @@ class RelayContactsRepository {
       return result.allRelaysAnswered ? const <String>[] : null;
     }
 
-    return _followedPubkeys(own.first);
+    return _followedPubkeys(own.first.tags);
   }
 
   /// People whose current contact list includes [pubkeyHex].
@@ -136,13 +164,7 @@ class RelayContactsRepository {
     if (known != null && event.createdAt.isBefore(known)) return null;
     _noteContactList(pubkeyHex, event.createdAt);
 
-    return (
-      tags: [
-        for (final tag in event.tags)
-          if (tag.isNotEmpty && tag[0] == 'p') tag,
-      ],
-      event: event,
-    );
+    return (tags: event.tags, event: event);
   }
 
   /// Follow (true) or unfollow (false); NIP-02 republishes the whole list.
@@ -162,56 +184,31 @@ class RelayContactsRepository {
       );
     }
 
-    final desired = {
-      for (final tag in current.tags)
-        if (tag.length > 1) tag[1].toLowerCase(),
-    };
-    for (final change in changes.entries) {
-      final target = change.key.toLowerCase();
-      if (change.value) {
-        desired.add(target);
-      } else {
-        desired.remove(target);
-      }
-    }
-
+    final tags = _withFollowChanges(current.tags, changes);
     final results = await _publishFollowing(
       secretKey: secretKey,
       myPubkeyHex: myPubkeyHex,
-      currentTags: current.tags,
+      tags: tags,
       previous: current.event,
-      desiredFollowing: desired,
       relayUrls: relayUrls,
     );
-    return (results: results, following: desired);
+    return (results: results, following: _followedPubkeys(tags).toSet());
   }
 
   Future<Map<String, RelayPublishResult>> _publishFollowing({
     required SecretKey secretKey,
     required String myPubkeyHex,
-    required List<List<String>> currentTags,
+    required List<List<String>> tags,
     required NostrEvent? previous,
-    required Set<String> desiredFollowing,
     required Set<String> relayUrls,
   }) async {
-    final kept = [
-      for (final tag in currentTags)
-        if (tag.length > 1 && desiredFollowing.contains(tag[1].toLowerCase()))
-          tag,
-    ];
-    final keptPubkeys = {for (final tag in kept) tag[1].toLowerCase()};
-    final newTags = [
-      ...kept,
-      for (final pubkey in desiredFollowing)
-        if (!keptPubkeys.contains(pubkey)) ['p', pubkey],
-    ];
-
     final event = signEvent(
       secretKey: secretKey,
       pubkeyHex: myPubkeyHex,
       kind: 3,
-      tags: newTags,
-      content: '',
+      tags: tags,
+      // NIP-02 leaves it unused, but some clients keep their relays in it.
+      content: previous?.content ?? '',
       createdAt: nextReplaceableTime(previous),
     );
     final results = await client.publish(event, relayUrls);
