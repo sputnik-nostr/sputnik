@@ -380,7 +380,11 @@ class _PostHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              NoteContent(note: note, style: theme.textTheme.bodyMedium),
+              NoteContent(
+                note: note,
+                style: theme.textTheme.bodyMedium,
+                full: true,
+              ),
               const SizedBox(height: 16),
               Text(formatAbsoluteTime(note.createdAt), style: theme.metadata),
             ],

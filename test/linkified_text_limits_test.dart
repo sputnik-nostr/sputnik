@@ -215,6 +215,24 @@ void main() {
       expect(await shownWith(90), 'a' * 90);
     });
 
+    testWidgets('that the caller cut ends with an ellipsis too', (
+      tester,
+    ) async {
+      Future<void> pump({required bool truncated}) => tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: LinkifiedText('half a sentence', truncated: truncated),
+          ),
+        ),
+      );
+
+      await pump(truncated: false);
+      expect(_shown(tester), 'half a sentence');
+
+      await pump(truncated: true);
+      expect(_shown(tester), 'half a sentence...');
+    });
+
     testWidgets('is cut again when the text or the limit changes', (
       tester,
     ) async {

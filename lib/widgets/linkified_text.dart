@@ -47,6 +47,7 @@ class LinkifiedText extends StatefulWidget {
     this.selectable = true,
     this.maxLines,
     this.maxLength = maxNoteLength,
+    this.truncated = false,
   });
 
   final String text;
@@ -60,6 +61,10 @@ class LinkifiedText extends StatefulWidget {
 
   /// Cuts the text, and ends it with "...", past this many UTF-16 code units.
   final int maxLength;
+
+  /// Whether the caller has already cut [text] short, so that it ends with
+  /// "..." as well.
+  final bool truncated;
 
   @override
   State<LinkifiedText> createState() => _LinkifiedTextState();
@@ -77,7 +82,7 @@ class _LinkifiedTextState extends State<LinkifiedText> {
 
   void _parse() {
     _shown = truncateText(widget.text, widget.maxLength);
-    _cut = _shown.length < widget.text.length;
+    _cut = widget.truncated || _shown.length < widget.text.length;
     _links = _linksIn(_shown, cut: _cut);
   }
 
@@ -132,7 +137,8 @@ class _LinkifiedTextState extends State<LinkifiedText> {
   void didUpdateWidget(LinkifiedText oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.text != widget.text ||
-        oldWidget.maxLength != widget.maxLength) {
+        oldWidget.maxLength != widget.maxLength ||
+        oldWidget.truncated != widget.truncated) {
       _parse();
       _lookUpMentions();
     }

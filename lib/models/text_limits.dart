@@ -10,6 +10,12 @@ import 'package:flutter/widgets.dart' show CharacterRange;
 /// A note in a feed row, a quote or a thread.
 const maxNoteLength = 8000;
 
+/// A note on its own screen. It is laid out as one paragraph too, and the
+/// worst text takes up to four times as long when it is twice as long, so this
+/// is not much more than [maxNoteLength]: a post then costs at most about
+/// twice what a row does.
+const maxPostLength = 10000;
+
 /// [text] cut to at most [maxLength] code units, after a whole grapheme
 /// cluster: never inside a surrogate pair, nor between a letter and its
 /// accent. A cluster longer than [maxLength] is dropped whole.
