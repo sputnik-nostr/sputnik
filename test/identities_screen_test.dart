@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sputnik/app_state.dart';
 import 'package:sputnik/main.dart';
@@ -55,13 +56,17 @@ class _LockedIndexSecretStore extends FakeSecretStore {
 
 void main() {
   setUp(() {
-    IdentityStore.status.value = IdentityStatus.ready;
+    SharedPreferences.setMockInitialValues({});
+    IdentityStore.reset();
     // Without posts, HomeScreen's spinner keeps pumpAndSettle going forever.
     notesNotifier.value = const [];
+    followingNotesNotifier.value = const [];
     identitiesNotifier.value = const [];
     activeIdentityPubkeyNotifier.value = null;
     SettingsStore.secretStore = FakeSecretStore();
   });
+
+  tearDown(IdentityStore.reset);
 
   Future<void> openIdentitiesScreen(WidgetTester tester) async {
     await tester.pumpWidget(const MainApp());

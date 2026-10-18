@@ -9,20 +9,20 @@ import 'package:sputnik/models/identity_index.dart';
 import 'package:sputnik/services/settings_store.dart';
 
 import 'support/fake_secret_store.dart';
+import 'support/identity_storage.dart';
 import 'support/reported_errors.dart';
 
-// Refuses to store one identity's private key, like a locked keystore might.
-class _LockedSlotSecretStore extends FakeSecretStore {
-  _LockedSlotSecretStore(this._pubkeyHex);
+// Refuses to store one private key, under whatever name, like a locked
+// keystore might.
+class _LockedKeySecretStore extends FakeSecretStore {
+  _LockedKeySecretStore(this._privkeyHex, [super.initial]);
 
-  final String _pubkeyHex;
+  final String _privkeyHex;
   var locked = true;
 
   @override
   Future<void> write(String key, String value) {
-    if (locked && key == 'identity_secret_$_pubkeyHex') {
-      throw StateError('locked');
-    }
+    if (locked && value == _privkeyHex) throw StateError('locked');
     return super.write(key, value);
   }
 }
@@ -100,7 +100,7 @@ void main() {
     expect((await SettingsStore.loadIdentityIndex()).identities, isEmpty);
   });
 
-  test('each identity has its own private key slot', () async {
+  test('each identity keeps its own private key', () async {
     await SettingsStore.savePrivateKey('a' * 64, 'seckey-a');
     await SettingsStore.savePrivateKey('b' * 64, 'seckey-b');
 
@@ -109,50 +109,39 @@ void main() {
   });
 
   test(
-    'migrates a legacy identity whose private key was stored inline',
+    'moves a private key that was stored inline into an entry of its own',
     () async {
+      final held = newHeldIdentity();
       // The old format: privkeyHex inline in the identity index.
-      await SettingsStore.secretStore.write(
-        'identities',
-        jsonEncode([
-          {
-            'pubkeyHex': 'a' * 64,
-            'privkeyHex': 'legacy-secret',
-            'createdAt': DateTime(2024).millisecondsSinceEpoch,
-          },
-        ]),
-      );
+      SettingsStore.secretStore = FakeSecretStore(inlineStorage([held]));
 
       final identities = (await SettingsStore.loadIdentityIndex()).identities;
 
-      expect(identities, hasLength(1));
-      expect(identities.single.pubkeyHex, 'a' * 64);
-      expect(await SettingsStore.loadPrivateKey('a' * 64), 'legacy-secret');
+      expect(identities.map((i) => i.pubkeyHex), [held.pubkeyHex]);
+      expect(
+        await SettingsStore.loadPrivateKey(held.pubkeyHex),
+        held.privkeyHex,
+      );
 
       // No secret is left in the index, so it won't migrate again.
       final rewritten = await SettingsStore.secretStore.read('identities');
-      expect(rewritten, isNot(contains('legacy-secret')));
+      expect(rewritten, isNot(contains(held.privkeyHex)));
     },
   );
 
   test('a failed migration keeps the inline key in the index', () async {
-    final store = _LockedSlotSecretStore('b' * 64);
+    final a = newHeldIdentity();
+    final b = newHeldIdentity();
+    final store = _LockedKeySecretStore(b.privkeyHex, inlineStorage([a, b]));
     SettingsStore.secretStore = store;
-    await store.write(
-      'identities',
-      jsonEncode([
-        {'pubkeyHex': 'a' * 64, 'privkeyHex': 'secret-a', 'createdAt': 0},
-        {'pubkeyHex': 'b' * 64, 'privkeyHex': 'secret-b', 'createdAt': 0},
-      ]),
-    );
-
     final reported = captureReportedErrors();
 
     final identities = (await SettingsStore.loadIdentityIndex()).identities;
 
     expect(identities, hasLength(2));
-    expect(await SettingsStore.loadPrivateKey('a' * 64), 'secret-a');
-    expect(await store.read('identities'), contains('secret-b'));
+    expect(await SettingsStore.loadPrivateKey(a.pubkeyHex), a.privkeyHex);
+    expect(await store.read('identities'), contains(b.privkeyHex));
+    expect(await SettingsStore.loadPrivateKey(b.pubkeyHex), isNull);
     expect(reported, hasLength(1));
   });
 
@@ -164,10 +153,17 @@ void main() {
         {'pubkeyHex': 'a' * 64, 'privkeyHex': 'stale-secret', 'createdAt': 0},
       ]),
     );
+    final reported = captureReportedErrors();
 
     await SettingsStore.loadIdentityIndex();
 
+    // Which of the two is right is not for the migration to say: both stay.
     expect(await SettingsStore.loadPrivateKey('a' * 64), 'current-secret');
+    expect(
+      await SettingsStore.secretStore.read('identities'),
+      contains('stale-secret'),
+    );
+    expect(reported, hasLength(1));
   });
 
   group('changing the identity index', () {
@@ -294,38 +290,33 @@ void main() {
     });
   });
 
-  group('keys an older version stored inside the index', () {
-    final a = 'a' * 64;
-    final b = 'b' * 64;
+  group('a key an older version stored inside the index', () {
     final c = 'c' * 64;
+    late HeldIdentity a;
+    late HeldIdentity b;
 
-    Future<_LockedSlotSecretStore> lockedLegacyStore() async {
-      final store = _LockedSlotSecretStore(b);
+    _LockedKeySecretStore lockedLegacyStore() {
+      a = newHeldIdentity();
+      b = newHeldIdentity();
+      final store = _LockedKeySecretStore(b.privkeyHex, inlineStorage([a, b]));
       SettingsStore.secretStore = store;
-      await store.write(
-        'identities',
-        jsonEncode([
-          {'pubkeyHex': a, 'privkeyHex': 'secret-a', 'createdAt': 0},
-          {'pubkeyHex': b, 'privkeyHex': 'secret-b', 'createdAt': 0},
-        ]),
-      );
       return store;
     }
 
-    test('stay in the index through adding and removing identities', () async {
-      final store = await lockedLegacyStore();
+    test('stays in the index through adding and removing identities', () async {
+      final store = lockedLegacyStore();
       captureReportedErrors();
       await SettingsStore.loadIdentityIndex();
 
       await SettingsStore.addIdentity(_identity(c), 'secret-c');
-      await SettingsStore.removeIdentity(a);
+      await SettingsStore.removeIdentity(a.pubkeyHex);
 
-      expect(await store.read('identities'), contains('secret-b'));
-      expect(await SettingsStore.loadPrivateKey(b), isNull);
+      expect(await store.read('identities'), contains(b.privkeyHex));
+      expect(await SettingsStore.loadPrivateKey(b.pubkeyHex), isNull);
     });
 
-    test('are moved once their entry can be written', () async {
-      final store = await lockedLegacyStore();
+    test('is moved once its entry can be written', () async {
+      final store = lockedLegacyStore();
       captureReportedErrors();
       await SettingsStore.loadIdentityIndex();
       await SettingsStore.addIdentity(_identity(c), 'secret-c');
@@ -333,28 +324,28 @@ void main() {
       store.locked = false;
       await SettingsStore.loadIdentityIndex();
 
-      expect(await SettingsStore.loadPrivateKey(b), 'secret-b');
-      expect(await store.read('identities'), isNot(contains('secret-b')));
+      expect(await SettingsStore.loadPrivateKey(b.pubkeyHex), b.privkeyHex);
+      expect(await store.read('identities'), isNot(contains(b.privkeyHex)));
     });
 
-    test('are not lost with an entry that cannot be read', () async {
+    test('is not lost with an entry that cannot be read', () async {
       final store = SettingsStore.secretStore;
       final damaged = {
-        'pubkeyHex': b,
+        'pubkeyHex': 'b' * 64,
         'createdAt': '0',
         'privkeyHex': 'secret-b',
       };
       await store.write(
         'identities',
         jsonEncode([
-          {'pubkeyHex': a, 'createdAt': 0},
+          {'pubkeyHex': 'a' * 64, 'createdAt': 0},
           damaged,
         ]),
       );
 
       await SettingsStore.loadIdentityIndex();
       await SettingsStore.addIdentity(_identity(c), 'secret-c');
-      await SettingsStore.removeIdentity(a);
+      await SettingsStore.removeIdentity('a' * 64);
 
       final entries =
           (jsonDecode((await store.read('identities'))!)

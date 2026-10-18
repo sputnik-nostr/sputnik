@@ -48,11 +48,6 @@ Future<void> main() async {
     ),
     IdentityStore.load(),
     bindPersisted(
-      activeIdentityPubkeyNotifier,
-      SettingsStore.loadActiveIdentityPubkey,
-      SettingsStore.saveActiveIdentityPubkey,
-    ),
-    bindPersisted(
       loadProfileImagesNotifier,
       SettingsStore.loadLoadProfileImages,
       SettingsStore.saveLoadProfileImages,
