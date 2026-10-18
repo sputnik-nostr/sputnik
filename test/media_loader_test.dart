@@ -608,6 +608,24 @@ void main() {
       expect(got, 'https://blossom.example/$hash.png');
     });
 
+    test('skips a server with a port nothing could connect to', () async {
+      final log = <String>[];
+      final source = MediaSource(
+        url: primary,
+        sha256: hash,
+        serverLookup: () async => [
+          'https://big.example:99999999999999999999999',
+          'https://past.example:65536',
+          'https://blossom.example',
+        ],
+      );
+
+      final got = await source.fetch(attempts(log, failing: {primary}));
+
+      expect(got, 'https://blossom.example/$hash.png');
+      expect(log, [primary, got]);
+    });
+
     test('still asks the servers when the URL does not parse', () async {
       final log = <String>[];
       final source = MediaSource(

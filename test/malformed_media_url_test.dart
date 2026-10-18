@@ -50,7 +50,25 @@ Iterable<String> _shapes(String name) => [
   'https://a.example/x.png?q=$name#$name',
 ];
 
-final _hostileUrls = [for (final name in _badEscapes) ..._shapes(name)];
+/// Ports the parser lets through although no connection could use them. The
+/// last ones are too big for an int, so reading the port throws.
+const _badPorts = [
+  '65536',
+  '99999999999',
+  '9223372036854775807',
+  '9223372036854775808',
+  '99999999999999999999999',
+  '-1',
+];
+
+final _hostileUrls = [
+  for (final name in _badEscapes) ..._shapes(name),
+  for (final port in _badPorts) ...[
+    'https://a.example:$port',
+    'https://a.example:$port/x.png',
+    'https://a.example:$port/$_hash.png',
+  ],
+];
 
 final _png = Uint8List.fromList([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
 
@@ -61,6 +79,16 @@ final _consumers = <String, Object? Function(String url)>{
   'isFetchableUrl': (url) => isFetchableUrl(Uri.parse(url)),
   'blossomUrls': (url) =>
       blossomUrls(['https://b.example'], _hash, extensionOf(Uri.parse(url))),
+  'blossomUrls with the URL as a server': (url) =>
+      blossomUrls([url, 'https://b.example'], _hash, '.png'),
+  'blossomServersFromEvent': (url) => blossomServersFromEvent(
+    fakeEvent(
+      kind: 10063,
+      tags: [
+        ['server', url],
+      ],
+    ),
+  ),
   'noteMedia': (url) => noteMedia('look $url', const []),
   'noteMedia with imeta': (url) => noteMedia(url, [
     ['imeta', 'url $url', 'm image/jpeg', 'x $_hash', 'fallback $url'],
@@ -87,7 +115,7 @@ void main() {
           url: url,
           sha256: _hash,
           fallbackUrls: [url],
-          serverLookup: () async => ['https://blossom.example'],
+          serverLookup: () async => [url, 'https://blossom.example'],
         );
 
         await expectLater(
@@ -146,6 +174,15 @@ void main() {
         'https://b.example/%ED%A0%80.png',
         'https://c.example/ok.jpg',
       ]);
+    });
+
+    test('leaves a link with a port nothing could connect to as text', () {
+      for (final port in _badPorts) {
+        final content = 'look https://a.example:$port/x.png';
+
+        expect(noteMedia(content, const []), isEmpty, reason: port);
+        expect(nostrPostFromEvent(fakeEvent(content: content)).media, isEmpty);
+      }
     });
 
     test('takes a type from imeta when the name says nothing', () {

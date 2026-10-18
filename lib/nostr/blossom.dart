@@ -33,12 +33,28 @@ String extensionOf(Uri uri) {
   return _plainExtension.hasMatch(extension) ? extension : '';
 }
 
-/// Whether [uri] is one we would fetch: HTTPS, with a host and no credentials.
+/// Whether [uri] is one we would fetch: HTTPS, with a host, no credentials and
+/// a port a connection could use.
 bool isFetchableUrl(Uri? uri) {
   return uri != null &&
       uri.scheme == 'https' &&
       uri.host.isNotEmpty &&
-      uri.userInfo.isEmpty;
+      uri.userInfo.isEmpty &&
+      _hasUsablePort(uri);
+}
+
+/// Whether [uri] has no port, or one from 0 to 65535.
+///
+/// The parser accepts a port of any length, and reading one too big for an
+/// int throws, as would rebuilding or requesting the URL.
+bool _hasUsablePort(Uri uri) {
+  if (!uri.hasPort) return true;
+  try {
+    final port = uri.port;
+    return port >= 0 && port <= 65535;
+  } on FormatException {
+    return false;
+  }
 }
 
 /// [server]'s scheme, host and port alone, or null if it is not an HTTPS one.

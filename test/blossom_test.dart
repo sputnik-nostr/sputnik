@@ -86,6 +86,50 @@ void main() {
     );
   });
 
+  group('isFetchableUrl', () {
+    test('takes an https URL with a host, no credentials and a real port', () {
+      for (final url in [
+        'https://a.example',
+        'https://a.example/x.png',
+        'https://a.example:8443/x.png',
+        'https://a.example:65535',
+        'https://[2001:db8::1]:8443/x.png',
+      ]) {
+        expect(isFetchableUrl(Uri.parse(url)), isTrue, reason: url);
+      }
+    });
+
+    test('refuses other schemes, no host and credentials', () {
+      for (final url in [
+        'http://a.example/x.png',
+        'file:///x.png',
+        '//a.example/x.png',
+        'https:///x.png',
+        'https://u:p@a.example/x.png',
+      ]) {
+        expect(isFetchableUrl(Uri.parse(url)), isFalse, reason: url);
+      }
+      expect(isFetchableUrl(null), isFalse);
+    });
+
+    test('refuses a port no connection could use, without throwing', () {
+      for (final port in [
+        '65536',
+        '99999999999',
+        '9223372036854775807',
+        // Too big for an int, so that reading the port throws.
+        '9223372036854775808',
+        '99999999999999999999999',
+        '-1',
+      ]) {
+        final uri = Uri.tryParse('https://a.example:$port/x.png');
+
+        expect(() => isFetchableUrl(uri), returnsNormally, reason: port);
+        expect(isFetchableUrl(uri), isFalse, reason: port);
+      }
+    });
+  });
+
   group('blossomServersFromEvent', () {
     test('lists the https servers in order, as origins', () {
       final event = fakeEvent(
@@ -142,6 +186,20 @@ void main() {
       );
 
       expect(blossomServersFromEvent(event), ['https://ok.example']);
+    });
+
+    test('drops a server whose port nothing could connect to', () {
+      final event = fakeEvent(
+        kind: 10063,
+        tags: [
+          ['server', 'https://big.example:99999999999999999999999'],
+          ['server', 'https://past.example:65536'],
+          ['server', 'https://negative.example:-1'],
+          ['server', 'https://ok.example:8443'],
+        ],
+      );
+
+      expect(blossomServersFromEvent(event), ['https://ok.example:8443']);
     });
 
     test('lists a repeated server once and caps the list', () {
@@ -243,6 +301,22 @@ void main() {
         expect(blossomUrls([server], hash, '.png'), isEmpty, reason: hash);
       }
       expect(blossomUrls([server], _hash.toUpperCase(), ''), bare);
+    });
+
+    test('skips a server with an unusable port, and still asks the rest', () {
+      // Rebuilding a URL whose port is too big for an int throws.
+      expect(
+        blossomUrls(
+          [
+            'https://big.example:99999999999999999999999',
+            'https://past.example:65536',
+            'https://ok.example',
+          ],
+          _hash,
+          '.png',
+        ),
+        [Uri.parse('https://ok.example/$_hash.png')],
+      );
     });
 
     test('uses only the origin of a server, and skips what is not one', () {
