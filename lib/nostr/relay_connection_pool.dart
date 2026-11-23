@@ -7,7 +7,9 @@ import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../services/ssrf_guard.dart';
 import 'hex.dart';
+import 'inbound_guard_socket.dart';
 import 'models/nostr_event.dart';
 import 'models/nostr_filter.dart';
 import 'relay_message_parser.dart';
@@ -36,13 +38,34 @@ const _pingInterval = Duration(seconds: 20);
 const _firstCooldown = Duration(seconds: 5);
 const _maxCooldown = Duration(minutes: 2);
 
-/// Maximum message length; well above common relay event limits, so it will
-/// only be reached by abuse.
+/// Maximum message length, in bytes over all the frames of a message; well
+/// above common relay event limits, so it will only be reached by abuse.
 const _maxMessageLength = 1 << 20;
 
 /// Maximum length of text waiting to be parsed on one connection before its
 /// relay is counted as flooding.
-const _maxPendingParseLength = 32 << 20;
+@visibleForTesting
+int maxPendingParseLength = 32 << 20;
+
+/// Maximum number of messages waiting to be parsed on one connection. Each
+/// costs about a kilobyte of heap whatever its length, so the cap on text above
+/// doesn't bound a flood of tiny messages.
+@visibleForTesting
+int maxPendingMessages = 50000;
+
+/// Maximum number of `[` and `{` in the messages waiting to be parsed on one
+/// connection. Decoding takes up to about 250 bytes of heap for each, however
+/// short the text, so this bounds that heap to 128 MiB where the caps above
+/// would allow a hundred times the text they hold. It is what the full cap of
+/// text has at 64 bytes per opener; a follow list has one in 73.
+@visibleForTesting
+int maxPendingOpeners = 1 << 19;
+
+/// What dials a relay: the SSRF guard, which refuses private addresses. Tests
+/// that serve a relay on loopback replace it.
+@visibleForTesting
+Future<ConnectionTask<Socket>> Function(Uri, String?, int?)
+relayConnectionFactory = guardedConnectionFactory;
 
 class _RelayCoolingDown implements Exception {
   const _RelayCoolingDown();
@@ -148,7 +171,8 @@ class RelayQueryResult {
   bool get allRelaysAnswered =>
       queriedRelays > 0 && answeredRelays == queriedRelays;
 
-  /// Enough to trust an absence, since one dead relay must not block writes.
+  /// Enough to trust a copy that was found, since one dead relay must not block
+  /// writes. Not enough to trust an absence: that needs [allRelaysAnswered].
   bool get mostRelaysAnswered => answeredRelays * 2 > queriedRelays;
 }
 
@@ -224,6 +248,15 @@ class RelayConnectionPool {
         if (!relayUrls.contains(entry.key)) entry,
     ];
     await Future.wait(stale.map((entry) => _drop(entry.key, entry.value)));
+  }
+
+  /// Closes every connection and forgets every relay that failed, so that a
+  /// test starts with a pool nothing happened to. A relay is remembered by its
+  /// URL, and the system soon hands a freed port to the next server.
+  @visibleForTesting
+  Future<void> reset() async {
+    await retainOnly(const {});
+    _cooldowns.clear();
   }
 
   Future<({List<NostrEvent> events, bool eose})> _queryRelay(
@@ -342,15 +375,22 @@ class RelayConnectionPool {
 typedef _TrafficMark = ({int received, bool wasAlive});
 
 class _RelayConnection {
-  _RelayConnection(String relayUrl, {required this.onFlood})
-    : _channel = IOWebSocketChannel(
-        // Compression off, so a small frame can't inflate into a huge one.
-        WebSocket.connect(
-          relayUrl,
-          compression: CompressionOptions.compressionOff,
-          maxPayloadLength: _maxMessageLength,
-        ).then((socket) => socket..pingInterval = _pingInterval),
-      ) {
+  _RelayConnection(String relayUrl, {required this.onFlood}) {
+    _channel = IOWebSocketChannel(
+      // Compression off, so a small frame can't inflate into a huge one.
+      WebSocket.connect(
+        relayUrl,
+        compression: CompressionOptions.compressionOff,
+        maxPayloadLength: _maxMessageLength,
+        // Not dart:io's shared client: this one always dials through the SSRF
+        // guard, and watches the frames the relay sends.
+        customClient: inboundGuardedHttpClient(
+          connect: relayConnectionFactory,
+          maxMessageBytes: _maxMessageLength,
+          onViolation: (_) => _breakLimit(),
+        ),
+      ).then((socket) => socket..pingInterval = _pingInterval),
+    );
     ready = _channel.ready;
     _streamSubscription = _channel.stream.listen(
       _handleMessage,
@@ -359,7 +399,7 @@ class _RelayConnection {
     );
   }
 
-  final WebSocketChannel _channel;
+  late final WebSocketChannel _channel;
   final void Function(_RelayConnection connection) onFlood;
   late final Future<void> ready;
   late final StreamSubscription<dynamic> _streamSubscription;
@@ -371,6 +411,10 @@ class _RelayConnection {
   int _messagesReceived = 0;
   int _activeSubscriptions = 0;
   int _pendingParseLength = 0;
+  int _pendingMessages = 0;
+  int _pendingOpeners = 0;
+
+  /// Set once the relay broke a limit, and the connection is being dropped.
   bool flooded = false;
   final _subscriptionSlots = <Completer<void>>[];
 
@@ -384,17 +428,39 @@ class _RelayConnection {
   /// Nothing at all arrived since [mark], so the socket is likely dead.
   bool silentSince(_TrafficMark mark) => _messagesReceived == mark.received;
 
+  /// Drops the relay, so that a message the limits kept out is never followed
+  /// by an EOSE that vouches for a complete answer.
+  void _breakLimit() {
+    if (flooded || _closed) return;
+    flooded = true;
+    onFlood(this);
+  }
+
   /// Parses in parallel but handles in order, so EOSE can't beat events.
   void _handleMessage(dynamic raw) {
     _messagesReceived++;
-    // Fragmented messages can still exceed the per-frame cap.
-    if (raw is! String || raw.length > _maxMessageLength || _closed) return;
-    if (_pendingParseLength + raw.length > _maxPendingParseLength) {
-      flooded = true;
-      onFlood(this);
+    if (_closed) return;
+    // What the frame guard stops on the socket, for a connection it can't
+    // watch (through a proxy): the per-frame cap lets a fragmented message
+    // through, and a binary one is not Nostr.
+    if (raw is! String || raw.length > _maxMessageLength) {
+      _breakLimit();
       return;
     }
+    if (_pendingMessages >= maxPendingMessages ||
+        _pendingParseLength + raw.length > maxPendingParseLength) {
+      _breakLimit();
+      return;
+    }
+    final openers = countOpeners(raw);
+    if (openers > maxMessageOpeners ||
+        _pendingOpeners + openers > maxPendingOpeners) {
+      _breakLimit();
+      return;
+    }
+    _pendingMessages++;
     _pendingParseLength += raw.length;
+    _pendingOpeners += openers;
 
     final parsing = RelayMessageParser.instance
         .parse(raw, subscriptionIds: _handlers.keys.toSet())
@@ -416,9 +482,11 @@ class _RelayConnection {
       }
       _handlers[parsed.subscriptionId]?.call(parsed);
     });
-    _dispatchQueue = dispatched
-        .catchError((Object _) {})
-        .whenComplete(() => _pendingParseLength -= raw.length);
+    _dispatchQueue = dispatched.catchError((Object _) {}).whenComplete(() {
+      _pendingParseLength -= raw.length;
+      _pendingMessages--;
+      _pendingOpeners -= openers;
+    });
   }
 
   void _fail() {

@@ -84,7 +84,8 @@ void main() {
     await tester.pumpWidget(const MainApp());
     await tester.pumpAndSettle();
 
-    final name = tester.widget<Text>(find.text(hostileName).first);
+    // Only the first 100 code units of it reach the engine.
+    final name = tester.widget<Text>(find.text('${'A' * 100}...').first);
     expect(name.maxLines, 1);
     expect(name.overflow, TextOverflow.ellipsis);
   });

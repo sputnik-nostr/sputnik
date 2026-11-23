@@ -41,6 +41,8 @@ Future<List<Note>> hydratePosts(
   return applyReactionCounts(
     notes,
     await reactionsFuture,
+    // Read after the waits: the likers are everyone's, so what was fetched
+    // fits whichever identity is active by the time it arrives.
     myPubkeyHex: activeIdentityPubkeyNotifier.value,
   );
 }

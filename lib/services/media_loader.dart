@@ -30,20 +30,34 @@ String? fetchableUrlOrNull(String? url) =>
     url != null && isFetchableUrl(Uri.tryParse(url)) ? url : null;
 
 /// A profile picture or banner, held to the hash a Blossom URL names.
-MediaSource profileImageSource(String url) =>
-    MediaSource(url: url, sha256: blossomHash(Uri.parse(url)));
+MediaSource profileImageSource(String url) {
+  final uri = Uri.tryParse(url);
+  return MediaSource(url: url, sha256: uri == null ? null : blossomHash(uri));
+}
 
 /// Bounds the connections one host can hold open on the shared client.
 const _maxConnectionsPerHost = 6;
+
+/// Whether the proxy of the environment may carry an https request.
+///
+/// no_proxy exempts hosts one by one, so a URL without a host stands for all.
+bool _httpsMayUseProxy() =>
+    HttpClient.findProxyFromEnvironment(Uri(scheme: 'https')) != 'DIRECT';
 
 HttpClient Function() _sharedClientBuilder = guardedHttpClient;
 HttpClient? _sharedClient;
 
 /// Shared so a feed reuses connections; a download aborts only itself.
+///
+/// Behind a proxy it has no limit per host: HttpClient keeps the requests
+/// beyond the limit waiting for the proxy, and once the tunnels are made
+/// nothing starts them.
 HttpClient sharedImageClient() {
   return _sharedClient ??= _sharedClientBuilder()
     ..connectionTimeout = _connectTimeout
-    ..maxConnectionsPerHost = _maxConnectionsPerHost;
+    ..maxConnectionsPerHost = _httpsMayUseProxy()
+        ? null
+        : _maxConnectionsPerHost;
 }
 
 @visibleForTesting
@@ -315,7 +329,8 @@ class MediaSource {
       } catch (_) {
         // A failed lookup just leaves the earlier error to report.
       }
-      final extension = extensionOf(Uri.parse(url));
+      final original = Uri.tryParse(url);
+      final extension = original == null ? '' : extensionOf(original);
       for (final uri in blossomUrls(servers, hash, extension)) {
         final result = await tryUri(uri);
         if (result != null) return result.value;

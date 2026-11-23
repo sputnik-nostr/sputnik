@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../models/note.dart';
+import '../models/text_limits.dart';
 import '../nostr/http_urls.dart';
 import '../screens/post_screen.dart';
 import '../services/bounded_cache.dart';
@@ -9,6 +10,7 @@ import '../services/note_hydration.dart';
 import '../theme/app_text_styles.dart';
 import 'linkified_text.dart';
 import 'note_author_line.dart';
+import 'truncation_notice.dart';
 
 const _previewLines = 6;
 
@@ -135,8 +137,10 @@ class _Preview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final content = truncateText(note.content, maxNoteLength);
+    final truncated = content.length < note.content.length;
     // Media stays behind a tap on the full post.
-    final text = withoutUrls(note.content, {
+    final text = withoutUrls(content, {
       for (final media in note.media) media.url,
     });
 
@@ -151,8 +155,10 @@ class _Preview extends StatelessWidget {
             style: theme.textTheme.bodyMedium,
             selectable: false,
             maxLines: _previewLines,
+            truncated: truncated,
           ),
         ],
+        if (truncated) ...[const SizedBox(height: 6), const TruncationNotice()],
         if (note.media.isNotEmpty) ...[
           const SizedBox(height: 6),
           Text(

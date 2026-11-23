@@ -2,6 +2,8 @@ import '../nostr/nostr.dart';
 import 'note.dart';
 
 /// Applies counts, and whether [myPubkeyHex] reacted, where present.
+///
+/// The flags are that identity's alone, so the notes say whose they are.
 List<Note> applyReactionCounts(
   List<Note> notes,
   Map<String, PostReactions> reactionsByPostId, {
@@ -16,6 +18,7 @@ List<Note> applyReactionCounts(
       repostCount: reactions.repostCount,
       likedByMe: me != null && reactions.likerPubkeys.contains(me),
       repostedByMe: me != null && reactions.reposterPubkeys.contains(me),
+      reactionsOf: me,
     );
   }).toList();
 }

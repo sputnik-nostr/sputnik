@@ -26,7 +26,11 @@ class BookmarksScreen extends StatelessWidget {
         return ListView.separated(
           itemCount: notes.length,
           separatorBuilder: (_, _) => const Divider(height: 1),
-          itemBuilder: (context, index) => NoteTile(note: notes[index]),
+          // Bookmarks are never refreshed, so what a row remembers is all
+          // there is to show: keep it with its note when rows above it go.
+          findItemIndexCallback: (key) => indexOfNoteRow(notes, key),
+          itemBuilder: (context, index) =>
+              NoteTile(key: ValueKey(notes[index].id), note: notes[index]),
         );
       },
     );

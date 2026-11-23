@@ -19,8 +19,18 @@ class PostCursor {
   bool _loading = false;
   int _generation = 0;
 
-  /// Bumped by [first], so a load can tell whether a newer one replaced it.
+  /// Bumped by [first] and [invalidate], so a load can tell whether a newer
+  /// one replaced it.
   int get generation => _generation;
+
+  /// Forgets the position and drops loads in flight, so none of them lands.
+  ///
+  /// For a feed whose query changed under it, such as the identity it is for.
+  void invalidate() {
+    _generation++;
+    _next = null;
+    hasMore.value = false;
+  }
 
   /// Starts over from the newest post; null if a newer call replaced this one.
   Future<List<NostrPost>?> first() async {

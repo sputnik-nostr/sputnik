@@ -205,7 +205,11 @@ void main() {
       RelayPublishOutcome.accepted,
       ownReaction: myLike,
     );
-    final likedNote = note.copyWith(likeCount: 1, likedByMe: true);
+    final likedNote = note.copyWith(
+      likeCount: 1,
+      likedByMe: true,
+      reactionsOf: identity.pubkeyHex,
+    );
     RelayClient.instance = fakeClient;
     await pumpButton(tester, LikeButton(note: likedNote));
     expect(find.byIcon(Icons.favorite), findsOneWidget);
@@ -227,7 +231,11 @@ void main() {
     'change anything',
     (tester) async {
       final fakeClient = _FakeRelayClient(target, RelayPublishOutcome.accepted);
-      final likedNote = note.copyWith(likeCount: 1, likedByMe: true);
+      final likedNote = note.copyWith(
+        likeCount: 1,
+        likedByMe: true,
+        reactionsOf: identity.pubkeyHex,
+      );
       RelayClient.instance = fakeClient;
       await pumpButton(tester, LikeButton(note: likedNote));
 

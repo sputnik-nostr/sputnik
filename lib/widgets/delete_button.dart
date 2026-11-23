@@ -4,7 +4,8 @@ import '../models/note.dart';
 import '../services/reaction_actions.dart';
 import 'note_action_button.dart';
 
-/// Callers show this only on the active identity's own notes.
+/// Callers show this only on the active identity's own notes; [deleteNote]
+/// refuses any other, since the identity can change after this was built.
 class DeleteButton extends StatefulWidget {
   const DeleteButton({
     super.key,

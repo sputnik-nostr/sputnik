@@ -8,6 +8,7 @@ import '../models/identity.dart';
 import '../models/time_format.dart';
 import '../nostr/nostr.dart';
 import '../services/error_reporting.dart';
+import '../services/identity_store.dart';
 import '../services/publishing.dart';
 import '../services/settings_store.dart';
 import '../widgets/placeholder_tab.dart';
@@ -39,18 +40,10 @@ String _pubkeyHexOf(String seckeyHex) {
   }
 }
 
-Future<void> _addIdentity(String pubkeyHex, String privkeyHex) async {
-  // Save the secret first so an identity is never listed without one.
-  await SettingsStore.savePrivateKey(pubkeyHex, privkeyHex);
-  final identity = Identity(pubkeyHex: pubkeyHex, createdAt: DateTime.now());
-  identitiesNotifier.value = [...identitiesNotifier.value, identity];
-  activeIdentityPubkeyNotifier.value = identity.pubkeyHex;
-}
-
 Future<void> _generateIdentity(BuildContext context) async {
   try {
     final keyPair = generateNostrKeyPair();
-    await _addIdentity(keyPair.publicKeyHex, keyPair.privateKeyHex);
+    await IdentityStore.add(keyPair.publicKeyHex, keyPair.privateKeyHex);
   } catch (error, stack) {
     reportError('generating an identity', error, stack);
     if (context.mounted) {
@@ -142,7 +135,7 @@ Future<void> _importIdentity(BuildContext context) async {
   if (seckeyHex == null) return;
 
   try {
-    await _addIdentity(_pubkeyHexOf(seckeyHex), seckeyHex);
+    await IdentityStore.add(_pubkeyHexOf(seckeyHex), seckeyHex);
   } catch (error, stack) {
     reportError('importing an identity', error, stack);
     if (context.mounted) {
@@ -169,16 +162,32 @@ Future<void> _confirmDeleteIdentity(
   );
   if (!confirmed) return;
 
-  final remaining = identitiesNotifier.value
-      .where((i) => i.pubkeyHex != identity.pubkeyHex)
-      .toList();
-  identitiesNotifier.value = remaining;
-  if (activeIdentityPubkeyNotifier.value == identity.pubkeyHex) {
-    activeIdentityPubkeyNotifier.value = remaining.isEmpty
-        ? null
-        : remaining.first.pubkeyHex;
+  try {
+    await IdentityStore.remove(identity);
+    // After the removal, so an identity whose key could not be deleted keeps
+    // what was seen of its follow list.
+    forgetOwnContactList(identity.pubkeyHex);
+  } catch (error, stack) {
+    reportError('deleting an identity', error, stack);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not delete this key')),
+      );
+    }
   }
-  await SettingsStore.deletePrivateKey(identity.pubkeyHex);
+}
+
+Future<void> _restoreKey(BuildContext context, UnlistedKey key) async {
+  try {
+    await IdentityStore.restore(key);
+  } catch (error, stack) {
+    reportError('listing a stored key again', error, stack);
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not add this key')));
+    }
+  }
 }
 
 Future<void> _showNsec(BuildContext context, Identity identity) async {
@@ -248,64 +257,141 @@ class IdentitiesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Identities'),
-        actions: [
-          SizedBox(
-            width: kToolbarHeight,
-            child: Center(
-              child: IconButton(
-                key: const Key('importIdentityButton'),
-                icon: const Icon(Icons.key_outlined),
-                tooltip: 'Import private key',
-                onPressed: () => _importIdentity(context),
+    return ValueListenableBuilder<IdentityStatus>(
+      valueListenable: IdentityStore.status,
+      builder: (context, status, _) {
+        // Nothing is added or removed while the identities are unknown.
+        final ready = status == IdentityStatus.ready;
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Identities'),
+            actions: [
+              SizedBox(
+                width: kToolbarHeight,
+                child: Center(
+                  child: IconButton(
+                    key: const Key('importIdentityButton'),
+                    icon: const Icon(Icons.key_outlined),
+                    tooltip: 'Import private key',
+                    onPressed: ready ? () => _importIdentity(context) : null,
+                  ),
+                ),
               ),
-            ),
-          ),
-          SizedBox(
-            width: kToolbarHeight,
-            child: Center(
-              child: IconButton(
-                key: const Key('generateIdentityButton'),
-                icon: const Icon(Icons.add),
-                tooltip: 'Generate new key pair',
-                onPressed: () => _generateIdentity(context),
+              SizedBox(
+                width: kToolbarHeight,
+                child: Center(
+                  child: IconButton(
+                    key: const Key('generateIdentityButton'),
+                    icon: const Icon(Icons.add),
+                    tooltip: 'Generate new key pair',
+                    onPressed: ready ? () => _generateIdentity(context) : null,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-      body: ValueListenableBuilder<List<Identity>>(
-        valueListenable: identitiesNotifier,
-        builder: (context, identities, _) {
-          if (identities.isEmpty) {
-            return const PlaceholderTab(
-              icon: Icons.key_outlined,
-              label: 'No identities yet',
-            );
-          }
+          body: !ready
+              ? _IdentitiesUnavailable(
+                  retrying: status == IdentityStatus.loading,
+                )
+              : AnimatedBuilder(
+                  animation: Listenable.merge([
+                    identitiesNotifier,
+                    activeIdentityPubkeyNotifier,
+                    IdentityStore.unlisted,
+                  ]),
+                  builder: (context, _) {
+                    final identities = identitiesNotifier.value;
+                    final unlisted = IdentityStore.unlisted.value;
+                    if (identities.isEmpty && unlisted.isEmpty) {
+                      return const PlaceholderTab(
+                        icon: Icons.key_outlined,
+                        label: 'No identities yet',
+                      );
+                    }
 
-          return ValueListenableBuilder<String?>(
-            valueListenable: activeIdentityPubkeyNotifier,
-            builder: (context, activePubkey, _) {
-              return ListView(
-                children: [
-                  for (final identity in identities)
-                    _IdentityTile(
-                      identity: identity,
-                      active: identity.pubkeyHex == activePubkey,
-                      onSelect: () => activeIdentityPubkeyNotifier.value =
-                          identity.pubkeyHex,
-                      onShowNsec: () => _showNsec(context, identity),
-                      onDelete: () => _confirmDeleteIdentity(context, identity),
-                    ),
-                ],
-              );
-            },
-          );
-        },
+                    return ListView(
+                      children: [
+                        for (final identity in identities)
+                          _IdentityTile(
+                            identity: identity,
+                            active:
+                                identity.pubkeyHex ==
+                                activeIdentityPubkeyNotifier.value,
+                            onSelect: () => activeIdentityPubkeyNotifier.value =
+                                identity.pubkeyHex,
+                            onShowNsec: () => _showNsec(context, identity),
+                            onDelete: () =>
+                                _confirmDeleteIdentity(context, identity),
+                          ),
+                        for (final key in unlisted)
+                          _UnlistedKeyTile(
+                            pubkeyHex: key.pubkeyHex,
+                            onAdd: () => _restoreKey(context, key),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+        );
+      },
+    );
+  }
+}
+
+/// Shown instead of the list when the identities could not be read, so the
+/// empty screen is not mistaken for having none.
+class _IdentitiesUnavailable extends StatelessWidget {
+  const _IdentitiesUnavailable({required this.retrying});
+
+  final bool retrying;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const PlaceholderTab(
+              icon: Icons.lock_outline,
+              label: 'Could not read your identities',
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Secure storage could not be read, so identities cannot be '
+              'added or removed for now. Nothing has been deleted.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              key: const Key('retryIdentitiesButton'),
+              onPressed: retrying ? null : IdentityStore.load,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+/// A key found in secure storage that the list of identities does not have.
+class _UnlistedKeyTile extends StatelessWidget {
+  const _UnlistedKeyTile({required this.pubkeyHex, required this.onAdd});
+
+  final String pubkeyHex;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      key: ValueKey('unlisted-$pubkeyHex'),
+      leading: const Icon(Icons.help_outline),
+      title: Text(truncateNpub(npubFromHex(pubkeyHex))),
+      subtitle: const Text('Found on this device, but not in your list'),
+      trailing: TextButton(onPressed: onAdd, child: const Text('Add')),
     );
   }
 }

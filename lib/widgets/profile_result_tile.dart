@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/text_limits.dart';
 import '../nostr/nostr.dart';
 import '../screens/profile_screen.dart';
 import '../theme/app_text_styles.dart';
@@ -47,7 +48,7 @@ class ProfileResultTile extends StatelessWidget {
         fallback: const Icon(Icons.person_outline),
       ),
       title: Text(
-        displayName ?? truncateNpub(npub),
+        boundedName(displayName ?? truncateNpub(npub)),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: theme.avatarName,

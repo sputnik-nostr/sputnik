@@ -192,13 +192,16 @@ class _NotesList extends StatelessWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           itemCount: notes.length + (more ? 1 : 0),
           separatorBuilder: (_, _) => const Divider(height: 1),
+          // A refresh or a deletion shifts the rows; each keeps its note's
+          // state, such as a like that was just made.
+          findItemIndexCallback: (key) => indexOfNoteRow(notes, key),
           itemBuilder: (context, index) => index == notes.length
               // A new key per page, so the next is asked for if still in view.
               ? LoadMoreFooter(
                   key: ValueKey(notes.length),
                   onLoadMore: onLoadMore,
                 )
-              : NoteTile(note: notes[index]),
+              : NoteTile(key: ValueKey(notes[index].id), note: notes[index]),
         ),
       );
     }

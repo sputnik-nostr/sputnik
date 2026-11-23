@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../services/follow_confirmation.dart';
 import '../services/follow_sync.dart';
 import '../services/publishing.dart';
 
@@ -29,10 +30,10 @@ class FollowButton extends StatelessWidget {
       final confirmed = await confirmAction(
         context,
         title: follow ? 'Follow this person?' : 'Unfollow this person?',
-        message: follow
-            ? 'This publishes your updated follow list to your relays.'
-            : 'This removes them from your follow list, published to your '
-                  'relays.',
+        message: followListChangeMessage(
+          follow: follow,
+          listSize: loadedFollowingCount(),
+        ),
         action: follow ? 'Follow' : 'Unfollow',
       );
       if (!confirmed || !context.mounted) return;

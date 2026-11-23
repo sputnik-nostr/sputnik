@@ -20,6 +20,42 @@ String? _sanitizedOkMessage(Object? raw) {
 /// Events dated further ahead than this are dropped, to tolerate clock drift.
 const maxEventFutureSkew = Duration(hours: 1);
 
+/// Most `[` and `{` outside strings that one message may hold. Decoding costs
+/// heap per opener, not per byte (an empty map takes about 250 bytes for 3
+/// characters of text), so the cap on length alone lets a message grow nearly a
+/// hundredfold. The fullest legitimate message is a kind 3 with the 14,358
+/// follows that fit in the length cap, which has 14,361; relays store events
+/// far smaller.
+const maxMessageOpeners = 1 << 16;
+
+const _quote = 0x22;
+const _backslash = 0x5c;
+const _openBracket = 0x5b;
+const _openBrace = 0x7b;
+
+/// The number of `[` and `{` outside strings in [raw], counted in one pass that
+/// gives up once it is past [limit]. Brackets inside strings are text, which a
+/// note may be full of.
+int countOpeners(String raw, {int limit = maxMessageOpeners}) {
+  var openers = 0;
+  var inString = false;
+  for (var i = 0; i < raw.length; i++) {
+    final c = raw.codeUnitAt(i);
+    if (inString) {
+      if (c == _backslash) {
+        i++;
+      } else if (c == _quote) {
+        inString = false;
+      }
+    } else if (c == _quote) {
+      inString = true;
+    } else if ((c == _openBracket || c == _openBrace) && ++openers > limit) {
+      break;
+    }
+  }
+  return openers;
+}
+
 /// [event] is set for EVENT messages and [accepted] for OK messages.
 class ParsedRelayMessage {
   const ParsedRelayMessage({

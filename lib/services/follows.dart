@@ -2,10 +2,14 @@ import '../nostr/nostr.dart';
 import 'cache_store.dart';
 
 /// Cached while fresh; null when some relay may still hold a list.
+///
+/// With [own], the list is the user's, and what is found is kept as the newest
+/// seen, so that a change made later is not built on an older copy unasked.
 Future<List<String>?> loadFollowingOrNull(
   String pubkeyHex,
   Set<String> relayUrls, {
   bool force = false,
+  bool own = false,
 }) async {
   final cached = force ? null : CacheStore.freshFollowing(pubkeyHex);
   if (cached != null) return cached;
@@ -13,6 +17,7 @@ Future<List<String>?> loadFollowingOrNull(
   final following = await RelayContactsRepository().fetchFollowingOrNull(
     pubkeyHex,
     relayUrls,
+    remember: own,
   );
   if (following != null) {
     CacheStore.putFollowing(pubkeyHex, following);

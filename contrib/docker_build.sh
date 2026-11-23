@@ -22,7 +22,11 @@ flutter pub get --enforce-lockfile
 if [[ $mode == check ]]; then
     dart format --output=none --set-exit-if-changed .
     flutter analyze
+    contrib/tests/run.sh
     make test
+    # Bundles the libraries as the release does, and checks that they resolve.
+    flutter build linux --release
+    contrib/package_appimage.sh --appdir-only
     exit 0
 fi
 
@@ -35,8 +39,11 @@ for abi in armeabi-v7a arm64-v8a x86_64; do
     cp "build/app/outputs/flutter-apk/app-$abi-release.apk" \
         "/out/sputnik-$abi-unsigned.apk"
 done
-(cd /out && sha256sum sputnik-x86_64.AppImage sputnik-*-unsigned.apk >SHA256SUMS)
+# The release signs the APKs, so the hashes of these unsigned ones are of no use
+# for what is installed, only for comparing builds: they get a file of their own.
+(cd /out && sha256sum sputnik-x86_64.AppImage >SHA256SUMS)
+(cd /out && sha256sum sputnik-*-unsigned.apk >SHA256SUMS.unsigned)
 if [[ -n ${HOST_UID:-} ]]; then
     chown -R "$HOST_UID:${HOST_GID:-$HOST_UID}" /out
 fi
-cat /out/SHA256SUMS
+cat /out/SHA256SUMS /out/SHA256SUMS.unsigned
