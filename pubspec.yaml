@@ -25,7 +25,7 @@ dependencies:
   media_kit_libs_video: ^1.0.7
   path_provider: ^2.1.6
   file_selector: ^1.1.0
-  gal: ^2.3.3
+  gal: ^3.0.1
   flutter_blurhash: ^0.9.1
 
 dev_dependencies:
